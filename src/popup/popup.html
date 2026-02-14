@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WaveLink</title>
+  <link rel="stylesheet" href="../popup/styles/popup.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-brand">
+        <h1 class="header-title">WaveLink</h1>
+        <span class="header-subtitle">Salesforce Data Seeding</span>
+      </div>
+      <div id="connection-status" class="status-badge disconnected">
+        Disconnected
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Auth Section (shown when not connected) -->
+      <section id="auth-section" class="section">
+        <p class="section-description">Connect to a Salesforce org to get started.</p>
+        <div class="auth-buttons">
+          <button id="btn-login-prod" class="btn btn-primary">
+            Connect Production
+          </button>
+          <button id="btn-login-sandbox" class="btn btn-secondary">
+            Connect Sandbox
+          </button>
+        </div>
+      </section>
+
+      <!-- Connected Section (shown when connected) -->
+      <section id="connected-section" class="section hidden">
+        <!-- Org Info -->
+        <div class="org-info">
+          <div class="org-detail">
+            <span class="org-label">Org:</span>
+            <span id="org-name" class="org-value">—</span>
+          </div>
+          <div class="org-detail">
+            <span class="org-label">User:</span>
+            <span id="org-username" class="org-value">—</span>
+          </div>
+          <div class="org-detail">
+            <span class="org-label">Instance:</span>
+            <span id="org-instance" class="org-value">—</span>
+          </div>
+        </div>
+
+        <!-- Action Tabs -->
+        <nav class="tabs">
+          <button class="tab active" data-tab="push">Data Push</button>
+          <button class="tab" data-tab="templates">Templates</button>
+          <button class="tab" data-tab="history">History</button>
+        </nav>
+
+        <!-- Data Push Tab -->
+        <div id="tab-push" class="tab-content active">
+          <div class="form-group">
+            <label for="object-select">Target Object</label>
+            <select id="object-select" class="input">
+              <option value="">Select an object...</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="operation-select">Operation</label>
+            <select id="operation-select" class="input">
+              <option value="insert">Insert</option>
+              <option value="update">Update</option>
+              <option value="upsert">Upsert</option>
+              <option value="delete">Delete</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Data Source</label>
+            <div class="file-drop" id="file-drop-zone">
+              <p>Drop CSV/JSON file here or click to browse</p>
+              <input type="file" id="file-input" accept=".csv,.json" class="hidden">
+            </div>
+          </div>
+
+          <div id="data-preview" class="data-preview hidden">
+            <h3>Preview</h3>
+            <div id="preview-stats" class="preview-stats"></div>
+            <div id="preview-table-container" class="table-container"></div>
+          </div>
+
+          <div id="field-mapping-section" class="hidden">
+            <h3>Field Mapping</h3>
+            <div id="field-mappings" class="field-mappings"></div>
+          </div>
+
+          <button id="btn-push" class="btn btn-primary btn-full hidden" disabled>
+            Push Data
+          </button>
+        </div>
+
+        <!-- Templates Tab -->
+        <div id="tab-templates" class="tab-content hidden">
+          <div id="templates-list" class="templates-list">
+            <p class="empty-state">No saved templates yet.</p>
+          </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="tab-history" class="tab-content hidden">
+          <div id="history-list" class="history-list">
+            <p class="empty-state">No push history yet.</p>
+          </div>
+        </div>
+
+        <!-- Disconnect -->
+        <div class="section-footer">
+          <button id="btn-disconnect" class="btn btn-danger btn-small">
+            Disconnect
+          </button>
+        </div>
+      </section>
+
+      <!-- Progress Overlay -->
+      <div id="progress-overlay" class="progress-overlay hidden">
+        <div class="progress-card">
+          <h3>Pushing Data...</h3>
+          <div class="progress-bar">
+            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+          </div>
+          <div id="progress-stats" class="progress-stats">
+            0 / 0 records
+          </div>
+          <button id="btn-cancel-push" class="btn btn-secondary btn-small">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
