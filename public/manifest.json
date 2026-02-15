@@ -18,8 +18,7 @@
     "https://test.salesforce.com/*"
   ],
   "background": {
-    "service_worker": "background/index.js",
-    "type": "module"
+    "service_worker": "background/index.js"
   },
   "action": {
     "default_popup": "popup/popup.html",
