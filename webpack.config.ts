@@ -12,6 +12,7 @@ const config: Configuration = {
     background: path.resolve(__dirname, 'src/background/index.ts'),
     popup: path.resolve(__dirname, 'src/popup/index.ts'),
     content: path.resolve(__dirname, 'src/content/index.ts'),
+    app: path.resolve(__dirname, 'src/app/index.tsx'),
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -53,6 +54,11 @@ const config: Configuration = {
       template: path.resolve(__dirname, 'src/popup/popup.html'),
       filename: 'popup/popup.html',
       chunks: ['popup'],
+    }),
+    new HtmlWebpackPlugin({
+      template: path.resolve(__dirname, 'src/app/app.html'),
+      filename: 'app/app.html',
+      chunks: ['app'],
     }),
   ],
   optimization: {

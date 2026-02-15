@@ -17,6 +17,10 @@ export interface LocalStorageSchema {
   dataTemplates: DataTemplate[];
   /** Push operation history */
   pushHistory: PushHistoryEntry[];
+  /** Saved SOQL queries */
+  savedQueries: SavedQuery[];
+  /** UI settings for panel/app */
+  uiSettings: UiSettings;
 }
 
 /** Data stored in chrome.storage.session (ephemeral, cleared on browser close) */
@@ -34,6 +38,21 @@ export interface CachedSchema {
   data: unknown;
   cachedAt: number;
   ttl: number;
+}
+
+export interface SavedQuery {
+  id: string;
+  name: string;
+  soql: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface UiSettings {
+  panelWidth: number;
+  panelDock: 'right' | 'left';
+  panelPinned: boolean;
+  lastTabId?: number;
 }
 
 /** Saved data template for reusable data pushes */
