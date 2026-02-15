@@ -9,6 +9,8 @@ const storageMock: Record<string, Record<string, unknown>> = {
   session: {},
 };
 
+const cookiesMock: Array<{ name: string; value: string; domain: string }> = [];
+
 const chrome = {
   runtime: {
     sendMessage: jest.fn((_message: unknown, callback?: (response: unknown) => void) => {
@@ -83,6 +85,22 @@ const chrome = {
         return Promise.resolve();
       }),
     },
+  },
+  cookies: {
+    get: jest.fn((details: { url: string; name: string }) => {
+      const hostname = new URL(details.url).hostname;
+      const cookie = cookiesMock.find(c =>
+        c.name === details.name
+        && (hostname === c.domain.replace(/^\./, '') || hostname.endsWith(c.domain)),
+      );
+      return Promise.resolve(cookie ?? null);
+    }),
+    getAll: jest.fn((details: { name?: string }) => {
+      if (!details.name) {
+        return Promise.resolve(cookiesMock);
+      }
+      return Promise.resolve(cookiesMock.filter(c => c.name === details.name));
+    }),
   },
   tabs: {
     query: jest.fn((_queryInfo: unknown, callback: (tabs: unknown[]) => void) => {

@@ -21,15 +21,21 @@
 
     <!-- Main Content Area -->
     <main class="main-content">
+      <!-- Inspector UI Launcher -->
+      <section class="section">
+        <p class="section-description">Inspector-style tools.</p>
+        <div class="auth-buttons">
+          <button id="btn-open-app" class="btn btn-secondary">Open WaveLink App</button>
+          <button id="btn-toggle-panel" class="btn btn-secondary">Toggle Panel (Ctrl+Shift+L)</button>
+        </div>
+      </section>
+
       <!-- Auth Section (shown when not connected) -->
       <section id="auth-section" class="section">
-        <p class="section-description">Connect to a Salesforce org to get started.</p>
+        <p class="section-description">Open a logged-in Salesforce tab, then connect.</p>
         <div class="auth-buttons">
           <button id="btn-login-prod" class="btn btn-primary">
-            Connect Production
-          </button>
-          <button id="btn-login-sandbox" class="btn btn-secondary">
-            Connect Sandbox
+            Connect Current Salesforce Tab
           </button>
         </div>
       </section>

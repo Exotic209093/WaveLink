@@ -1,5 +1,4 @@
 export { SalesforceAuth } from './auth';
-export type { OAuthConfig, OAuthTokenResponse, OAuthUserInfo } from './auth';
 
 export { SalesforceApiClient } from './api-client';
 export type { ApiClientConfig, QueryResult, DescribeGlobalResult, DescribeGlobalSObject } from './api-client';

@@ -5,7 +5,7 @@
   "description": "Push and seed data into Salesforce orgs directly from your browser",
   "permissions": [
     "storage",
-    "identity",
+    "cookies",
     "activeTab",
     "tabs"
   ],
@@ -33,12 +33,22 @@
       "matches": [
         "https://*.salesforce.com/*",
         "https://*.force.com/*",
-        "https://*.lightning.force.com/*"
+        "https://*.lightning.force.com/*",
+        "https://*.my.salesforce.com/*"
       ],
       "js": ["content/index.js"],
       "run_at": "document_idle"
     }
   ],
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Toggle WaveLink panel"
+    }
+  },
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
