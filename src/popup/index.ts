@@ -15,8 +15,9 @@ const elements = {
   connectionStatus: document.getElementById('connection-status')!,
   authSection: document.getElementById('auth-section')!,
   connectedSection: document.getElementById('connected-section')!,
+  btnOpenApp: document.getElementById('btn-open-app')!,
+  btnTogglePanel: document.getElementById('btn-toggle-panel')!,
   btnLoginProd: document.getElementById('btn-login-prod')!,
-  btnLoginSandbox: document.getElementById('btn-login-sandbox')!,
   btnDisconnect: document.getElementById('btn-disconnect')!,
   orgName: document.getElementById('org-name')!,
   orgUsername: document.getElementById('org-username')!,
@@ -65,10 +66,10 @@ async function checkAuthStatus(): Promise<void> {
   }
 }
 
-async function handleLogin(environment: 'production' | 'sandbox'): Promise<void> {
+async function handleLogin(): Promise<void> {
   try {
-    setButtonLoading(environment === 'production' ? elements.btnLoginProd : elements.btnLoginSandbox, true);
-    const response = await messageBus.send('AUTH_INITIATE', { environment });
+    setButtonLoading(elements.btnLoginProd, true);
+    const response = await messageBus.send('AUTH_INITIATE', {});
     if (response.success) {
       await checkAuthStatus();
     } else {
@@ -78,7 +79,6 @@ async function handleLogin(environment: 'production' | 'sandbox'): Promise<void>
     alert(`Login failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   } finally {
     setButtonLoading(elements.btnLoginProd, false);
-    setButtonLoading(elements.btnLoginSandbox, false);
   }
 }
 
@@ -287,8 +287,18 @@ messageBus.on('DATA_PUSH_COMPLETE', async (message) => {
 // ── Event Listeners ──────────────────────────────────────────────────
 
 function setupEventListeners(): void {
-  elements.btnLoginProd.addEventListener('click', () => handleLogin('production'));
-  elements.btnLoginSandbox.addEventListener('click', () => handleLogin('sandbox'));
+  elements.btnOpenApp.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('app/app.html') });
+  });
+  elements.btnTogglePanel.addEventListener('click', async () => {
+    try {
+      await messageBus.send('PANEL_TOGGLE', {});
+    } catch {
+      // Ignore
+    }
+  });
+
+  elements.btnLoginProd.addEventListener('click', handleLogin);
   elements.btnDisconnect.addEventListener('click', handleDisconnect);
   elements.btnPush.addEventListener('click', handleDataPush);
 

@@ -66,4 +66,6 @@ export const STORAGE_KEYS = {
   PUSH_HISTORY: 'pushHistory',
   ACTIVE_TOKENS: 'activeTokens',
   ACTIVE_PUSHES: 'activePushes',
+  SAVED_QUERIES: 'savedQueries',
+  UI_SETTINGS: 'uiSettings',
 } as const;

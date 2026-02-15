@@ -5,7 +5,7 @@
 
 import { StorageError } from '../../core/errors';
 import { STORAGE_KEYS, MAX_PUSH_HISTORY } from '../../core/constants';
-import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry } from '../../core/types/storage';
+import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry, SavedQuery, UiSettings } from '../../core/types/storage';
 import type { SalesforceOrg } from '../../core/types/salesforce';
 
 /**
@@ -78,6 +78,55 @@ export class StorageService {
       history.length = MAX_PUSH_HISTORY;
     }
     await this.setLocal(STORAGE_KEYS.PUSH_HISTORY, history);
+  }
+
+  // ── Saved Queries ─────────────────────────────────────────────────
+
+  async getSavedQueries(): Promise<SavedQuery[]> {
+    return (await this.getLocal<SavedQuery[]>(STORAGE_KEYS.SAVED_QUERIES)) ?? [];
+  }
+
+  async upsertSavedQuery(query: Omit<SavedQuery, 'createdAt' | 'updatedAt'> & Partial<Pick<SavedQuery, 'createdAt' | 'updatedAt'>>): Promise<SavedQuery> {
+    const now = Date.now();
+    const queries = await this.getSavedQueries();
+    const idx = queries.findIndex(q => q.id === query.id);
+    const next: SavedQuery = {
+      id: query.id,
+      name: query.name,
+      soql: query.soql,
+      createdAt: query.createdAt ?? (idx >= 0 ? queries[idx].createdAt : now),
+      updatedAt: now,
+    };
+    if (idx >= 0) {
+      queries[idx] = next;
+    } else {
+      queries.unshift(next);
+    }
+    await this.setLocal(STORAGE_KEYS.SAVED_QUERIES, queries);
+    return next;
+  }
+
+  async deleteSavedQuery(id: string): Promise<void> {
+    const queries = await this.getSavedQueries();
+    await this.setLocal(STORAGE_KEYS.SAVED_QUERIES, queries.filter(q => q.id !== id));
+  }
+
+  // ── UI Settings ───────────────────────────────────────────────────
+
+  async getUiSettings(): Promise<UiSettings> {
+    const existing = await this.getLocal<UiSettings>(STORAGE_KEYS.UI_SETTINGS);
+    return existing ?? {
+      panelWidth: 420,
+      panelDock: 'right',
+      panelPinned: true,
+    };
+  }
+
+  async setUiSettings(patch: Partial<UiSettings>): Promise<UiSettings> {
+    const current = await this.getUiSettings();
+    const next: UiSettings = { ...current, ...patch };
+    await this.setLocal(STORAGE_KEYS.UI_SETTINGS, next);
+    return next;
   }
 
   // ── Data Templates ──────────────────────────────────────────────

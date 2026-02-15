@@ -28,7 +28,22 @@ export type MessageType =
   // Storage messages
   | 'STORAGE_GET'
   | 'STORAGE_SET'
-  | 'STORAGE_REMOVE';
+  | 'STORAGE_REMOVE'
+  // Salesforce Inspector-style messages
+  | 'SF_TABS_LIST'
+  | 'SF_CONTEXT_GET'
+  | 'SF_QUERY_RUN'
+  | 'SF_QUERY_MORE'
+  | 'SF_DESCRIBE_GLOBAL'
+  | 'SF_DESCRIBE_SOBJECT'
+  | 'SF_LIMITS_GET'
+  // UI control
+  | 'PANEL_TOGGLE'
+  | 'UI_SETTINGS_GET'
+  | 'UI_SETTINGS_SET'
+  | 'SAVED_QUERIES_LIST'
+  | 'SAVED_QUERIES_UPSERT'
+  | 'SAVED_QUERIES_DELETE';
 
 /** Base message shape */
 export interface ExtensionMessage<T extends MessageType = MessageType, P = unknown> {
@@ -40,7 +55,7 @@ export interface ExtensionMessage<T extends MessageType = MessageType, P = unkno
 }
 
 /** Where a message originates from */
-export type MessageSource = 'popup' | 'background' | 'content';
+export type MessageSource = 'popup' | 'background' | 'content' | 'app';
 
 /** Response wrapper */
 export interface MessageResponse<T = unknown> {
@@ -58,7 +73,7 @@ export interface MessageError {
 
 /** Auth message payloads */
 export interface AuthInitiatePayload {
-  environment: 'production' | 'sandbox';
+  environment?: 'production' | 'sandbox';
   loginUrl?: string;
 }
 
@@ -85,7 +100,8 @@ export interface OrgDetectPayload {
 
 /** Data push payloads */
 export interface DataPushStartPayload {
-  orgId: string;
+  orgId?: string;
+  tabId?: number;
   objectName: string;
   records: Record<string, unknown>[];
   operation: 'insert' | 'update' | 'upsert' | 'delete';
