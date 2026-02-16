@@ -1,6 +1,17 @@
 /**
  * Salesforce REST API client.
  * Provides typed methods for CRUD, Composite, and metadata operations.
+ *
+ * Why a dedicated client:
+ * - Centralizes URL construction, headers, and retry/backoff logic.
+ * - Provides typed response shapes for common Salesforce endpoints.
+ *
+ * Data types:
+ * - Most payloads are `Record<string, unknown>` to support arbitrary SObject field shapes.
+ *
+ * Complexity:
+ * - Individual request methods are O(1) JS work; dominant costs are network + JSON parsing.
+ * - Batch helpers (collectionCreate/update/delete) are O(N) in the batch size due to payload construction.
  */
 
 import { API_BASE_PATH, MAX_API_RETRIES, RETRY_BASE_DELAY_MS } from '../../core/constants';
@@ -53,8 +64,19 @@ export class SalesforceApiClient {
     return this.request<QueryResult<T>>(`/query?q=${encodedQuery}`);
   }
 
+  /** Execute a SOQL query against the Tooling API */
+  async toolingQuery<T = Record<string, unknown>>(soql: string): Promise<QueryResult<T>> {
+    const encodedQuery = encodeURIComponent(soql);
+    return this.request<QueryResult<T>>(`/tooling/query?q=${encodedQuery}`);
+  }
+
   /** Fetch next page of query results */
   async queryMore<T = Record<string, unknown>>(nextRecordsUrl: string): Promise<QueryResult<T>> {
+    return this.request<QueryResult<T>>(nextRecordsUrl, { useFullPath: true });
+  }
+
+  /** Fetch next page of Tooling API query results */
+  async toolingQueryMore<T = Record<string, unknown>>(nextRecordsUrl: string): Promise<QueryResult<T>> {
     return this.request<QueryResult<T>>(nextRecordsUrl, { useFullPath: true });
   }
 
@@ -107,10 +129,12 @@ export class SalesforceApiClient {
   async composite(
     subrequests: CompositeSubRequest[],
     allOrNone: boolean = false,
+    options: { signal?: AbortSignal } = {},
   ): Promise<CompositeResponse> {
     return this.request<CompositeResponse>('/composite', {
       method: 'POST',
       body: { allOrNone, compositeRequest: subrequests },
+      signal: options.signal,
     });
   }
 
@@ -119,6 +143,7 @@ export class SalesforceApiClient {
     objectName: string,
     records: Record<string, unknown>[],
     allOrNone: boolean = false,
+    options: { signal?: AbortSignal } = {},
   ): Promise<SalesforceRecordResult[]> {
     const body = records.map(r => ({
       attributes: { type: objectName },
@@ -127,6 +152,7 @@ export class SalesforceApiClient {
     return this.request<SalesforceRecordResult[]>('/composite/sobjects', {
       method: 'POST',
       body: { allOrNone, records: body },
+      signal: options.signal,
     });
   }
 
@@ -134,19 +160,25 @@ export class SalesforceApiClient {
   async collectionUpdate(
     records: Array<{ Id: string; [key: string]: unknown }>,
     allOrNone: boolean = false,
+    options: { signal?: AbortSignal } = {},
   ): Promise<SalesforceRecordResult[]> {
     return this.request<SalesforceRecordResult[]>('/composite/sobjects', {
       method: 'PATCH',
       body: { allOrNone, records },
+      signal: options.signal,
     });
   }
 
   /** Execute an SObject Collection delete (up to 200 IDs) */
-  async collectionDelete(ids: string[], allOrNone: boolean = false): Promise<SalesforceRecordResult[]> {
+  async collectionDelete(
+    ids: string[],
+    allOrNone: boolean = false,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<SalesforceRecordResult[]> {
     const idsParam = ids.join(',');
     return this.request<SalesforceRecordResult[]>(
       `/composite/sobjects?ids=${idsParam}&allOrNone=${allOrNone}`,
-      { method: 'DELETE' },
+      { method: 'DELETE', signal: options.signal },
     );
   }
 
@@ -173,7 +205,16 @@ export class SalesforceApiClient {
     path: string,
     options: RequestOptions = {},
   ): Promise<T> {
-    const { method = 'GET', body, useFullPath = false } = options;
+    /**
+     * Single place where we:
+     * - Construct an absolute URL from `{instanceUrl, apiVersion}`.
+     * - Attach `Authorization: Bearer <token>` and content headers.
+     * - Apply retry with exponential backoff for retryable errors.
+     *
+     * Complexity:
+     * - O(1) JS work per attempt; total attempts bounded by `MAX_API_RETRIES`.
+     */
+    const { method = 'GET', body, useFullPath = false, signal } = options;
 
     const url = useFullPath
       ? `${this.config.instanceUrl}${path}`
@@ -196,6 +237,7 @@ export class SalesforceApiClient {
             method,
             headers,
             body: body ? JSON.stringify(body) : undefined,
+            signal,
           });
         } catch (error) {
           throw new NetworkError(
@@ -240,6 +282,7 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
   useFullPath?: boolean;
+  signal?: AbortSignal;
 }
 
 export interface QueryResult<T> {

@@ -29,6 +29,8 @@ export interface SessionStorageSchema {
   activeTokens: Record<string, string>;
   /** In-progress push operations */
   activePushes: Record<string, ActivePush>;
+  /** Completed push results retained for the current browser session */
+  pushResults: Record<string, PushResult>;
 }
 
 /** Cached schema metadata with TTL */
@@ -93,12 +95,24 @@ export interface PushHistoryEntry {
   orgId: string;
   objectName: string;
   operation: 'insert' | 'update' | 'upsert' | 'delete';
+  strategy?: 'bulk' | 'rest';
+  externalIdField?: string;
   totalRecords: number;
   successCount: number;
   failureCount: number;
   startedAt: number;
   completedAt: number;
   errors?: Array<{ recordIndex: number; message: string }>;
+}
+
+/** Stored successful record IDs for a completed push (session scoped) */
+export interface PushResult {
+  pushId: string;
+  orgId: string;
+  objectName: string;
+  operation: 'insert' | 'update' | 'upsert' | 'delete';
+  ids: string[];
+  capturedAt: number;
 }
 
 /** In-progress push operation */

@@ -1,3 +1,13 @@
+/**
+ * Cleanser header bar.
+ *
+ * What this file does:
+ * - Displays dataset stats, summary, and blocking warnings.
+ * - Provides primary actions (upload/clear/apply/export/send to push).
+ *
+ * Complexity: O(1).
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 

@@ -1,3 +1,15 @@
+/**
+ * Object/field explorer screen.
+ *
+ * What this file does:
+ * - Uses `describeGlobal` to list objects and `describeSObject` to list fields.
+ * - Provides copy-to-clipboard for object/field API names and optional token insertion into a query editor.
+ *
+ * Complexity:
+ * - Filtering is O(O) where O is number of objects.
+ * - Field table render is O(F) where F is number of fields in the described object.
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
@@ -6,6 +18,11 @@ import type { SObjectDescribe } from '../../core/types/salesforce';
 import { Toast } from '../components/Toast';
 
 async function copyText(text: string): Promise<void> {
+  /**
+   * Copy helper with a fallback for browsers/environments where Clipboard API is unavailable.
+   *
+   * Complexity: O(N) in text length for the fallback DOM path.
+   */
   try {
     await navigator.clipboard.writeText(text);
   } catch {

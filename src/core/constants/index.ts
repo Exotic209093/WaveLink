@@ -1,3 +1,16 @@
+/**
+ * Core constants used across the extension.
+ *
+ * What this file does:
+ * - Defines stable defaults (API version, batch sizes, cache TTLs).
+ * - Centralizes storage keys used by `StorageService`.
+ *
+ * Why:
+ * - Keeps configuration in one place and makes behavior changes auditable.
+ *
+ * Complexity: O(1).
+ */
+
 import type { ApiVersion } from '../types/salesforce';
 
 /** Default Salesforce API version */
@@ -64,6 +77,7 @@ export const STORAGE_KEYS = {
   SCHEMA_CACHE: 'schemaCache',
   DATA_TEMPLATES: 'dataTemplates',
   PUSH_HISTORY: 'pushHistory',
+  PUSH_RESULTS: 'pushResults',
   ACTIVE_TOKENS: 'activeTokens',
   ACTIVE_PUSHES: 'activePushes',
   SAVED_QUERIES: 'savedQueries',

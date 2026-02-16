@@ -1,3 +1,15 @@
+/**
+ * Record utilities for rendering/export.
+ *
+ * What this file does:
+ * - Flattens nested objects into a single-level map for table display.
+ * - Derives columns from a sample of records.
+ *
+ * Complexity:
+ * - `flattenRecord` is O(K) in number of traversed keys.
+ * - `deriveColumns` is O(N*K) over the sampled records.
+ */
+
 export type FlatRecord = Record<string, string | number | boolean | null>;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -64,4 +76,3 @@ export function deriveColumns(records: Array<Record<string, unknown>>, limit: nu
   }
   return Array.from(cols);
 }
-

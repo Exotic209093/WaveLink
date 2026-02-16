@@ -22,6 +22,7 @@ export type MessageType =
   | 'DATA_PUSH_COMPLETE'
   | 'DATA_PUSH_ERROR'
   | 'DATA_PUSH_CANCEL'
+  | 'DATA_PUSH_RESULT_GET'
   // Schema messages
   | 'SCHEMA_DESCRIBE'
   | 'SCHEMA_DESCRIBE_SOBJECT'
@@ -34,6 +35,8 @@ export type MessageType =
   | 'SF_CONTEXT_GET'
   | 'SF_QUERY_RUN'
   | 'SF_QUERY_MORE'
+  | 'SF_TOOLING_QUERY_RUN'
+  | 'SF_TOOLING_QUERY_MORE'
   | 'SF_DESCRIBE_GLOBAL'
   | 'SF_DESCRIBE_SOBJECT'
   | 'SF_LIMITS_GET'
@@ -107,6 +110,8 @@ export interface DataPushStartPayload {
   operation: 'insert' | 'update' | 'upsert' | 'delete';
   externalIdField?: string;
   batchSize?: number;
+  /** REST only: max concurrent batch requests (1-4) */
+  threads?: number;
   useBulkApi?: boolean;
 }
 
@@ -116,6 +121,26 @@ export interface DataPushProgressPayload {
   processedRecords: number;
   failedRecords: number;
   status: 'processing' | 'complete' | 'error' | 'cancelled';
+}
+
+export interface DataPushCancelPayload {
+  pushId: string;
+}
+
+export interface DataPushCancelResponse {
+  cancelled: boolean;
+}
+
+export interface DataPushResultGetPayload {
+  pushId: string;
+}
+
+export interface DataPushResultGetResponse {
+  pushId: string;
+  objectName: string;
+  operation: 'insert' | 'update' | 'upsert' | 'delete';
+  ids: string[];
+  capturedAt: number;
 }
 
 /** Schema payloads */

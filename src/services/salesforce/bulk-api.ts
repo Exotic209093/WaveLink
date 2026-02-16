@@ -1,6 +1,16 @@
 /**
  * Salesforce Bulk API 2.0 service.
  * Handles high-volume data operations using the ingest API.
+ *
+ * Why a separate service:
+ * - Bulk API is a different protocol (job lifecycle + CSV upload + polling) than standard REST CRUD.
+ *
+ * Data types:
+ * - Upload format is CSV (`text/csv`); results are also returned as CSV and parsed into `BulkJobResult[]`.
+ *
+ * Complexity:
+ * - Polling is O(A) attempts (bounded) with O(1) work per attempt plus network.
+ * - CSV conversion/parsing is O(N * K) over records/fields.
  */
 
 import { API_BASE_PATH } from '../../core/constants';
@@ -124,8 +134,12 @@ export class BulkApiService {
     intervalMs: number = 5000,
     maxAttempts: number = 120,
     onProgress?: (job: BulkJob) => void,
+    abortSignal?: AbortSignal,
   ): Promise<BulkJob> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (abortSignal?.aborted) {
+        throw new Error('Cancelled');
+      }
       const job = await this.getJobStatus(jobId);
 
       if (onProgress) {

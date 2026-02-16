@@ -1,8 +1,27 @@
+/**
+ * Data push screen (full app).
+ *
+ * What this file does:
+ * - Loads a CSV/JSON dataset, optionally uses cleaned records from the Cleanser.
+ * - Auto-maps source headers to Salesforce fields (best-effort) using `DataMapper.autoMapFields`.
+ * - Applies transformations and validates against `describeSObject` metadata via `DataValidator`.
+ * - Starts a push job via background and listens for progress broadcasts.
+ *
+ * Why we split it this way:
+ * - Background owns auth + network + push orchestration.
+ * - UI owns mapping/validation decisions and showing the state machine to the user.
+ *
+ * Complexity:
+ * - Mapping/validation are O(N*M) and O(N*K) respectively (see DataMapper/DataValidator).
+ * - Rendering large tables can be expensive; we cap certain lists (e.g., 500 errors).
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import { Toast } from '../components/Toast';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { parseCsvFile, parseJsonFile } from '../utils/fileParse';
 import { DataMapper } from '../../data/mappers';
 import { DataValidator } from '../../data/validators';
@@ -10,6 +29,8 @@ import type { FieldMapping, TransformationType } from '../../core/types/storage'
 import type { SObjectField } from '../../core/types/salesforce';
 import { MessageBus } from '../../services/messaging';
 import { TRANSFORM_OPTIONS } from '../utils/transforms';
+import { validateIdFirst } from '../utils/pushGuards';
+import { clampBatchSize, clampThreads } from '../utils/pushOptions';
 
 type Strategy = 'auto' | 'rest' | 'bulk';
 
@@ -57,6 +78,9 @@ export function DataPushScreen(props: {
   const [operation, setOperation] = useState<'insert' | 'update' | 'upsert' | 'delete'>('insert');
   const [strategy, setStrategy] = useState<Strategy>('auto');
   const [externalIdField, setExternalIdField] = useState<string>('');
+  const [batchSize, setBatchSize] = useState<number>(200);
+  const [threads, setThreads] = useState<number>(1);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean }>>([]);
   const [describeFields, setDescribeFields] = useState<SObjectField[] | null>(null);
@@ -72,6 +96,7 @@ export function DataPushScreen(props: {
   const [validationErrors, setValidationErrors] = useState<Array<{ field: string; message: string; value?: unknown }> | null>(null);
 
   const [push, setPush] = useState<{ pushId: string; status: string; processed: number; failed: number; total: number; error?: string } | null>(null);
+  const [pushResult, setPushResult] = useState<{ ids: string[]; capturedAt: number } | null>(null);
   const busRef = useRef<MessageBus | null>(null);
 
   useEffect(() => {
@@ -91,7 +116,13 @@ export function DataPushScreen(props: {
       const data = message.payload as { pushId: string; totalRecords: number; processedRecords: number; failedRecords: number; status?: string };
       setPush(prev => {
         if (!prev || prev.pushId !== data.pushId) return prev;
-        return { ...prev, status: 'complete', processed: data.processedRecords, failed: data.failedRecords, total: data.totalRecords };
+        return {
+          ...prev,
+          status: data.status ?? 'complete',
+          processed: data.processedRecords,
+          failed: data.failedRecords,
+          total: data.totalRecords,
+        };
       });
       return { success: true, requestId: message.requestId };
     });
@@ -145,6 +176,16 @@ export function DataPushScreen(props: {
     });
     setMappings(next.length ? next : makeEmptyMappings(sourceHeaders));
   }, [dataset?.filename, describeFields, sourceHeaders.join('|')]);
+
+  // Ensure Id mapping is prefilled for update/delete when the source provides an Id column.
+  useEffect(() => {
+    if (!dataset) return;
+    if (operation !== 'update' && operation !== 'delete') return;
+    setMappings(prev => prev.map(m => {
+      if (String(m.sourceField).trim().toLowerCase() !== 'id') return m;
+      return { ...m, targetField: 'Id', required: true };
+    }));
+  }, [dataset?.filename, operation, sourceHeaders.join('|')]);
 
   const targetableFields = useMemo(() => {
     if (!describeFields) return [];
@@ -221,28 +262,69 @@ export function DataPushScreen(props: {
     }
   }
 
-  async function startPush(): Promise<void> {
-    if (!mappedRecords || !dataset) return;
-    if (validationErrors && validationErrors.length > 0) {
-      setToast({ title: 'Blocked', body: 'Fix validation errors before pushing.' });
-      return;
-    }
-
-    setBusy(true);
+  async function cancelActivePush(): Promise<void> {
+    if (!push || push.status !== 'processing') return;
     try {
-      const useBulkApi = strategy === 'auto' ? undefined : strategy === 'bulk';
-      const res = await sf.startDataPush({
-        tabId,
-        objectName,
-        operation,
-        records: mappedRecords,
-        externalIdField: operation === 'upsert' ? (externalIdField || undefined) : undefined,
-        useBulkApi,
-      });
-      setPush({ pushId: res.pushId, status: 'processing', processed: 0, failed: 0, total: mappedRecords.length });
-      setToast({ title: 'Push Started', body: `${res.strategy.toUpperCase()} - ${res.pushId}` });
+      setBusy(true);
+      await sf.cancelDataPush(push.pushId);
+      setToast({ title: 'Cancel Requested', body: push.pushId });
     } catch (e) {
-      setToast({ title: 'Push Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+      setToast({ title: 'Cancel Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadPushIds(): Promise<void> {
+    if (!push) return;
+    try {
+      setBusy(true);
+      const res = await sf.getDataPushResult(push.pushId);
+      if (!res) {
+        setToast({ title: 'No IDs Found', body: 'No stored IDs for this push (session-only retention).' });
+        setPushResult(null);
+        return;
+      }
+      setPushResult({ ids: res.ids, capturedAt: res.capturedAt });
+      setToast({ title: 'IDs Loaded', body: `${res.ids.length} IDs` });
+    } catch (e) {
+      setToast({ title: 'Load IDs Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function prepareDeletePushFromIds(): Promise<void> {
+    if (!push) return;
+    try {
+      setBusy(true);
+      const res = await sf.getDataPushResult(push.pushId);
+      if (!res) {
+        setToast({ title: 'No IDs Found', body: 'No stored IDs for this push (session-only retention).' });
+        return;
+      }
+      if (res.ids.length === 0) {
+        setToast({ title: 'No Successful IDs', body: 'This push did not store any successful record IDs.' });
+        return;
+      }
+
+      const records = res.ids.map(id => ({ Id: id }));
+      props.onDataset({
+        sourceRecords: records,
+        filename: `rollback-${push.pushId}.json`,
+        format: 'json',
+        headers: ['Id'],
+      });
+      setOperation('delete');
+      setStrategy('rest');
+      setExternalIdField('');
+      setMappings(makeEmptyMappings(['Id']));
+      setMappedRecords(records);
+      setMappingErrors(null);
+      setValidationErrors([]);
+      setToast({ title: 'Prepared Delete Push', body: `${records.length} IDs` });
+    } catch (e) {
+      setToast({ title: 'Prepare Failed', body: e instanceof Error ? e.message : 'Unknown error' });
     } finally {
       setBusy(false);
     }
@@ -250,6 +332,9 @@ export function DataPushScreen(props: {
 
   const hasDataset = !!dataset;
   const datasetTooLarge = hasDataset ? estimateTooLarge(datasetBytes, sourceRecords.length) : null;
+  const idFirstError = hasDataset ? validateIdFirst(sourceHeaders, operation) : null;
+  const isBlocked = !!datasetTooLarge || !!idFirstError;
+  const effectiveBatchSizeUi = operation === 'upsert' ? 25 : batchSize;
 
   return (
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -275,6 +360,12 @@ export function DataPushScreen(props: {
         </div>
 
         <div class="wl-row">
+          {idFirstError ? (
+            <div class="wl-bannerDanger">
+              {idFirstError} Fix it by reordering your dataset columns so the header row starts with "Id".
+            </div>
+          ) : null}
+
           <div class="wl-row2">
             <select class="wl-select" value={objectName} onChange={(e) => setObjectName((e.currentTarget as HTMLSelectElement).value)}>
               {availableObjects
@@ -310,6 +401,40 @@ export function DataPushScreen(props: {
             )}
           </div>
 
+          <div class="wl-row2">
+            <input
+              class="wl-input"
+              type="number"
+              min={1}
+              max={200}
+              disabled={operation === 'upsert'}
+              value={effectiveBatchSizeUi}
+              onInput={(e) => {
+                const n = parseInt((e.currentTarget as HTMLInputElement).value || '0', 10);
+                setBatchSize(clampBatchSize(n));
+              }}
+              placeholder="Batch size (REST)"
+              title={operation === 'upsert' ? 'Upsert uses 25 per request (Composite API limit).' : 'REST batch size (1-200).'}
+            />
+            <input
+              class="wl-input"
+              type="number"
+              min={1}
+              max={4}
+              value={threads}
+              onInput={(e) => {
+                const n = parseInt((e.currentTarget as HTMLInputElement).value || '0', 10);
+                setThreads(clampThreads(n));
+              }}
+              placeholder="Threads (REST)"
+              title="REST only: max concurrent batch requests (1-4)."
+            />
+          </div>
+
+          <div class="wl-muted">
+            REST only: batch size (1-200) and threads (1-4). Upsert uses 25 per request. Bulk ignores these settings.
+          </div>
+
           {props.cleanedRecords ? (
             <div class="wl-muted">Using cleaned records from Cleanser.</div>
           ) : null}
@@ -326,10 +451,14 @@ export function DataPushScreen(props: {
         <div class="wl-cardHeader">
           <h2>Mapping</h2>
           <div class="wl-actions">
-            <button class="wl-btn wl-btnPrimary" onClick={applyMapping} disabled={!hasDataset || !describeFields || !!datasetTooLarge}>Apply Mapping</button>
-            <button class="wl-btn" onClick={validate} disabled={!mappedRecords || !describeFields}>Validate</button>
-            <button class="wl-btn wl-btnPrimary" onClick={startPush} disabled={!mappedRecords || !!datasetTooLarge || (validationErrors !== null && validationErrors.length > 0) || busy}>
-              Push
+            <button class="wl-btn wl-btnPrimary" onClick={applyMapping} disabled={!hasDataset || !describeFields || isBlocked}>Apply Mapping</button>
+            <button class="wl-btn" onClick={validate} disabled={!mappedRecords || !describeFields || isBlocked}>Validate</button>
+            <button
+              class="wl-btn wl-btnPrimary"
+              onClick={() => setConfirmOpen(true)}
+              disabled={!mappedRecords || isBlocked || (validationErrors !== null && validationErrors.length > 0) || busy}
+            >
+              Review &amp; Push
             </button>
           </div>
         </div>
@@ -461,8 +590,105 @@ export function DataPushScreen(props: {
             <div class="wl-muted">{push.processed} / {push.total} processed - {push.failed} failed</div>
             {push.error ? <div class="wl-muted" style="color:var(--wl-danger)">{push.error}</div> : null}
           </div>
+          <div class="wl-row" style="gap:10px;flex-wrap:wrap">
+            {push.status === 'processing' ? (
+              <button class="wl-btn wl-btnDanger" disabled={busy} onClick={cancelActivePush}>Cancel Push</button>
+            ) : null}
+            {push.status === 'complete' ? (
+              <>
+                <button class="wl-btn" disabled={busy} onClick={loadPushIds}>View IDs</button>
+                <button class="wl-btn wl-btnPrimary" disabled={busy} onClick={prepareDeletePushFromIds}>Prepare Delete Push</button>
+              </>
+            ) : null}
+          </div>
+          {pushResult ? (
+            <div class="wl-row" style="flex-direction:column;gap:6px;align-items:flex-start">
+              <div class="wl-muted">Stored IDs: {pushResult.ids.length}</div>
+              {pushResult.ids.length > 0 ? (
+                <div class="wl-mono" style="max-width:100%;overflow:auto">
+                  {pushResult.ids.slice(0, 10).join('\n')}
+                  {pushResult.ids.length > 10 ? `\n... (${pushResult.ids.length - 10} more)` : ''}
+                </div>
+              ) : null}
+              <div class="wl-muted">Session-only: IDs are cleared when the browser closes.</div>
+            </div>
+          ) : null}
         </div>
       ) : null}
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Confirm Data Push"
+        busy={busy}
+        confirmDisabled={
+          !mappedRecords
+          || !dataset
+          || isBlocked
+          || (validationErrors !== null && validationErrors.length > 0)
+          || (operation === 'upsert' && !externalIdField)
+        }
+        confirmText="Start Push"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={async () => {
+          if (!mappedRecords || !dataset) return;
+          if (validationErrors && validationErrors.length > 0) {
+            setToast({ title: 'Blocked', body: 'Fix validation errors before pushing.' });
+            return;
+          }
+          if (idFirstError) {
+            setToast({ title: 'Blocked', body: idFirstError });
+            return;
+          }
+          if (operation === 'upsert' && !externalIdField) {
+            setToast({ title: 'Blocked', body: 'Select an external ID field for upsert.' });
+            return;
+          }
+
+          setBusy(true);
+          try {
+            const useBulkApi = strategy === 'auto' ? undefined : strategy === 'bulk';
+            const res = await sf.startDataPush({
+              tabId,
+              objectName,
+              operation,
+              records: mappedRecords,
+              externalIdField: operation === 'upsert' ? (externalIdField || undefined) : undefined,
+              batchSize: operation === 'upsert' ? undefined : clampBatchSize(batchSize),
+              threads: clampThreads(threads),
+              useBulkApi,
+            });
+            setConfirmOpen(false);
+            setPush({ pushId: res.pushId, status: 'processing', processed: 0, failed: 0, total: mappedRecords.length });
+            setPushResult(null);
+            setToast({ title: 'Push Started', body: `${res.strategy.toUpperCase()} - ${res.pushId}` });
+          } catch (e) {
+            setToast({ title: 'Push Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <div class="wl-chipRow">
+          <span class="wl-chip"><span style="font-weight:900">Object:</span> {objectName}</span>
+          <span class="wl-chip"><span style="font-weight:900">Op:</span> {operation}</span>
+          <span class="wl-chip"><span style="font-weight:900">Records:</span> {mappedRecords ? mappedRecords.length : 0}</span>
+          <span class="wl-chip"><span style="font-weight:900">Strategy:</span> {strategy.toUpperCase()}</span>
+          {operation === 'upsert' ? (
+            <span class="wl-chip"><span style="font-weight:900">External ID:</span> {externalIdField || '(not set)'}</span>
+          ) : null}
+          <span class="wl-chip"><span style="font-weight:900">Batch:</span> {operation === 'upsert' ? '25 (fixed)' : clampBatchSize(batchSize)}</span>
+          <span class="wl-chip"><span style="font-weight:900">Threads:</span> {clampThreads(threads)}</span>
+        </div>
+        {operation === 'upsert' ? (
+          <div class="wl-muted">Upsert requires an External ID field; upsert requests are sent in batches of 25 (Composite API limit).</div>
+        ) : null}
+        {(operation === 'update' || operation === 'delete') ? (
+          <div class="wl-muted">Update/Delete safety: the first dataset column header must be "Id".</div>
+        ) : null}
+        {strategy === 'bulk' ? (
+          <div class="wl-muted">Bulk strategy ignores batch size and threads settings.</div>
+        ) : null}
+      </ConfirmModal>
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </div>

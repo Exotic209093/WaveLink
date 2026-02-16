@@ -1,3 +1,16 @@
+/**
+ * In-page panel root (rendered into a shadow DOM by the content script).
+ *
+ * What this file does:
+ * - Provides a lightweight subset of the full app (query/objects/settings).
+ * - Resolves context without a tab selector because it always operates on the current page's Salesforce tab.
+ *
+ * Why:
+ * - "Inspector-style" panel lets users work without leaving Salesforce.
+ *
+ * Complexity: O(1) boot; individual screens determine their own complexity.
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
@@ -18,12 +31,14 @@ export function PanelRoot(props: { shadowRoot: ShadowRoot }): VNode {
   const [soql, setSoql] = useState<string>('SELECT Id, Name FROM Account LIMIT 10');
 
   useEffect(() => {
+    // Resolve Salesforce context for the current tab (no explicit tabId needed from content script).
     sf.getContext()
       .then(setContext)
       .catch(e => setToast({ title: 'Not Connected', body: e instanceof Error ? e.message : 'Open a logged-in Salesforce tab.' }));
   }, [sf]);
 
   async function openFullApp(): Promise<void> {
+    // Open the full app in a new tab. (Per-tab pinning is handled by the popup launcher.)
     const url = chrome.runtime.getURL('app/app.html');
     window.open(url, '_blank', 'noopener,noreferrer');
   }

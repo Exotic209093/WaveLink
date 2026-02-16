@@ -1,3 +1,12 @@
+/**
+ * Simple dismissible toast component.
+ *
+ * Why:
+ * - Background/network failures should surface to the user without blocking the whole UI.
+ *
+ * Complexity: O(1).
+ */
+
 import type { ComponentChildren, VNode } from 'preact';
 import { h } from 'preact';
 
@@ -12,4 +21,3 @@ export function Toast(props: { title: string; children?: ComponentChildren; onCl
     </div>
   );
 }
-

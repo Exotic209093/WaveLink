@@ -1,3 +1,18 @@
+/**
+ * SOQL query screen.
+ *
+ * What this file does:
+ * - Runs SOQL queries against the selected Salesforce tab/org.
+ * - Supports pagination (queryMore), exporting results (CSV/JSON), and saved queries.
+ *
+ * Why:
+ * - This is the fastest "Inspector-like" workflow for verifying data and troubleshooting pushes.
+ *
+ * Complexity:
+ * - Export/rendering is O(R*C) where R is result rows and C is selected columns.
+ * - Network/query time dominates for large result sets.
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';

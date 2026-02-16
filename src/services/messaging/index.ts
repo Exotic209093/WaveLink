@@ -2,6 +2,15 @@
  * Extension messaging bus.
  * Provides a typed, request/response messaging layer between
  * background, popup, and content scripts.
+ *
+ * Why a MessageBus abstraction:
+ * - Normalizes message shape (`requestId`, `timestamp`, `source`).
+ * - Supports request/response semantics with timeouts.
+ * - Allows each context (background/popup/content/app) to register handlers with type-safe message types.
+ *
+ * Complexity:
+ * - `send` / `sendToTab` are O(1) in JS work (plus extension messaging overhead).
+ * - `broadcast` is O(T) where T is the number of open tabs (we attempt to fan out to each tab).
  */
 
 import type {

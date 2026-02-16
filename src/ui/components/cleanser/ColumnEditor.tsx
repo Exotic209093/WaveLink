@@ -1,3 +1,13 @@
+/**
+ * Single-column editor for the cleanser.
+ *
+ * What this file does:
+ * - Lets the user rename, transform, or drop a column.
+ * - Shows before/after previews for a few sample values.
+ *
+ * Complexity: O(L) where L is number of sample values rendered (capped at 10).
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import type { ColumnOp } from '../../utils/cleanse';

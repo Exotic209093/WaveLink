@@ -1,3 +1,14 @@
+/**
+ * Validation UI for cleanser output.
+ *
+ * What this file does:
+ * - Lets the user choose an SObject + operation and run validation (performed in parent screen).
+ * - Groups and summarizes errors by field and supports exporting.
+ *
+ * Complexity:
+ * - Grouping errors is O(E) where E is number of errors.
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
@@ -178,4 +189,3 @@ export function ValidationPanel(props: {
     </div>
   );
 }
-

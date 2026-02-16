@@ -1,3 +1,9 @@
+/**
+ * Salesforce services barrel.
+ *
+ * Complexity: O(1).
+ */
+
 export { SalesforceAuth } from './auth';
 
 export { SalesforceApiClient } from './api-client';

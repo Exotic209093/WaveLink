@@ -1,6 +1,9 @@
 /**
  * Data template management.
  * Handles creation, storage, and application of reusable data push templates.
+ *
+ * Complexity:
+ * - `applyTemplate` is O(N*M) where N is records and M is fieldMappings.
  */
 
 import type { DataTemplate, FieldMapping } from '../../core/types/storage';
@@ -38,6 +41,7 @@ export function applyTemplate(
   template: DataTemplate,
   sourceRecords: Record<string, unknown>[],
 ): Record<string, unknown>[] {
+  // Time: O(N*M). Data: emits shallow-mapped records; does not transform types.
   return sourceRecords.map(source => {
     const mapped: Record<string, unknown> = {};
     for (const mapping of template.fieldMappings) {

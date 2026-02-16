@@ -1,21 +1,31 @@
+/**
+ * Shared CSS (as a string) for the full app and in-page panel.
+ *
+ * Why:
+ * - We inject the same style text into Document (app) and ShadowRoot (panel) for consistent visuals.
+ *
+ * Complexity: O(1).
+ */
+
 export const uiCss = `
 :host, :root {
-  --wl-font-sans: "Trebuchet MS", Verdana, sans-serif;
+  --wl-font-sans: "Aptos", "Segoe UI Variable Text", "Candara", "Trebuchet MS", Verdana, sans-serif;
   --wl-font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
 
-  --wl-ink: #151515;
-  --wl-ink-dim: rgba(21, 21, 21, 0.72);
-  --wl-paper: #fbfbf8;
-  --wl-paper-2: #f0f1ee;
-  --wl-line: rgba(21, 21, 21, 0.16);
-  --wl-line-2: rgba(21, 21, 21, 0.10);
+  --wl-ink: #072033;
+  --wl-ink-dim: rgba(7, 32, 51, 0.72);
+  --wl-paper: #f5fbff;
+  --wl-paper-2: #eaf4ff;
+  --wl-line: rgba(7, 32, 51, 0.18);
+  --wl-line-2: rgba(7, 32, 51, 0.10);
 
-  --wl-accent: #0b66ff;
-  --wl-accent-2: #16c79a;
-  --wl-danger: #d7263d;
+  --wl-accent: #00a6c8;
+  --wl-accent-2: #2de2c5;
+  --wl-danger: #ff3b5c;
+  --wl-glow: rgba(0, 166, 200, 0.22);
 
-  --wl-radius: 14px;
-  --wl-radius-sm: 10px;
+  --wl-radius: 16px;
+  --wl-radius-sm: 12px;
   --wl-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
 
   --wl-nav-w: 228px;
@@ -28,9 +38,12 @@ export const uiCss = `
   color: var(--wl-ink);
   min-height: 100vh;
   background:
-    radial-gradient(800px 400px at 15% 10%, rgba(11, 102, 255, 0.14), transparent 60%),
-    radial-gradient(700px 380px at 85% 18%, rgba(22, 199, 154, 0.16), transparent 60%),
-    linear-gradient(180deg, var(--wl-paper), #ffffff 60%);
+    radial-gradient(900px 520px at 10% 6%, rgba(0, 166, 200, 0.20), transparent 62%),
+    radial-gradient(780px 520px at 86% 14%, rgba(45, 226, 197, 0.16), transparent 62%),
+    radial-gradient(920px 620px at 60% 110%, rgba(4, 60, 82, 0.18), transparent 58%),
+    linear-gradient(180deg, var(--wl-paper), #ffffff 62%),
+    repeating-linear-gradient(135deg, rgba(0, 110, 140, 0.028) 0 2px, transparent 2px 10px);
+  animation: wl-pageIn 520ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 
 .wl-topbar {
@@ -43,7 +56,7 @@ export const uiCss = `
   gap: 12px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--wl-line-2);
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(10px);
 }
 
@@ -56,7 +69,7 @@ export const uiCss = `
 .wl-brand h1 {
   margin: 0;
   font-size: 18px;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.5px;
 }
 
 .wl-chip {
@@ -77,6 +90,38 @@ export const uiCss = `
   min-height: calc(100vh - 56px);
 }
 
+.wl-app[data-mode="app"] .wl-layout {
+  grid-template-columns: 1fr;
+}
+
+.wl-topNav {
+  position: sticky;
+  top: 56px;
+  z-index: 4;
+  display: flex;
+  gap: 8px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--wl-line-2);
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(10px);
+  overflow: auto;
+}
+
+.wl-topNavBtn {
+  border: 1px solid var(--wl-line-2);
+  background: rgba(255, 255, 255, 0.80);
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 12px;
+  color: var(--wl-ink-dim);
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease, border-color 160ms ease;
+  white-space: nowrap;
+}
+.wl-topNavBtn:hover { background: rgba(0, 166, 200, 0.08); color: var(--wl-ink); transform: translateY(-1px); border-color: rgba(0, 166, 200, 0.32); }
+.wl-topNavBtn[data-active="true"] { background: rgba(0, 166, 200, 0.14); color: var(--wl-ink); border-color: rgba(0, 166, 200, 0.32); }
+
 .wl-nav {
   padding: 14px;
   border-right: 1px solid var(--wl-line-2);
@@ -85,7 +130,7 @@ export const uiCss = `
 .wl-nav .wl-navCard {
   border: 1px solid var(--wl-line-2);
   border-radius: var(--wl-radius);
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
@@ -101,12 +146,13 @@ export const uiCss = `
   font-size: 13px;
   color: var(--wl-ink-dim);
   border-bottom: 1px solid var(--wl-line-2);
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
 .wl-navBtn:last-child { border-bottom: none; }
-.wl-navBtn:hover { background: rgba(11, 102, 255, 0.06); color: var(--wl-ink); }
+.wl-navBtn:hover { background: rgba(0, 166, 200, 0.07); color: var(--wl-ink); transform: translateX(2px); }
 .wl-navBtn[data-active="true"] {
-  background: rgba(11, 102, 255, 0.10);
+  background: rgba(0, 166, 200, 0.12);
   color: var(--wl-ink);
 }
 
@@ -120,6 +166,7 @@ export const uiCss = `
   background: rgba(255, 255, 255, 0.85);
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.06);
   overflow: hidden;
+  animation: wl-rise 420ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 
 .wl-cardHeader {
@@ -148,13 +195,20 @@ export const uiCss = `
   font-weight: 800;
   font-size: 12px;
   color: var(--wl-ink);
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
 }
-.wl-btn:hover { border-color: rgba(11, 102, 255, 0.45); }
+.wl-btn:hover { border-color: rgba(0, 166, 200, 0.55); transform: translateY(-1px); box-shadow: 0 10px 22px rgba(4, 60, 82, 0.10); }
+.wl-btn:active { transform: translateY(0px); box-shadow: none; }
 .wl-btnPrimary {
-  border-color: rgba(11, 102, 255, 0.50);
-  background: linear-gradient(135deg, rgba(11, 102, 255, 0.16), rgba(22, 199, 154, 0.12));
+  border-color: rgba(0, 166, 200, 0.55);
+  background: linear-gradient(135deg, rgba(0, 166, 200, 0.18), rgba(45, 226, 197, 0.14));
 }
-.wl-btnDanger { border-color: rgba(215, 38, 61, 0.55); }
+.wl-btnDanger { border-color: rgba(255, 59, 92, 0.55); }
+
+.wl-btn[data-active="true"] {
+  border-color: rgba(0, 166, 200, 0.55);
+  background: rgba(0, 166, 200, 0.10);
+}
 
 .wl-input, .wl-select, .wl-textarea {
   width: 100%;
@@ -168,8 +222,8 @@ export const uiCss = `
 }
 .wl-textarea { font-family: var(--wl-font-mono); min-height: 120px; resize: vertical; }
 .wl-input:focus, .wl-select:focus, .wl-textarea:focus {
-  border-color: rgba(11, 102, 255, 0.65);
-  box-shadow: 0 0 0 4px rgba(11, 102, 255, 0.12);
+  border-color: rgba(0, 166, 200, 0.70);
+  box-shadow: 0 0 0 4px var(--wl-glow);
 }
 
 .wl-row { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 14px; }
@@ -197,7 +251,7 @@ export const uiCss = `
   letter-spacing: 0.6px;
   color: var(--wl-ink-dim);
 }
-.wl-table tr:hover td { background: rgba(11, 102, 255, 0.035); }
+.wl-table tr:hover td { background: rgba(0, 166, 200, 0.040); }
 
 .wl-toast {
   position: fixed;
@@ -210,14 +264,47 @@ export const uiCss = `
   background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--wl-shadow);
   font-size: 13px;
+  animation: wl-toastIn 280ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 .wl-toastTitle { font-weight: 900; margin-bottom: 4px; }
 
 .wl-chipRow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 
+.wl-meter {
+  height: 10px;
+  width: 140px;
+  border-radius: 999px;
+  border: 1px solid var(--wl-line-2);
+  background: rgba(7, 32, 51, 0.04);
+  overflow: hidden;
+}
+.wl-meterFill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(0, 166, 200, 0.65), rgba(45, 226, 197, 0.55));
+}
+.wl-meterFillDanger {
+  background: linear-gradient(90deg, rgba(255, 59, 92, 0.72), rgba(255, 59, 92, 0.40));
+}
+
+.wl-modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 1000000;
+}
+
+.wl-modal {
+  width: min(720px, 100%);
+}
+
 .wl-bannerDanger {
-  border: 1px solid rgba(215, 38, 61, 0.55);
-  background: rgba(215, 38, 61, 0.08);
+  border: 1px solid rgba(255, 59, 92, 0.55);
+  background: rgba(255, 59, 92, 0.08);
   color: var(--wl-danger);
   padding: 10px 12px;
   border-radius: 12px;
@@ -269,7 +356,8 @@ export const uiCss = `
   cursor: pointer;
 }
 .wl-colRow:hover { background: rgba(11, 102, 255, 0.035); }
-.wl-colRowSelected { background: rgba(11, 102, 255, 0.10); }
+.wl-colRow:hover { background: rgba(0, 166, 200, 0.040); }
+.wl-colRowSelected { background: rgba(0, 166, 200, 0.12); }
 
 .wl-colRowLeft { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
 .wl-colNames { min-width: 0; }
@@ -318,7 +406,7 @@ export const uiCss = `
   right: 0;
   width: var(--wl-panel-w, 420px);
   transform: translateX(0%);
-  transition: transform 160ms ease;
+  transition: transform 220ms cubic-bezier(0.2, 0.9, 0.25, 1);
   z-index: 999999;
 }
 .wl-panelRoot[data-open="false"] { transform: translateX(calc(100% - 52px)); }
@@ -333,7 +421,9 @@ export const uiCss = `
   height: 44px;
   border-radius: 999px;
   border: 1px solid rgba(21,21,21,0.12);
-  background: rgba(255,255,255,0.92);
+  background:
+    radial-gradient(120px 80px at 30% 30%, rgba(0, 166, 200, 0.22), transparent 60%),
+    rgba(255,255,255,0.92);
   box-shadow: 0 10px 28px rgba(0,0,0,0.10);
   cursor: pointer;
   font-weight: 900;
@@ -356,4 +446,24 @@ export const uiCss = `
   font-weight: 800;
 }
 .wl-link:hover { text-decoration: underline; }
+
+@keyframes wl-pageIn {
+  from { opacity: 0; filter: saturate(0.9); }
+  to { opacity: 1; filter: saturate(1); }
+}
+
+@keyframes wl-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0px); }
+}
+
+@keyframes wl-toastIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-app, .wl-card, .wl-toast { animation: none !important; }
+  .wl-btn, .wl-navBtn, .wl-topNavBtn, .wl-panelRoot { transition: none !important; }
+}
 `;

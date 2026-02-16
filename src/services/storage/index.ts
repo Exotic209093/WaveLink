@@ -1,11 +1,23 @@
 /**
  * Chrome extension storage service.
  * Provides typed, safe access to chrome.storage.local and chrome.storage.session.
+ *
+ * Why a wrapper:
+ * - Centralizes key names and default shapes.
+ * - Converts chrome.storage errors into typed `StorageError`s with context.
+ *
+ * Data types:
+ * - local: persistent data such as org metadata, schema cache, history, UI settings.
+ * - session: ephemeral data such as active tokens (`activeTokens`).
+ *
+ * Complexity:
+ * - Most methods are O(1) in JS work, with I/O dominated by chrome.storage.
+ * - History operations are O(H) where H is the number of stored history entries (capped).
  */
 
 import { StorageError } from '../../core/errors';
 import { STORAGE_KEYS, MAX_PUSH_HISTORY } from '../../core/constants';
-import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry, SavedQuery, UiSettings } from '../../core/types/storage';
+import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry, PushResult, SavedQuery, UiSettings } from '../../core/types/storage';
 import type { SalesforceOrg } from '../../core/types/salesforce';
 
 /**
@@ -16,6 +28,7 @@ export class StorageService {
 
   /** Get all connected orgs */
   async getOrgs(): Promise<Record<string, SalesforceOrg>> {
+    // Time: O(1) JS work (storage I/O). Data: orgs keyed by `orgId`.
     const data = await this.getLocal<Record<string, SalesforceOrg>>(STORAGE_KEYS.ORGS);
     return data ?? {};
   }
@@ -72,6 +85,7 @@ export class StorageService {
 
   /** Add a push history entry (maintains max size) */
   async addPushHistory(entry: PushHistoryEntry): Promise<void> {
+    // Time: O(H) worst-case due to `unshift` + truncation; H is capped by MAX_PUSH_HISTORY.
     const history = await this.getPushHistory();
     history.unshift(entry);
     if (history.length > MAX_PUSH_HISTORY) {
@@ -200,6 +214,41 @@ export class StorageService {
   /** Clear session data */
   async clearSession(): Promise<void> {
     await chrome.storage.session.clear();
+  }
+
+  // -- Push Results (Session) -------------------------------------------------
+
+  /**
+   * Get a stored push result (session scoped).
+   * Returns null if not found (or if the session was cleared).
+   */
+  async getPushResult(pushId: string): Promise<PushResult | null> {
+    const all = (await this.getSession<Record<string, PushResult>>(STORAGE_KEYS.PUSH_RESULTS)) ?? {};
+    return all[pushId] ?? null;
+  }
+
+  /**
+   * Store a push result (session scoped) and evict older entries.
+   * We cap this to avoid excessive session storage growth.
+   */
+  async setPushResult(result: PushResult, maxEntries: number = 20): Promise<void> {
+    const all = (await this.getSession<Record<string, PushResult>>(STORAGE_KEYS.PUSH_RESULTS)) ?? {};
+    all[result.pushId] = result;
+
+    const entries = Object.values(all).sort((a, b) => b.capturedAt - a.capturedAt);
+    const kept = entries.slice(0, maxEntries);
+    const next: Record<string, PushResult> = {};
+    for (const e of kept) next[e.pushId] = e;
+
+    await this.setSession(STORAGE_KEYS.PUSH_RESULTS, next);
+  }
+
+  /** Remove a stored push result (session scoped). */
+  async removePushResult(pushId: string): Promise<void> {
+    const all = (await this.getSession<Record<string, PushResult>>(STORAGE_KEYS.PUSH_RESULTS)) ?? {};
+    if (!(pushId in all)) return;
+    delete all[pushId];
+    await this.setSession(STORAGE_KEYS.PUSH_RESULTS, all);
   }
 
   // ── Low-Level Helpers ───────────────────────────────────────────

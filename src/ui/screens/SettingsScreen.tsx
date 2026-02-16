@@ -1,3 +1,13 @@
+/**
+ * Settings screen for both app and panel.
+ *
+ * What this file does:
+ * - Reads/writes `UiSettings` via background (`UI_SETTINGS_GET/SET`).
+ * - Exposes panel layout options and some maintenance actions (clear saved queries).
+ *
+ * Complexity: O(1) per interaction (storage I/O dominates).
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
@@ -97,4 +107,3 @@ export function SettingsScreen(props: { sf: SfApi; mode: 'app' | 'panel' }): VNo
     </div>
   );
 }
-

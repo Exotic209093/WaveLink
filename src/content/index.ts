@@ -5,6 +5,14 @@
  * - Detect which org the user is currently in
  * - Extract org metadata from the page context
  * - Relay org info to the background service worker
+ *
+ * Also hosts the in-page WaveLink Panel (Inspector-style):
+ * - Mounted into a shadow DOM to avoid CSS collisions with Salesforce.
+ * - Toggled via background command (`PANEL_TOGGLE`).
+ *
+ * Complexity:
+ * - Org detection is O(1) DOM querying.
+ * - URL change detection uses a MutationObserver; callback work is O(1) per DOM mutation batch.
  */
 
 import { MessageBus } from '../services/messaging';
@@ -22,6 +30,14 @@ const messageBus = new MessageBus('content');
  * Detect Salesforce org information from the current page.
  */
 function detectSalesforceOrg(): OrgDetectPayload | null {
+  /**
+   * Create an `OrgDetectPayload` based on the current page and (best-effort) DOM extraction.
+   *
+   * Why best-effort:
+   * - Lightning pages differ by layout; we don't want failures here to break the extension.
+   *
+   * Complexity: O(1) with a handful of DOM queries.
+   */
   const url = window.location.href;
 
   if (!isSalesforceUrl(url)) {
@@ -55,6 +71,14 @@ function detectSalesforceOrg(): OrgDetectPayload | null {
  * Looks for common DOM patterns in Lightning Experience.
  */
 function extractOrgIdFromPage(): string | null {
+  /**
+   * Pull the Org ID from known Lightning patterns.
+   *
+   * Tradeoff:
+   * - We avoid injecting scripts or relying on private JS APIs; DOM-based extraction is less brittle.
+   *
+   * Complexity: O(1).
+   */
   // Method 1: Check for org ID in the aura framework context
   try {
     const auraConfig = document.querySelector('script[data-aura-config]');
@@ -83,6 +107,11 @@ function extractOrgIdFromPage(): string | null {
  * Attempt to extract the current username from the page.
  */
 function extractUsernameFromPage(): string | null {
+  /**
+   * Attempt to derive a human-friendly username from the page.
+   *
+   * Complexity: O(1).
+   */
   // Check for username in common Lightning elements
   const userNavItem = document.querySelector('.uiOutputText[data-aura-rendered-by]');
   if (userNavItem?.textContent) {
@@ -96,6 +125,14 @@ function extractUsernameFromPage(): string | null {
  * Send detected org info to the background service worker.
  */
 async function reportOrgDetection(): Promise<void> {
+  /**
+   * Notify background of org detection.
+   *
+   * Why:
+   * - Background can cache org metadata, coordinate UI, and run privileged operations.
+   *
+   * Complexity: O(1) (single message send).
+   */
   const orgInfo = detectSalesforceOrg();
   if (!orgInfo) return;
 
@@ -146,6 +183,14 @@ let resizeHandle: HTMLDivElement | null = null;
 let shadow: ShadowRoot | null = null;
 
 async function mountPanel(): Promise<void> {
+  /**
+   * Mount the in-page panel once, inside a shadow root.
+   *
+   * Why shadow DOM:
+   * - Salesforce pages have complex CSS; the panel must be isolated to stay stable.
+   *
+   * Complexity: O(1) DOM creation; rendering complexity is in Preact components.
+   */
   if (panelMounted) return;
   panelMounted = true;
 
@@ -203,6 +248,11 @@ async function mountPanel(): Promise<void> {
 }
 
 function setPanelOpen(next: boolean): void {
+  /**
+   * Toggle panel open/closed state by updating a data attribute used by CSS.
+   *
+   * Complexity: O(1).
+   */
   panelOpen = next;
   if (panelEl) {
     panelEl.dataset.open = String(panelOpen);
@@ -210,6 +260,13 @@ function setPanelOpen(next: boolean): void {
 }
 
 function wireResize(): void {
+  /**
+   * Wire pointer-driven resize behavior for the panel, and persist width to UI settings.
+   *
+   * Complexity:
+   * - Pointer move handler is O(1) per event.
+   * - Persisting is O(1) (single storage write).
+   */
   if (!panelEl || !resizeHandle) return;
   const sf = new SfApi('content');
 
