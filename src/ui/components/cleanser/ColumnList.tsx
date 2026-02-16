@@ -1,3 +1,13 @@
+/**
+ * Column list for the cleanser.
+ *
+ * What this file does:
+ * - Renders each source column with its current op state (rename, drop, transform).
+ * - Supports selection + drop toggles.
+ *
+ * Complexity: O(C) where C is `filteredSources.length`.
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import type { ColumnOp } from '../../utils/cleanse';

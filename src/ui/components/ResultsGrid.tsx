@@ -1,3 +1,14 @@
+/**
+ * Generic results table for displaying query results / record lists.
+ *
+ * What this file does:
+ * - Derives columns from provided rows.
+ * - Renders a simple table with some Salesforce-ID affordances.
+ *
+ * Complexity:
+ * - Rendering is roughly O(R*C) where R is rows and C is columns (typical for tables).
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
@@ -90,4 +101,3 @@ export function ResultsGrid(props: {
     </div>
   );
 }
-

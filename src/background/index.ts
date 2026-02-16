@@ -1,11 +1,21 @@
 /**
  * Background Service Worker - the heart of WaveLink.
  *
- * Runs as a Manifest V3 service worker. Handles:
+ * Runs as a Manifest V3 service worker. This is where all privileged extension work happens:
  * - Message routing between popup, content scripts, and services
  * - Salesforce authentication lifecycle
  * - Data push orchestration
  * - Schema caching
+ *
+ * Design notes:
+ * - We support two modes of "context":
+ *   1) Stored orgs (`orgId`) for legacy popup flows.
+ *   2) Per-tab Inspector-style auth (`tabId`) which derives a session token from cookies at request time.
+ * - Handlers are intentionally small and side-effect scoped; long-running pushes execute asynchronously and
+ *   report progress via broadcast messages.
+ *
+ * Complexity:
+ * - Most handlers are O(1) aside from operations that enumerate browser tabs (O(T)) or iterate record batches (O(N)).
  */
 
 import { MessageBus } from '../services/messaging';
@@ -13,15 +23,15 @@ import { StorageService } from '../services/storage';
 import { SalesforceAuth } from '../services/salesforce/auth';
 import { SalesforceApiClient } from '../services/salesforce/api-client';
 import { BulkApiService } from '../services/salesforce/bulk-api';
+import { buildUpsertSubrequests, parseUpsertCompositeResponse } from '../services/salesforce/composite-upsert';
 import { DataMapper } from '../data/mappers';
 import { DataValidator } from '../data/validators';
-import { DEFAULT_API_VERSION, DEFAULT_BATCH_SIZE, BULK_API_THRESHOLD, SCHEMA_CACHE_TTL } from '../core/constants';
+import { API_BASE_PATH, DEFAULT_API_VERSION, DEFAULT_BATCH_SIZE, BULK_API_THRESHOLD, MAX_COMPOSITE_BATCH_SIZE, SCHEMA_CACHE_TTL } from '../core/constants';
 import { generateId } from '../core/utils';
-import { chunkArray } from '../core/utils';
 import { isSalesforceUrl } from '../core/utils';
 import type { MessageResponse } from '../core/types/messaging';
 import type { SalesforceOrg, SObjectDescribe } from '../core/types/salesforce';
-import type { PushHistoryEntry } from '../core/types/storage';
+import type { PushHistoryEntry, PushResult } from '../core/types/storage';
 
 // ── Service Instances ────────────────────────────────────────────────
 
@@ -31,6 +41,9 @@ const dataMapper = new DataMapper();
 const dataValidator = new DataValidator();
 
 const auth = new SalesforceAuth();
+
+// In-memory registry for cancellation; cleared when the MV3 service worker is restarted.
+const activePushes = new Map<string, { abortController: AbortController }>();
 
 // ── Auth Handlers ────────────────────────────────────────────────────
 
@@ -128,6 +141,18 @@ messageBus.on('AUTH_LOGOUT', async (message): Promise<MessageResponse> => {
 // ── Inspector-Style Salesforce Handlers ──────────────────────────────
 
 function getTargetTabId(payload: unknown, sender: chrome.runtime.MessageSender): number {
+  /**
+   * Resolve the target Salesforce tab for Inspector-style operations.
+   *
+   * Why:
+   * - The full-page app explicitly passes `tabId`.
+   * - Content-script initiated requests can rely on `sender.tab`.
+   *
+   * Data types:
+   * - `payload` is unknown at runtime; we treat it as `{ tabId?: number } | null` and validate.
+   *
+   * Complexity: O(1).
+   */
   const maybePayload = payload as { tabId?: number } | null;
   const tabId = maybePayload?.tabId ?? sender.tab?.id;
   if (!tabId) {
@@ -137,6 +162,16 @@ function getTargetTabId(payload: unknown, sender: chrome.runtime.MessageSender):
 }
 
 async function resolveSfOrg(payload: unknown, sender: chrome.runtime.MessageSender): Promise<SalesforceOrg> {
+  /**
+   * Derive a valid `SalesforceOrg` (instanceUrl + accessToken + identity) for a specific Salesforce tab.
+   *
+   * Why this approach:
+   * - We avoid OAuth and instead reuse the existing Salesforce browser session (Inspector-style).
+   * - Tokens can change; we "ensureValidToken" by re-reading cookies when needed.
+   *
+   * Complexity:
+   * - Dominated by network validation calls performed inside auth, so "O(1)" in terms of JS data structures.
+   */
   const tabId = getTargetTabId(payload, sender);
   const org = await auth.loginForTab(tabId);
   // Refresh from cookies if needed (also validates session).
@@ -145,6 +180,14 @@ async function resolveSfOrg(payload: unknown, sender: chrome.runtime.MessageSend
 
 messageBus.on('SF_TABS_LIST', async (message): Promise<MessageResponse> => {
   try {
+    /**
+     * List all open Salesforce tabs for the full-page app selector.
+     *
+     * Data types:
+     * - Returns `{ tabs: Array<{ tabId: number; title?: string; url: string; hostname: string }> }`.
+     *
+     * Complexity: O(T) where T is the number of open tabs in the browser.
+     */
     const tabs = await chrome.tabs.query({});
     const sfTabs = tabs
       .filter(t => typeof t.url === 'string' && isSalesforceUrl(t.url))
@@ -170,9 +213,20 @@ messageBus.on('SF_TABS_LIST', async (message): Promise<MessageResponse> => {
 
 messageBus.on('SF_CONTEXT_GET', async (message, sender): Promise<MessageResponse> => {
   try {
+    /**
+     * Resolve org context for a given tab.
+     *
+     * Why:
+     * - UI needs identity + instanceUrl to label the org and build API requests.
+     * - We gate persistence of `lastTabId` to the full-page app so the popup doesn't fight per-tab selection.
+     *
+     * Complexity: O(1) in JS terms (auth may do network validation).
+     */
     const org = await resolveSfOrg(message.payload, sender);
     const tabId = (message.payload as { tabId?: number } | null)?.tabId ?? sender.tab?.id;
-    if (tabId) {
+    // Only persist the user's last selected tab from the full app.
+    // The popup should not influence per-app-tab selection.
+    if (tabId && message.source === 'app') {
       await storage.setUiSettings({ lastTabId: tabId });
     }
     return {
@@ -230,6 +284,46 @@ messageBus.on('SF_QUERY_MORE', async (message, sender): Promise<MessageResponse>
     return {
       success: false,
       error: { code: 'SF_QUERY_MORE_ERROR', message: error instanceof Error ? error.message : 'QueryMore failed' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('SF_TOOLING_QUERY_RUN', async (message, sender): Promise<MessageResponse> => {
+  try {
+    const { soql } = message.payload as { soql: string };
+    const org = await resolveSfOrg(message.payload, sender);
+    const client = new SalesforceApiClient({
+      instanceUrl: org.instanceUrl,
+      accessToken: org.accessToken,
+      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
+    });
+    const result = await client.toolingQuery(soql);
+    return { success: true, data: result, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'SF_TOOLING_QUERY_ERROR', message: error instanceof Error ? error.message : 'Tooling query failed' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('SF_TOOLING_QUERY_MORE', async (message, sender): Promise<MessageResponse> => {
+  try {
+    const { nextRecordsUrl } = message.payload as { nextRecordsUrl: string };
+    const org = await resolveSfOrg(message.payload, sender);
+    const client = new SalesforceApiClient({
+      instanceUrl: org.instanceUrl,
+      accessToken: org.accessToken,
+      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
+    });
+    const result = await client.toolingQueryMore(nextRecordsUrl);
+    return { success: true, data: result, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'SF_TOOLING_QUERY_MORE_ERROR', message: error instanceof Error ? error.message : 'Tooling queryMore failed' },
       requestId: message.requestId,
     };
   }
@@ -369,6 +463,15 @@ messageBus.on('SAVED_QUERIES_DELETE', async (message): Promise<MessageResponse> 
 });
 
 async function togglePanelOnActiveTab(): Promise<void> {
+  /**
+   * Ask the active Salesforce tab's content script to toggle the in-page panel.
+   *
+   * Why:
+   * - The panel UI runs in the page context (content script + shadow DOM).
+   * - Background is the coordinator that can find the active tab and relay commands.
+   *
+   * Complexity: O(1) in JS work (single tab lookup + message send).
+   */
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   const tab = tabs[0];
   if (!tab?.id) return;
@@ -479,6 +582,19 @@ messageBus.on('SCHEMA_DESCRIBE_SOBJECT', async (message): Promise<MessageRespons
 
 messageBus.on('DATA_PUSH_START', async (message): Promise<MessageResponse> => {
   try {
+    /**
+     * Kick off a data push and return immediately with a `pushId`.
+     *
+     * Why this is "fire-and-forget":
+     * - Chrome message channels have timeouts and the UI expects an immediate response.
+     * - The real work happens asynchronously and reports progress via `DATA_PUSH_PROGRESS` broadcasts.
+     *
+     * Data types:
+     * - `records` is `Record<string, unknown>[]` to support arbitrary CSV/JSON inputs.
+     * - Target org can be resolved from `tabId` (preferred) or `orgId` (legacy).
+     *
+     * Complexity: O(1) here; the async job is O(N) over records.
+     */
     const payload = message.payload as {
       orgId?: string;
       tabId?: number;
@@ -487,10 +603,14 @@ messageBus.on('DATA_PUSH_START', async (message): Promise<MessageResponse> => {
       operation: 'insert' | 'update' | 'upsert' | 'delete';
       externalIdField?: string;
       batchSize?: number;
+      threads?: number;
       useBulkApi?: boolean;
     };
 
     const pushId = generateId();
+    const startedAt = Date.now();
+    const abortController = new AbortController();
+    activePushes.set(pushId, { abortController });
     if (!payload.tabId && !payload.orgId) {
       throw new Error('DATA_PUSH_START requires either tabId (full app) or orgId (popup).');
     }
@@ -501,17 +621,21 @@ messageBus.on('DATA_PUSH_START', async (message): Promise<MessageResponse> => {
     // Determine API strategy
     const useBulk = payload.useBulkApi ?? payload.records.length >= BULK_API_THRESHOLD;
 
+    const strategy = useBulk ? 'bulk' : 'rest';
+
     if (useBulk) {
       // Bulk API 2.0 path
-      executeBulkPush(pushId, org, payload);
+      executeBulkPush(pushId, org, payload, { startedAt, abortSignal: abortController.signal, strategy })
+        .finally(() => activePushes.delete(pushId));
     } else {
-      // REST API (SObject Collections) path
-      executeRestPush(pushId, org, payload);
+      // REST API (SObject Collections + Composite) path
+      executeRestPush(pushId, org, payload, { startedAt, abortSignal: abortController.signal, strategy })
+        .finally(() => activePushes.delete(pushId));
     }
 
     return {
       success: true,
-      data: { pushId, strategy: useBulk ? 'bulk' : 'rest' },
+      data: { pushId, strategy },
       requestId: message.requestId,
     };
   } catch (error) {
@@ -528,6 +652,19 @@ messageBus.on('DATA_PUSH_START', async (message): Promise<MessageResponse> => {
 
 // ── Push Execution (runs asynchronously) ─────────────────────────────
 
+function isAbortLikeError(error: unknown): boolean {
+  return (
+    (error instanceof Error && error.name === 'AbortError')
+    || (error instanceof Error && error.message === 'Cancelled')
+  );
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  const n = typeof value === 'number' ? value : parseInt(String(value), 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(n)));
+}
+
 async function executeRestPush(
   pushId: string,
   org: SalesforceOrg,
@@ -535,77 +672,229 @@ async function executeRestPush(
     objectName: string;
     records: Record<string, unknown>[];
     operation: 'insert' | 'update' | 'upsert' | 'delete';
+    externalIdField?: string;
     batchSize?: number;
+    threads?: number;
   },
+  ctx: { startedAt: number; abortSignal: AbortSignal; strategy: 'rest' | 'bulk' },
 ): Promise<void> {
+  /**
+   * Execute a push using REST (SObject Collections / Composite-style endpoints).
+   *
+   * Why REST here:
+   * - For smaller datasets REST is simpler and provides per-record errors inline.
+   * - Bulk API becomes more efficient above a threshold and is handled elsewhere.
+   *
+   * Data types:
+   * - `records` is an array of "untyped" objects (`Record<string, unknown>`). Mapping/validation happens
+   *   in DataMapper/DataValidator before API submission.
+   *
+   * Complexity:
+   * - O(N) records processed overall, with O(B) per batch where B is `batchSize`.
+   * - Network calls: O(ceil(N / B)).
+   */
   const client = createApiClient(org);
-  const batchSize = payload.batchSize ?? DEFAULT_BATCH_SIZE;
-  const batches = chunkArray(payload.records, batchSize);
+
+  const effectiveBatchSize =
+    payload.operation === 'upsert'
+      ? MAX_COMPOSITE_BATCH_SIZE
+      : clampInt(payload.batchSize ?? DEFAULT_BATCH_SIZE, 1, DEFAULT_BATCH_SIZE, DEFAULT_BATCH_SIZE);
+  const threads = clampInt(payload.threads ?? 1, 1, 4, 1);
+
+  const batchDescs: Array<{ start: number; batch: Record<string, unknown>[] }> = [];
+  for (let start = 0; start < payload.records.length; start += effectiveBatchSize) {
+    batchDescs.push({ start, batch: payload.records.slice(start, start + effectiveBatchSize) });
+  }
 
   let processedRecords = 0;
   let failedRecords = 0;
   const errors: Array<{ recordIndex: number; message: string }> = [];
+  const successfulIds: string[] = [];
   let broadcastedError = false;
+  let cancelled = false;
 
-  for (const batch of batches) {
-    const batchStartIndex = processedRecords;
+  const applyBatchResult = (res: {
+    processed: number;
+    failed: number;
+    ids: string[];
+    errors: Array<{ recordIndex: number; message: string }>;
+    batchLevelError?: string;
+  }): void => {
+    processedRecords += res.processed;
+    failedRecords += res.failed;
+    if (res.ids.length) successfulIds.push(...res.ids);
+    if (res.errors.length) errors.push(...res.errors);
+
+    messageBus.broadcast('DATA_PUSH_PROGRESS', {
+      pushId,
+      totalRecords: payload.records.length,
+      processedRecords,
+      failedRecords,
+      status: 'processing',
+    });
+
+    if (res.batchLevelError && !broadcastedError) {
+      broadcastedError = true;
+      messageBus.broadcast('DATA_PUSH_ERROR', { pushId, error: res.batchLevelError });
+    }
+  };
+
+  async function runBatch(
+    desc: { start: number; batch: Record<string, unknown>[] },
+  ): Promise<{ aborted: true } | { aborted: false; result: Parameters<typeof applyBatchResult>[0] }> {
+    if (ctx.abortSignal.aborted) return { aborted: true };
     try {
-      let results;
-      switch (payload.operation) {
-        case 'insert':
-          results = await client.collectionCreate(payload.objectName, batch);
-          break;
-        case 'update':
-          results = await client.collectionUpdate(batch as Array<{ Id: string }>);
-          break;
-        case 'delete':
-          results = await client.collectionDelete(batch.map(r => r.Id as string));
-          break;
-        default:
-          results = await client.collectionCreate(payload.objectName, batch);
+      const batch = desc.batch;
+      const start = desc.start;
+
+      if (payload.operation === 'upsert') {
+        const externalIdField = payload.externalIdField;
+        if (!externalIdField) {
+          return {
+            aborted: false,
+            result: {
+              processed: batch.length,
+              failed: batch.length,
+              ids: [],
+              errors: batch.map((_, i) => ({ recordIndex: start + i, message: 'Upsert requires externalIdField.' })),
+              batchLevelError: 'Upsert requires externalIdField.',
+            },
+          };
+        }
+
+        const built = buildUpsertSubrequests({
+          apiVersion: org.apiVersion,
+          objectName: payload.objectName,
+          externalIdField,
+          records: batch,
+          recordIndexOffset: start,
+        });
+
+        const outErrors: Array<{ recordIndex: number; message: string }> = [];
+        for (const s of built.skipped) outErrors.push({ recordIndex: s.recordIndex, message: s.message });
+
+        if (built.subrequests.length === 0) {
+          return {
+            aborted: false,
+            result: {
+              processed: batch.length,
+              failed: batch.length,
+              ids: [],
+              errors: outErrors,
+            },
+          };
+        }
+
+        const composite = await client.composite(built.subrequests, false, { signal: ctx.abortSignal });
+        const parsed = parseUpsertCompositeResponse(composite, built.refToRecordIndex);
+
+        const ids: string[] = [];
+        for (const s of parsed.successes) {
+          if (s.id) ids.push(s.id);
+        }
+        for (const f of parsed.failures) outErrors.push({ recordIndex: f.recordIndex, message: f.message });
+
+        return {
+          aborted: false,
+          result: {
+            processed: batch.length,
+            failed: built.skipped.length + parsed.failures.length,
+            ids,
+            errors: outErrors,
+          },
+        };
       }
 
-      for (const result of results) {
-        processedRecords++;
+      let results: Array<{ id: string; success: boolean; errors: Array<{ message: string }> }> | null = null;
+      switch (payload.operation) {
+        case 'insert':
+          results = await client.collectionCreate(payload.objectName, batch, false, { signal: ctx.abortSignal });
+          break;
+        case 'update':
+          results = await client.collectionUpdate(batch as Array<{ Id: string }>, false, { signal: ctx.abortSignal });
+          break;
+        case 'delete':
+          results = await client.collectionDelete(batch.map(r => r.Id as string), false, { signal: ctx.abortSignal });
+          break;
+        default:
+          results = await client.collectionCreate(payload.objectName, batch, false, { signal: ctx.abortSignal });
+      }
+
+      const ids: string[] = [];
+      const outErrors: Array<{ recordIndex: number; message: string }> = [];
+      let failed = 0;
+
+      // Defensive: if Salesforce returns fewer results than sent, mark remainder as failed.
+      const expected = batch.length;
+      const got = results?.length ?? 0;
+      for (let i = 0; i < expected; i++) {
+        const recordIndex = start + i;
+        const result = results?.[i];
+        if (!result) {
+          failed++;
+          outErrors.push({ recordIndex, message: 'No result returned for record.' });
+          continue;
+        }
         if (!result.success) {
-          failedRecords++;
-          errors.push({
-            recordIndex: processedRecords - 1,
-            message: result.errors.map(e => e.message).join('; '),
-          });
+          failed++;
+          outErrors.push({ recordIndex, message: result.errors.map(e => e.message).join('; ') });
+        } else if (typeof result.id === 'string' && result.id.length > 0) {
+          ids.push(result.id);
         }
       }
 
-      // Broadcast progress
-      messageBus.broadcast('DATA_PUSH_PROGRESS', {
-        pushId,
-        totalRecords: payload.records.length,
-        processedRecords,
-        failedRecords,
-        status: 'processing',
-      });
+      // If SF returns extra results (unexpected), ignore extras but still count as processed by input size.
+      void got;
+
+      return {
+        aborted: false,
+        result: {
+          processed: expected,
+          failed,
+          ids,
+          errors: outErrors,
+        },
+      };
     } catch (error) {
+      if (ctx.abortSignal.aborted || isAbortLikeError(error)) {
+        return { aborted: true };
+      }
       const message = error instanceof Error ? error.message : 'Batch failed';
-      for (let i = 0; i < batch.length; i++) {
-        errors.push({ recordIndex: batchStartIndex + i, message: `Batch failed: ${message}` });
-      }
-      failedRecords += batch.length;
-      processedRecords += batch.length;
-
-      messageBus.broadcast('DATA_PUSH_PROGRESS', {
-        pushId,
-        totalRecords: payload.records.length,
-        processedRecords,
-        failedRecords,
-        status: 'processing',
-      });
-
-      if (!broadcastedError) {
-        broadcastedError = true;
-        messageBus.broadcast('DATA_PUSH_ERROR', { pushId, error: message });
-      }
+      return {
+        aborted: false,
+        result: {
+          processed: desc.batch.length,
+          failed: desc.batch.length,
+          ids: [],
+          errors: desc.batch.map((_, i) => ({ recordIndex: desc.start + i, message: `Batch failed: ${message}` })),
+          batchLevelError: message,
+        },
+      };
     }
   }
+
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (true) {
+      if (ctx.abortSignal.aborted) {
+        cancelled = true;
+        return;
+      }
+      const idx = next++;
+      if (idx >= batchDescs.length) return;
+      const out = await runBatch(batchDescs[idx]);
+      if (out.aborted) {
+        cancelled = true;
+        return;
+      }
+      applyBatchResult(out.result);
+    }
+  }
+
+  const poolSize = Math.min(threads, Math.max(1, batchDescs.length));
+  await Promise.all(Array.from({ length: poolSize }, () => worker()));
+
+  const completedAt = Date.now();
 
   // Save to history
   const historyEntry: PushHistoryEntry = {
@@ -613,22 +902,35 @@ async function executeRestPush(
     orgId: org.orgId,
     objectName: payload.objectName,
     operation: payload.operation,
+    strategy: ctx.strategy === 'bulk' ? 'bulk' : 'rest',
+    externalIdField: payload.operation === 'upsert' ? payload.externalIdField : undefined,
     totalRecords: payload.records.length,
     successCount: processedRecords - failedRecords,
     failureCount: failedRecords,
-    startedAt: Date.now(),
-    completedAt: Date.now(),
+    startedAt: ctx.startedAt,
+    completedAt,
     errors: errors.length > 0 ? errors : undefined,
   };
 
   await storage.addPushHistory(historyEntry);
+
+  // Store successful IDs (session scoped) for rollback/audit.
+  const pushResult: PushResult = {
+    pushId,
+    orgId: org.orgId,
+    objectName: payload.objectName,
+    operation: payload.operation,
+    ids: successfulIds,
+    capturedAt: completedAt,
+  };
+  await storage.setPushResult(pushResult);
 
   messageBus.broadcast('DATA_PUSH_COMPLETE', {
     pushId,
     totalRecords: payload.records.length,
     processedRecords,
     failedRecords,
-    status: 'complete',
+    status: cancelled ? 'cancelled' : 'complete',
   });
 }
 
@@ -641,7 +943,18 @@ async function executeBulkPush(
     operation: 'insert' | 'update' | 'upsert' | 'delete';
     externalIdField?: string;
   },
+  ctx: { startedAt: number; abortSignal: AbortSignal; strategy: 'rest' | 'bulk' },
 ): Promise<void> {
+  /**
+   * Execute a push using Bulk API 2.0.
+   *
+   * Why Bulk here:
+   * - Bulk API is generally better for large datasets and avoids per-request record limits.
+   *
+   * Complexity:
+   * - CSV conversion is O(N * K) where K is number of fields serialized per record.
+   * - Polling adds time but not additional data-structure complexity.
+   */
   const bulkApi = new BulkApiService({
     instanceUrl: org.instanceUrl,
     accessToken: org.accessToken,
@@ -655,6 +968,17 @@ async function executeBulkPush(
       externalIdFieldName: payload.externalIdField,
     });
 
+    // Best-effort abort if cancelled after job creation.
+    if (ctx.abortSignal.aborted) {
+      try { await bulkApi.abortJob(job.id); } catch { /* ignore */ }
+      throw new Error('Cancelled');
+    }
+    ctx.abortSignal.addEventListener('abort', () => {
+      bulkApi.abortJob(job.id).catch(() => {
+        // Ignore
+      });
+    }, { once: true });
+
     const csvData = bulkApi.recordsToCsv(payload.records);
     await bulkApi.uploadJobData(job.id, csvData);
     await bulkApi.closeJob(job.id);
@@ -667,21 +991,46 @@ async function executeBulkPush(
         failedRecords: progressJob.numberRecordsFailed,
         status: 'processing',
       });
-    });
+    }, ctx.abortSignal);
+
+    const completedAt = Date.now();
+    const successfulIds: string[] = [];
+    if (completedJob.state === 'JobComplete') {
+      try {
+        const successful = await bulkApi.getSuccessfulResults(job.id);
+        for (const row of successful) {
+          if (typeof row.sf__Id === 'string' && row.sf__Id.length > 0) successfulIds.push(row.sf__Id);
+        }
+      } catch {
+        // Ignore: results endpoint may fail in some orgs/permissions; push itself can still be complete.
+      }
+    }
 
     const historyEntry: PushHistoryEntry = {
       id: pushId,
       orgId: org.orgId,
       objectName: payload.objectName,
       operation: payload.operation,
+      strategy: 'bulk',
+      externalIdField: payload.operation === 'upsert' ? payload.externalIdField : undefined,
       totalRecords: payload.records.length,
       successCount: completedJob.numberRecordsProcessed - completedJob.numberRecordsFailed,
       failureCount: completedJob.numberRecordsFailed,
-      startedAt: Date.now(),
-      completedAt: Date.now(),
+      startedAt: ctx.startedAt,
+      completedAt,
     };
 
     await storage.addPushHistory(historyEntry);
+
+    const pushResult: PushResult = {
+      pushId,
+      orgId: org.orgId,
+      objectName: payload.objectName,
+      operation: payload.operation,
+      ids: successfulIds,
+      capturedAt: completedAt,
+    };
+    await storage.setPushResult(pushResult);
 
     messageBus.broadcast('DATA_PUSH_COMPLETE', {
       pushId,
@@ -691,9 +1040,81 @@ async function executeBulkPush(
       status: completedJob.state === 'JobComplete' ? 'complete' : 'error',
     });
   } catch (error) {
-    messageBus.broadcast('DATA_PUSH_ERROR', {
+    const cancelled = ctx.abortSignal.aborted || isAbortLikeError(error);
+    if (cancelled) {
+      const completedAt = Date.now();
+      const historyEntry: PushHistoryEntry = {
+        id: pushId,
+        orgId: org.orgId,
+        objectName: payload.objectName,
+        operation: payload.operation,
+        strategy: 'bulk',
+        externalIdField: payload.operation === 'upsert' ? payload.externalIdField : undefined,
+        totalRecords: payload.records.length,
+        successCount: 0,
+        failureCount: 0,
+        startedAt: ctx.startedAt,
+        completedAt,
+        errors: [{ recordIndex: -1, message: 'Cancelled' }],
+      };
+      await storage.addPushHistory(historyEntry);
+
+      const pushResult: PushResult = {
+        pushId,
+        orgId: org.orgId,
+        objectName: payload.objectName,
+        operation: payload.operation,
+        ids: [],
+        capturedAt: completedAt,
+      };
+      await storage.setPushResult(pushResult);
+
+      messageBus.broadcast('DATA_PUSH_COMPLETE', {
+        pushId,
+        totalRecords: payload.records.length,
+        processedRecords: 0,
+        failedRecords: 0,
+        status: 'cancelled',
+      });
+      return;
+    }
+    const msg = error instanceof Error ? error.message : 'Bulk push failed';
+    const completedAt = Date.now();
+
+    messageBus.broadcast('DATA_PUSH_ERROR', { pushId, error: msg });
+
+    const historyEntry: PushHistoryEntry = {
+      id: pushId,
+      orgId: org.orgId,
+      objectName: payload.objectName,
+      operation: payload.operation,
+      strategy: 'bulk',
+      externalIdField: payload.operation === 'upsert' ? payload.externalIdField : undefined,
+      totalRecords: payload.records.length,
+      successCount: 0,
+      failureCount: payload.records.length,
+      startedAt: ctx.startedAt,
+      completedAt,
+      errors: [{ recordIndex: -1, message: msg }],
+    };
+    await storage.addPushHistory(historyEntry);
+
+    const pushResult: PushResult = {
       pushId,
-      error: error instanceof Error ? error.message : 'Bulk push failed',
+      orgId: org.orgId,
+      objectName: payload.objectName,
+      operation: payload.operation,
+      ids: [],
+      capturedAt: completedAt,
+    };
+    await storage.setPushResult(pushResult);
+
+    messageBus.broadcast('DATA_PUSH_COMPLETE', {
+      pushId,
+      totalRecords: payload.records.length,
+      processedRecords: 0,
+      failedRecords: payload.records.length,
+      status: 'error',
     });
   }
 }
@@ -733,6 +1154,57 @@ chrome.commands.onCommand.addListener((command) => {
     togglePanelOnActiveTab().catch(() => {
       // Ignore
     });
+  }
+});
+
+messageBus.on('DATA_PUSH_CANCEL', async (message): Promise<MessageResponse> => {
+  try {
+    const { pushId } = message.payload as { pushId: string };
+    const active = activePushes.get(pushId);
+    if (!active) {
+      return { success: true, data: { cancelled: false }, requestId: message.requestId };
+    }
+    active.abortController.abort();
+    return { success: true, data: { cancelled: true }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        code: 'DATA_PUSH_CANCEL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to cancel data push',
+      },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('DATA_PUSH_RESULT_GET', async (message): Promise<MessageResponse> => {
+  try {
+    const { pushId } = message.payload as { pushId: string };
+    const result = await storage.getPushResult(pushId);
+    if (!result) {
+      return { success: true, data: null, requestId: message.requestId };
+    }
+    return {
+      success: true,
+      data: {
+        pushId: result.pushId,
+        objectName: result.objectName,
+        operation: result.operation,
+        ids: result.ids,
+        capturedAt: result.capturedAt,
+      },
+      requestId: message.requestId,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        code: 'DATA_PUSH_RESULT_GET_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to fetch data push result',
+      },
+      requestId: message.requestId,
+    };
   }
 });
 

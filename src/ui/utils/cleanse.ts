@@ -1,3 +1,18 @@
+/**
+ * Cleanser data model and pure functions.
+ *
+ * What this file does:
+ * - Represents column operations (`ColumnOp`) and applies them to records.
+ * - Detects rename conflicts and provides summary stats for UI.
+ *
+ * Why pure functions:
+ * - Easier to test and reuse across screens/components.
+ *
+ * Complexity:
+ * - `cleanseRecords`: O(N*C) where N is records and C is ops/columns.
+ * - `computeConflicts`/`computeSummary`: O(C).
+ */
+
 import type { TransformationType } from '../../core/types/storage';
 
 export interface ColumnOp {

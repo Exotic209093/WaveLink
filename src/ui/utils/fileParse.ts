@@ -1,3 +1,13 @@
+/**
+ * File parsing helpers for CSV/JSON uploads.
+ *
+ * Why:
+ * - Keeps FileReader/parsing logic out of UI components.
+ *
+ * Complexity:
+ * - CSV parsing is O(N) in file size; JSON parsing is O(N) in text length.
+ */
+
 import Papa from 'papaparse';
 
 export interface ParsedDataset {
@@ -53,4 +63,3 @@ export async function parseCsvFile(file: File): Promise<ParsedDataset> {
   const headers = (result.meta.fields ?? []).filter(Boolean);
   return { records, headers: headers.length ? headers : inferHeaders(records) };
 }
-

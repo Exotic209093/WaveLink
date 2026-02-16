@@ -2,6 +2,17 @@
  * Salesforce authentication service using the existing browser session.
  * Reads the active Salesforce session cookie (`sid`) and uses it as
  * a bearer token for API calls.
+ *
+ * Why this approach:
+ * - Avoids OAuth / connected-app setup for internal tooling.
+ * - Mirrors Salesforce Inspector: if you're logged into Salesforce in the browser, the extension can call APIs.
+ *
+ * Data types:
+ * - Returns a `SalesforceOrg` object containing `instanceUrl`, `accessToken` (sid), and identity fields.
+ *
+ * Complexity:
+ * - Cookie enumeration can be O(C) where C is the number of `sid` cookies in the browser.
+ * - Session validation and identity resolution involve network calls (dominant cost).
  */
 
 import { DEFAULT_API_VERSION, TOKEN_REFRESH_BUFFER_MS } from '../../core/constants';
@@ -24,6 +35,7 @@ interface SalesforceIdentityResponse {
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 
 function domainMatches(hostname: string, cookieDomain: string): boolean {
+  // Time: O(1). Data: treats leading-dot cookie domains as suffix matches.
   const normalizedCookieDomain = cookieDomain.replace(/^\./, '');
   return hostname === normalizedCookieDomain || hostname.endsWith(`.${normalizedCookieDomain}`);
 }
@@ -36,6 +48,7 @@ function inferEnvironment(hostname: string): SalesforceEnvironment {
 }
 
 function normalizeSessionId(value: string): string {
+  // Time: O(N) in cookie length. Data: trims, unquotes, and URI-decodes if needed.
   let normalized = value.trim().replace(/^"|"$/g, '');
   try {
     normalized = decodeURIComponent(normalized);
@@ -52,6 +65,8 @@ function normalizeSessionId(value: string): string {
 export class SalesforceAuth {
   /**
    * Authenticates using the active Salesforce browser tab/session.
+   *
+   * Complexity: O(1) JS work; may do network validation.
    */
   async login(_environment?: SalesforceEnvironment): Promise<SalesforceOrg> {
     const tab = await this.getActiveSalesforceTab();
@@ -60,6 +75,8 @@ export class SalesforceAuth {
 
   /**
    * Authenticates using a specific Salesforce tab (used by the full-page app).
+   *
+   * Complexity: O(1) JS work; may do network validation.
    */
   async loginForTab(tabId: number): Promise<SalesforceOrg> {
     const tab = await chrome.tabs.get(tabId);
@@ -188,6 +205,18 @@ export class SalesforceAuth {
   }
 
   private async getSessionIdsForInstances(instanceUrls: string[]): Promise<string[]> {
+    /**
+     * Collect possible session IDs for the candidate instance URLs.
+     *
+     * Why multiple sources:
+     * - Cookies may be set on different domains (myDomain, lightning, etc).
+     * - We attempt direct `cookies.get` per instance URL and also scan all `sid` cookies to match by domain.
+     *
+     * Complexity: O(I + C*Ih) where:
+     * - I = instanceUrls.length
+     * - C = number of `sid` cookies
+     * - Ih = number of instance hostnames (same as I)
+     */
     const sessionIds = new Set<string>();
     const instanceHosts = instanceUrls.map(url => new URL(url).hostname);
 
@@ -213,6 +242,11 @@ export class SalesforceAuth {
     instanceUrls: string[],
     accessTokens: string[],
   ): Promise<{ instanceUrl: string; accessToken: string } | null> {
+    /**
+     * Find the first (instanceUrl, accessToken) pair that successfully validates against the REST API root.
+     *
+     * Complexity: O(I * A) validations where I=instanceUrls.length and A=accessTokens.length (each validation is network).
+     */
     for (const instanceUrl of instanceUrls) {
       for (const accessToken of accessTokens) {
         const isValid = await this.validateSession(instanceUrl, accessToken);

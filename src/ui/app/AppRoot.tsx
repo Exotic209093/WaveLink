@@ -1,3 +1,20 @@
+/**
+ * Full-page WaveLink App root (runs in `app/app.html`).
+ *
+ * What this file does:
+ * - Lists open Salesforce tabs and lets the user select which tab/org to operate against.
+ * - Resolves Salesforce context for the selected tab (orgId, instanceUrl, username).
+ * - Hosts the main navigation and screen routing (query/objects/push/cleanser/settings).
+ *
+ * Per-tab pinning:
+ * - If `?tabId=<salesforceTabId>` is present, this app tab is "pinned" to that Salesforce tab.
+ * - Changing the dropdown updates the URL via `history.replaceState` so reload preserves selection.
+ *
+ * Complexity:
+ * - Tab listing is O(T) where T is number of open browser tabs (performed in background).
+ * - Most UI state updates here are O(1).
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
@@ -11,6 +28,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { Toast } from '../components/Toast';
 import { DataCleanserScreen } from '../screens/DataCleanserScreen';
 import { DataPushScreen } from '../screens/DataPushScreen';
+import { parseTabIdFromSearch } from '../../core/utils';
 
 export function AppRoot(): VNode {
   const sf = useMemo(() => new SfApi('app'), []);
@@ -32,10 +50,34 @@ export function AppRoot(): VNode {
   const [cleaned, setCleaned] = useState<{ records: Record<string, unknown>[]; headers: string[] } | null>(null);
 
   async function refreshTabs(): Promise<void> {
+    /**
+     * Fetch UI settings + open Salesforce tabs, then choose the initial/updated selection.
+     *
+     * Why this approach:
+     * - `?tabId=` pins the app tab to a specific Salesforce tab (per-tab isolation).
+     * - Without `?tabId=`, we fall back to the last tab selected in the app (`ui.lastTabId`),
+     *   and then to the first Salesforce tab found.
+     *
+     * Complexity: O(S) where S is the number of Salesforce tabs returned (mapping + searching).
+     */
     try {
       const [ui, list] = await Promise.all([sf.getUiSettings(), sf.listTabs()]);
       setTabs(list.map(t => ({ tabId: t.tabId, title: t.title, hostname: t.hostname })));
-      const preferred = ui.lastTabId && list.some(t => t.tabId === ui.lastTabId) ? ui.lastTabId : (list[0]?.tabId ?? null);
+      const urlTabId = parseTabIdFromSearch(window.location.search);
+      if (urlTabId) {
+        const exists = list.some(t => t.tabId === urlTabId);
+        if (!exists) {
+          setSelectedTabId(null);
+          setToast({ title: 'Pinned Tab Not Found', body: `Salesforce tab ${urlTabId} is not available. Re-open it and click Refresh.` });
+          return;
+        }
+        setSelectedTabId(urlTabId);
+        return;
+      }
+
+      const preferred = ui.lastTabId && list.some(t => t.tabId === ui.lastTabId)
+        ? ui.lastTabId
+        : (list[0]?.tabId ?? null);
       setSelectedTabId(preferred);
     } catch (e) {
       setToast({ title: 'Failed to List Tabs', body: e instanceof Error ? e.message : 'Unknown error' });
@@ -43,10 +85,16 @@ export function AppRoot(): VNode {
   }
 
   useEffect(() => {
+    // Initial load: populate the tab selector.
     refreshTabs();
   }, []);
 
   useEffect(() => {
+    /**
+     * Resolve Salesforce context for the selected tab.
+     *
+     * Complexity: O(1) JS work (auth may validate session via network).
+     */
     if (!selectedTabId) {
       setContext(null);
       return;
@@ -56,13 +104,33 @@ export function AppRoot(): VNode {
       .catch(e => setToast({ title: 'Failed to Resolve Context', body: e instanceof Error ? e.message : 'Unknown error' }));
   }, [sf, selectedTabId]);
 
+  useEffect(() => {
+    /**
+     * Make each app tab distinguishable in the browser tab strip when working across orgs.
+     *
+     * Complexity: O(1).
+     */
+    if (!context) {
+      document.title = 'WaveLink App';
+      return;
+    }
+    const hostname = tabs.find(t => t.tabId === selectedTabId)?.hostname ?? new URL(context.instanceUrl).hostname;
+    document.title = `WaveLink - ${hostname} (${context.orgId})`;
+  }, [context, selectedTabId, tabs]);
+
   const titleRight = (
     <>
       <select
         class="wl-select"
         style="max-width:340px"
         value={selectedTabId ?? ''}
-        onChange={(e) => setSelectedTabId(parseInt((e.currentTarget as HTMLSelectElement).value, 10))}
+        onChange={(e) => {
+          const next = parseInt((e.currentTarget as HTMLSelectElement).value, 10);
+          if (Number.isFinite(next)) {
+            history.replaceState({}, '', `?tabId=${next}`);
+            setSelectedTabId(next);
+          }
+        }}
       >
         {tabs.length === 0 ? <option value="">No Salesforce tabs</option> : null}
         {tabs.map(t => (

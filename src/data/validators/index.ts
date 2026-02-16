@@ -2,6 +2,9 @@
  * Data validation engine.
  * Validates records against Salesforce SObject field metadata
  * before pushing to ensure data quality.
+ *
+ * Complexity:
+ * - `validateRecords` is O(N * K) where N is records and K is keys per record.
  */
 
 import type { SObjectField, SalesforceFieldType } from '../../core/types/salesforce';
@@ -24,6 +27,7 @@ export class DataValidator {
     fields: SObjectField[],
     operation: 'insert' | 'update' | 'upsert' | 'delete',
   ): ValidationResult {
+    // Time: O(N*K). Data: returns a flat list of `FieldValidationError` entries.
     const fieldMap = new Map(fields.map(f => [f.name, f]));
     const allErrors: FieldValidationError[] = [];
 

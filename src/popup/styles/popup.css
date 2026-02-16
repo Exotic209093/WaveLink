@@ -1,21 +1,55 @@
 /* ── WaveLink Popup Styles ─────────────────────────────────────────── */
 
+/*
+  WaveLink popup styling.
+
+  Scope:
+  - Styles only the extension popup (`popup/popup.html`).
+  - The in-page panel and full app use `src/ui/styles/uiCss.ts` instead.
+*/
+
 :root {
-  --color-primary: #0176d3;
-  --color-primary-hover: #014486;
-  --color-secondary: #747474;
-  --color-success: #2e844a;
-  --color-danger: #ea001e;
+  /* Keep popup in-sync with app/panel theme tokens (see `src/ui/styles/uiCss.ts`). */
+  --wl-font-sans: "Aptos", "Segoe UI Variable Text", "Candara", "Trebuchet MS", Verdana, sans-serif;
+  --wl-font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+
+  --wl-ink: #072033;
+  --wl-ink-dim: rgba(7, 32, 51, 0.72);
+  --wl-paper: #f5fbff;
+  --wl-paper-2: #eaf4ff;
+  --wl-line: rgba(7, 32, 51, 0.18);
+  --wl-line-2: rgba(7, 32, 51, 0.10);
+
+  --wl-accent: #00a6c8;
+  --wl-accent-2: #2de2c5;
+  --wl-danger: #ff3b5c;
+  --wl-glow: rgba(0, 166, 200, 0.22);
+
+  --wl-radius: 16px;
+  --wl-radius-sm: 12px;
+  --wl-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+
+  --wl-transition: 160ms ease;
+
+  /*
+    Back-compat aliases (popup uses these classnames, but the theme is wl-*).
+    Keeping aliases avoids having to refactor the popup DOM right now.
+  */
+  --color-primary: var(--wl-accent);
+  --color-primary-hover: #067c95;
+  --color-secondary: #2b4a5c;
+  --color-success: #1f9f7a;
+  --color-danger: var(--wl-danger);
   --color-warning: #fe9339;
-  --color-bg: #ffffff;
-  --color-bg-secondary: #f3f3f3;
-  --color-border: #dddbda;
-  --color-text: #181818;
-  --color-text-secondary: #706e6b;
+  --color-bg: var(--wl-paper);
+  --color-bg-secondary: var(--wl-paper-2);
+  --color-border: rgba(7, 32, 51, 0.16);
+  --color-text: var(--wl-ink);
+  --color-text-secondary: var(--wl-ink-dim);
   --color-text-inverse: #ffffff;
-  --radius: 6px;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  --transition: 150ms ease;
+  --radius: var(--wl-radius-sm);
+  --shadow: var(--wl-shadow);
+  --transition: var(--wl-transition);
 }
 
 * {
@@ -27,10 +61,16 @@
 body {
   width: 400px;
   min-height: 500px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--wl-font-sans);
   font-size: 13px;
   color: var(--color-text);
-  background: var(--color-bg);
+  background:
+    radial-gradient(900px 520px at 10% 6%, rgba(0, 166, 200, 0.20), transparent 62%),
+    radial-gradient(780px 520px at 86% 14%, rgba(45, 226, 197, 0.16), transparent 62%),
+    radial-gradient(920px 620px at 60% 110%, rgba(4, 60, 82, 0.18), transparent 58%),
+    linear-gradient(180deg, var(--wl-paper), #ffffff 62%),
+    repeating-linear-gradient(135deg, rgba(0, 110, 140, 0.028) 0 2px, transparent 2px 10px);
+  animation: wl-popupIn 520ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 
 .hidden { display: none !important; }
@@ -42,7 +82,9 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: var(--color-primary);
+  background:
+    radial-gradient(380px 180px at 20% 20%, rgba(255, 255, 255, 0.16), transparent 60%),
+    linear-gradient(135deg, #043c52, var(--color-primary));
   color: var(--color-text-inverse);
 }
 
@@ -66,7 +108,7 @@ body {
 }
 
 .status-badge.connected {
-  background: var(--color-success);
+  background: rgba(31, 159, 122, 0.92);
   color: var(--color-text-inverse);
 }
 
@@ -98,12 +140,12 @@ body {
   align-items: center;
   justify-content: center;
   padding: 8px 16px;
-  border: none;
+  border: 1px solid var(--wl-line);
   border-radius: var(--radius);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--transition);
+  transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition);
 }
 
 .btn:disabled {
@@ -118,6 +160,8 @@ body {
 
 .btn-primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(4, 60, 82, 0.18);
 }
 
 .btn-secondary {
@@ -127,7 +171,8 @@ body {
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--color-border);
+  background: rgba(0, 166, 200, 0.10);
+  border-color: rgba(0, 166, 200, 0.35);
 }
 
 .btn-danger {
@@ -244,7 +289,7 @@ body {
 .input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(1, 118, 211, 0.15);
+  box-shadow: 0 0 0 4px var(--wl-glow);
 }
 
 /* ── File Drop Zone ───────────────────────────────────────────────── */
@@ -262,7 +307,7 @@ body {
 .file-drop:hover,
 .file-drop.dragover {
   border-color: var(--color-primary);
-  background: rgba(1, 118, 211, 0.05);
+  background: rgba(0, 166, 200, 0.06);
 }
 
 /* ── Data Preview ─────────────────────────────────────────────────── */
@@ -387,4 +432,14 @@ body {
 .section-footer {
   margin-top: 16px;
   text-align: center;
+}
+
+@keyframes wl-popupIn {
+  from { opacity: 0; filter: saturate(0.9); }
+  to { opacity: 1; filter: saturate(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body { animation: none !important; }
+  .btn { transition: none !important; }
 }

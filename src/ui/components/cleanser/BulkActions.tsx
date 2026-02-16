@@ -1,3 +1,12 @@
+/**
+ * Bulk action bar for the cleanser column list.
+ *
+ * What this file does:
+ * - Applies the same action (transform/drop/reset/rename affix) to many selected columns.
+ *
+ * Complexity: O(1) render; parent applies changes across selected columns (typically O(S)).
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useState } from 'preact/hooks';

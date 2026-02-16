@@ -1,3 +1,19 @@
+/**
+ * Data cleanser screen.
+ *
+ * What this file does:
+ * - Loads a dataset and lets users drop/rename/transform columns.
+ * - Produces a "snapshot" of cleaned records and headers for the Data Push screen.
+ * - Optionally validates cleaned records against Salesforce field metadata (`describeSObject` + DataValidator).
+ *
+ * Why:
+ * - CSV/JSON from external sources rarely matches Salesforce field rules; cleanser reduces push failures.
+ *
+ * Complexity:
+ * - Most operations are O(N*K) over records/columns (cleanse + preview).
+ * - UI limits previews (100 rows, 12 columns) to keep rendering bounded.
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -17,6 +33,8 @@ import { downloadTextFile } from '../utils/download';
 import { flattenRecord } from '../utils/records';
 import { recordsToCsv } from '../utils/csv';
 import { DataValidator } from '../../data/validators';
+import { OrgHealthScreen } from './OrgHealthScreen';
+import { CoverageScreen } from './CoverageScreen';
 
 type Operation = 'insert' | 'update' | 'upsert' | 'delete';
 
@@ -67,6 +85,7 @@ export function DataCleanserScreen(props: {
 }): VNode {
   const { sf, tabId, dataset } = props;
 
+  const [view, setView] = useState<'cleanser' | 'health' | 'coverage'>('cleanser');
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
   const [ops, setOps] = useState<ColumnOp[]>([]);
   const [snapshot, setSnapshot] = useState<{ records: Record<string, unknown>[]; headers: string[] } | null>(null);
@@ -399,6 +418,28 @@ export function DataCleanserScreen(props: {
 
   return (
     <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="wl-card">
+        <div class="wl-cardHeader">
+          <h2>Cleanser</h2>
+          <div class="wl-actions">
+            <button class="wl-btn" data-active={view === 'cleanser'} onClick={() => setView('cleanser')}>Cleanser</button>
+            <button class="wl-btn" data-active={view === 'health'} onClick={() => setView('health')}>Org Health</button>
+            <button class="wl-btn" data-active={view === 'coverage'} onClick={() => setView('coverage')}>Coverage</button>
+          </div>
+        </div>
+        <div class="wl-row">
+          <div class="wl-muted">
+            Cleanser is for shaping datasets before pushing. Org Health shows limits/context. Coverage shows Apex coverage from the org.
+          </div>
+        </div>
+      </div>
+
+      {view === 'health' ? (
+        <OrgHealthScreen sf={sf} tabId={tabId} />
+      ) : view === 'coverage' ? (
+        <CoverageScreen sf={sf} tabId={tabId} />
+      ) : (
+        <>
       <DatasetHeader
         dataset={datasetHeaderModel}
         summary={summary}
@@ -510,6 +551,8 @@ export function DataCleanserScreen(props: {
         showOnlyErrorFields={showOnlyErrorFields}
         onShowOnlyErrorFields={setShowOnlyErrorFields}
       />
+        </>
+      )}
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </div>

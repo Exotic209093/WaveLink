@@ -1,7 +1,22 @@
+/**
+ * UI-facing Salesforce API wrapper.
+ *
+ * What this file does:
+ * - Provides a small, typed client (`SfApi`) used by the app/panel to call background handlers.
+ * - All privileged work (cookies, tabs, network) happens in the background service worker.
+ *
+ * Why:
+ * - Keeps UI code free of `chrome.*` auth concerns and centralizes message contracts.
+ *
+ * Complexity:
+ * - Each method is O(1) JS work and delegates to background (which may do O(T) tab scans or network calls).
+ */
+
 import { MessageBus } from '../../services/messaging';
 import type { SObjectDescribe } from '../../core/types/salesforce';
 import type { UiSettings, SavedQuery } from '../../core/types/storage';
 import type { DescribeGlobalResult, QueryResult } from '../../services/salesforce/api-client';
+import type { DataPushCancelResponse, DataPushResultGetResponse } from '../../core/types/messaging';
 
 export interface SfTabInfo {
   tabId: number;
@@ -52,6 +67,24 @@ export class SfApi {
       { tabId, nextRecordsUrl },
     );
     if (!res.success || !res.data) throw new Error(res.error?.message ?? 'QueryMore failed');
+    return res.data;
+  }
+
+  async runToolingQuery(soql: string, tabId?: number): Promise<QueryResult<Record<string, unknown>>> {
+    const res = await this.bus.send<{ tabId?: number; soql: string }, QueryResult<Record<string, unknown>>>(
+      'SF_TOOLING_QUERY_RUN',
+      { tabId, soql },
+    );
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Tooling query failed');
+    return res.data;
+  }
+
+  async toolingQueryMore(nextRecordsUrl: string, tabId?: number): Promise<QueryResult<Record<string, unknown>>> {
+    const res = await this.bus.send<{ tabId?: number; nextRecordsUrl: string }, QueryResult<Record<string, unknown>>>(
+      'SF_TOOLING_QUERY_MORE',
+      { tabId, nextRecordsUrl },
+    );
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Tooling queryMore failed');
     return res.data;
   }
 
@@ -116,10 +149,23 @@ export class SfApi {
     records: Record<string, unknown>[];
     externalIdField?: string;
     batchSize?: number;
+    threads?: number;
     useBulkApi?: boolean;
   }): Promise<{ pushId: string; strategy: 'bulk' | 'rest' }> {
     const res = await this.bus.send<typeof payload, { pushId: string; strategy: 'bulk' | 'rest' }>('DATA_PUSH_START', payload);
     if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to start data push');
     return res.data;
+  }
+
+  async cancelDataPush(pushId: string): Promise<DataPushCancelResponse> {
+    const res = await this.bus.send<{ pushId: string }, DataPushCancelResponse>('DATA_PUSH_CANCEL', { pushId });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to cancel data push');
+    return res.data;
+  }
+
+  async getDataPushResult(pushId: string): Promise<DataPushResultGetResponse | null> {
+    const res = await this.bus.send<{ pushId: string }, DataPushResultGetResponse | null>('DATA_PUSH_RESULT_GET', { pushId });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to fetch data push result');
+    return (res.data ?? null) as DataPushResultGetResponse | null;
   }
 }

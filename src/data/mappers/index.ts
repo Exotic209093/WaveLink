@@ -1,6 +1,10 @@
 /**
  * Data mapping and transformation engine.
  * Maps source data fields to Salesforce target fields with transformations.
+ *
+ * Complexity:
+ * - `mapRecords` is O(N * M) where N is records and M is mappings.
+ * - `autoMapFields` is O(S * F) worst-case where S is sourceFields and F is targetFields (fuzzy match loop).
  */
 
 import type { FieldMapping, TransformationType } from '../../core/types/storage';
@@ -30,6 +34,7 @@ export class DataMapper {
     sourceRecords: Record<string, unknown>[],
     mappings: FieldMapping[],
   ): MappingResult {
+    // Time: O(N*M). Data: returns mappedRecords (good) + errors (per-record/per-field).
     const mappedRecords: Record<string, unknown>[] = [];
     const errors: MappingError[] = [];
 
@@ -83,6 +88,7 @@ export class DataMapper {
     sourceFields: string[],
     targetFields: SObjectField[],
   ): FieldMapping[] {
+    // Time: O(S*F) worst-case; uses a Map to make exact matches O(1).
     const mappings: FieldMapping[] = [];
     const targetMap = new Map(
       targetFields

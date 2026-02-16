@@ -1,3 +1,9 @@
+/**
+ * Small preview table for cleanser output.
+ *
+ * Complexity: O(R*C) where R is rendered rows (capped) and C is headers length (capped).
+ */
+
 import type { VNode } from 'preact';
 import { h } from 'preact';
 
@@ -37,4 +43,3 @@ export function PreviewGrid(props: {
     </div>
   );
 }
-

@@ -1,6 +1,12 @@
 /**
  * Custom error hierarchy for WaveLink.
  * Provides structured error handling across the extension.
+ *
+ * Why:
+ * - Chrome messaging and fetch errors otherwise lose context.
+ * - We attach stable `code` values and `details` for UI-friendly reporting.
+ *
+ * Complexity: O(1).
  */
 
 /** Base error class for all WaveLink errors */

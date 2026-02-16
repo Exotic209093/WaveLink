@@ -1,11 +1,25 @@
 /**
  * Popup entry point.
- * Initializes the popup UI and wires up event handlers
- * to communicate with the background service worker.
+ *
+ * What this file does:
+ * - Renders the extension popup UI (DOM-based, no framework).
+ * - Derives Salesforce "context" (org/user/instance) from the *currently active Salesforce tab*.
+ * - Starts data pushes scoped to that tab by calling background handlers with `{ tabId }`.
+ * - Launches the full WaveLink App tab pinned to the active Salesforce tab (`app.html?tabId=...`).
+ *
+ * Why we do it this way (vs a manual Connect step):
+ * - It keeps popup usage per-tab and avoids global "active org" state.
+ * - It mirrors Salesforce Inspector behavior: reuse the browser session via cookies on demand.
+ *
+ * Complexity:
+ * - Context resolution is O(1) JS work (auth may do network validation).
+ * - Listing SObjects is O(S) over `DescribeGlobalResult.sobjects`.
+ * - Focusing an existing WaveLink App tab is O(T) over open tabs.
  */
 
 import { MessageBus } from '../services/messaging';
-import type { AuthStatusResponse } from '../core/types/messaging';
+import type { DescribeGlobalResult } from '../services/salesforce/api-client';
+import { extractTabIdFromUrl, isSalesforceUrl } from '../core/utils';
 
 const messageBus = new MessageBus('popup');
 
@@ -41,74 +55,118 @@ const elements = {
 
 // ── State ────────────────────────────────────────────────────────────
 
-let currentOrgId: string | null = null;
+type SfContext = {
+  orgId: string;
+  username: string;
+  instanceUrl: string;
+  apiVersion: string;
+  environment: 'production' | 'sandbox';
+};
+
+let currentTabId: number | null = null;
+let currentContext: SfContext | null = null;
 let loadedRecords: Record<string, unknown>[] = [];
+let currentPushId: string | null = null;
 
 // ── Initialization ───────────────────────────────────────────────────
 
 async function initialize(): Promise<void> {
+  /**
+   * Popup boot:
+   * - Wire DOM listeners.
+   * - Immediately attempt to resolve context from the active tab.
+   *
+   * Complexity: O(1).
+   */
   setupEventListeners();
-  await checkAuthStatus();
+  await refreshActiveTabContext();
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────
 
-async function checkAuthStatus(): Promise<void> {
-  try {
-    const response = await messageBus.send<object, AuthStatusResponse>('AUTH_STATUS', {});
-    if (response.success && response.data?.authenticated && response.data.org) {
-      showConnectedState(response.data.org);
-    } else {
-      showDisconnectedState();
-    }
-  } catch {
-    showDisconnectedState();
-  }
+async function getActiveTab(): Promise<chrome.tabs.Tab | null> {
+  /**
+   * Returns the active tab in the focused window (or null).
+   *
+   * Why:
+   * - All popup actions are scoped to "what the user is looking at right now".
+   *
+   * Complexity: O(1).
+   */
+  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  return tabs[0] ?? null;
 }
 
-async function handleLogin(): Promise<void> {
+async function refreshActiveTabContext(): Promise<void> {
+  /**
+   * Resolve Salesforce context from the active tab and update popup state.
+   *
+   * Why:
+   * - In MV3, we don't keep long-lived connections; we derive state from the tab + cookies on demand.
+   *
+   * Data types:
+   * - Background returns `SfContext` (`orgId`, `username`, `instanceUrl`, etc).
+   *
+   * Complexity: O(1) JS work (auth may validate session via network).
+   */
   try {
-    setButtonLoading(elements.btnLoginProd, true);
-    const response = await messageBus.send('AUTH_INITIATE', {});
-    if (response.success) {
-      await checkAuthStatus();
-    } else {
-      alert(`Login failed: ${response.error?.message ?? 'Unknown error'}`);
+    setButtonLoading(elements.btnLoginProd, true, 'Refreshing...');
+    const tab = await getActiveTab();
+    if (!tab?.id || !tab.url || !isSalesforceUrl(tab.url)) {
+      showDisconnectedState();
+      return;
     }
-  } catch (error) {
-    alert(`Login failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+    const response = await messageBus.send<{ tabId: number }, SfContext>('SF_CONTEXT_GET', { tabId: tab.id });
+    if (!response.success || !response.data) {
+      showDisconnectedState();
+      return;
+    }
+
+    showConnectedState(response.data, tab.id);
+  } catch {
+    showDisconnectedState();
   } finally {
     setButtonLoading(elements.btnLoginProd, false);
   }
 }
 
 async function handleDisconnect(): Promise<void> {
-  if (!currentOrgId) return;
-  try {
-    await messageBus.send('AUTH_LOGOUT', { orgId: currentOrgId });
-    showDisconnectedState();
-  } catch (error) {
-    alert(`Disconnect failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
+  showDisconnectedState();
 }
 
 // ── UI State ─────────────────────────────────────────────────────────
 
-function showConnectedState(org: { orgId: string; username: string; instanceUrl: string }): void {
-  currentOrgId = org.orgId;
+function showConnectedState(ctx: SfContext, tabId: number): void {
+  /**
+   * Enter "connected" UI state for the resolved Salesforce context.
+   *
+   * Complexity: O(1) DOM updates + triggers an async SObject load.
+   */
+  currentTabId = tabId;
+  currentContext = ctx;
   elements.authSection.classList.add('hidden');
   elements.connectedSection.classList.remove('hidden');
   elements.connectionStatus.textContent = 'Connected';
   elements.connectionStatus.className = 'status-badge connected';
-  elements.orgName.textContent = org.orgId;
-  elements.orgUsername.textContent = org.username;
-  elements.orgInstance.textContent = new URL(org.instanceUrl).hostname;
+  elements.orgName.textContent = ctx.orgId;
+  elements.orgUsername.textContent = ctx.username;
+  elements.orgInstance.textContent = new URL(ctx.instanceUrl).hostname;
 
   loadSObjects();
 }
 
 function showDisconnectedState(): void {
-  currentOrgId = null;
+  /**
+   * Reset popup state back to "disconnected".
+   *
+   * Note:
+   * - This does NOT log the user out of Salesforce; it's only clearing extension UI state.
+   *
+   * Complexity: O(1).
+   */
+  currentTabId = null;
+  currentContext = null;
   loadedRecords = [];
   elements.authSection.classList.remove('hidden');
   elements.connectedSection.classList.add('hidden');
@@ -119,13 +177,19 @@ function showDisconnectedState(): void {
 // ── SObject Loading ──────────────────────────────────────────────────
 
 async function loadSObjects(): Promise<void> {
-  if (!currentOrgId) return;
+  /**
+   * Populate the "Target Object" dropdown from `describeGlobal`.
+   *
+   * Complexity: O(S) where S is number of returned sObjects.
+   */
+  if (!currentTabId) return;
   try {
-    const response = await messageBus.send('SCHEMA_DESCRIBE', { orgId: currentOrgId });
-    if (response.success && Array.isArray(response.data)) {
+    const response = await messageBus.send<{ tabId: number }, DescribeGlobalResult>('SF_DESCRIBE_GLOBAL', { tabId: currentTabId });
+    if (response.success && response.data?.sobjects) {
       const select = elements.objectSelect;
       select.innerHTML = '<option value="">Select an object...</option>';
-      for (const obj of response.data as Array<{ name: string; label: string }>) {
+      const createables = response.data.sobjects.filter(s => s.createable);
+      for (const obj of createables) {
         const option = document.createElement('option');
         option.value = obj.name;
         option.textContent = `${obj.label} (${obj.name})`;
@@ -161,6 +225,14 @@ function handleFileSelect(file: File): void {
 }
 
 function parseCsvToRecords(csv: string): Record<string, unknown>[] {
+  /**
+   * Very small CSV parser for popup usage.
+   *
+   * Tradeoff:
+   * - This is not RFC-compliant CSV (quoted commas, newlines-in-fields, etc). For complex inputs, use the full app.
+   *
+   * Complexity: O(L) where L is the number of lines/values.
+   */
   const lines = csv.trim().split('\n');
   if (lines.length < 2) return [];
 
@@ -221,7 +293,12 @@ function showDataPreview(): void {
 // ── Data Push ────────────────────────────────────────────────────────
 
 async function handleDataPush(): Promise<void> {
-  if (!currentOrgId || loadedRecords.length === 0) return;
+  /**
+   * Start a push job via background and show progress overlay.
+   *
+   * Complexity: O(1) here; actual work is in background and is O(N) over records.
+   */
+  if (!currentTabId || loadedRecords.length === 0) return;
 
   const objectName = elements.objectSelect.value;
   const operation = elements.operationSelect.value as 'insert' | 'update' | 'upsert' | 'delete';
@@ -232,10 +309,15 @@ async function handleDataPush(): Promise<void> {
   }
 
   elements.progressOverlay.classList.remove('hidden');
+  elements.btnCancelPush.removeAttribute('disabled');
+  currentPushId = null;
 
   try {
-    const response = await messageBus.send('DATA_PUSH_START', {
-      orgId: currentOrgId,
+    const response = await messageBus.send<
+      { tabId: number; objectName: string; records: Record<string, unknown>[]; operation: 'insert' | 'update' | 'upsert' | 'delete' },
+      { pushId: string; strategy: 'bulk' | 'rest' }
+    >('DATA_PUSH_START', {
+      tabId: currentTabId,
       objectName,
       records: loadedRecords,
       operation,
@@ -244,10 +326,16 @@ async function handleDataPush(): Promise<void> {
     if (!response.success) {
       alert(`Push failed: ${response.error?.message ?? 'Unknown error'}`);
       elements.progressOverlay.classList.add('hidden');
+      elements.btnCancelPush.setAttribute('disabled', 'true');
+      currentPushId = null;
+      return;
     }
+    currentPushId = response.data?.pushId ?? null;
   } catch (error) {
     alert(`Push failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     elements.progressOverlay.classList.add('hidden');
+    elements.btnCancelPush.setAttribute('disabled', 'true');
+    currentPushId = null;
   }
 }
 
@@ -255,11 +343,16 @@ async function handleDataPush(): Promise<void> {
 
 messageBus.on('DATA_PUSH_PROGRESS', async (message) => {
   const data = message.payload as {
+    pushId?: string;
     totalRecords: number;
     processedRecords: number;
     failedRecords: number;
     status: string;
   };
+
+  if (currentPushId && data.pushId && data.pushId !== currentPushId) {
+    return { success: true, requestId: message.requestId };
+  }
 
   const pct = Math.round((data.processedRecords / data.totalRecords) * 100);
   elements.progressFill.style.width = `${pct}%`;
@@ -270,16 +363,28 @@ messageBus.on('DATA_PUSH_PROGRESS', async (message) => {
 
 messageBus.on('DATA_PUSH_COMPLETE', async (message) => {
   const data = message.payload as {
+    pushId?: string;
     totalRecords: number;
     processedRecords: number;
     failedRecords: number;
+    status?: string;
   };
+
+  if (currentPushId && data.pushId && data.pushId !== currentPushId) {
+    return { success: true, requestId: message.requestId };
+  }
 
   elements.progressOverlay.classList.add('hidden');
   elements.progressFill.style.width = '0%';
+  elements.btnCancelPush.setAttribute('disabled', 'true');
 
   const successCount = data.processedRecords - data.failedRecords;
-  alert(`Push complete!\n${successCount} succeeded, ${data.failedRecords} failed out of ${data.totalRecords} total.`);
+  if (data.status === 'cancelled') {
+    alert(`Push cancelled.\n${successCount} succeeded, ${data.failedRecords} failed out of ${data.totalRecords} total.`);
+  } else {
+    alert(`Push complete!\n${successCount} succeeded, ${data.failedRecords} failed out of ${data.totalRecords} total.`);
+  }
+  currentPushId = null;
 
   return { success: true, requestId: message.requestId };
 });
@@ -287,8 +392,15 @@ messageBus.on('DATA_PUSH_COMPLETE', async (message) => {
 // ── Event Listeners ──────────────────────────────────────────────────
 
 function setupEventListeners(): void {
+  /**
+   * Wire all popup DOM event listeners.
+   *
+   * Complexity: O(1) (listener registration).
+   */
   elements.btnOpenApp.addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('app/app.html') });
+    openWaveLinkAppForActiveTab().catch(() => {
+      // Ignore
+    });
   });
   elements.btnTogglePanel.addEventListener('click', async () => {
     try {
@@ -298,9 +410,17 @@ function setupEventListeners(): void {
     }
   });
 
-  elements.btnLoginProd.addEventListener('click', handleLogin);
+  elements.btnLoginProd.addEventListener('click', refreshActiveTabContext);
   elements.btnDisconnect.addEventListener('click', handleDisconnect);
   elements.btnPush.addEventListener('click', handleDataPush);
+  elements.btnCancelPush.addEventListener('click', async () => {
+    if (!currentPushId) return;
+    try {
+      await messageBus.send('DATA_PUSH_CANCEL', { pushId: currentPushId });
+    } catch {
+      // Ignore
+    }
+  });
 
   // Tab switching
   elements.tabs.forEach(tab => {
@@ -352,11 +472,50 @@ function escapeHtml(str: string): string {
   return div.innerHTML;
 }
 
-function setButtonLoading(btn: HTMLElement, loading: boolean): void {
+async function openWaveLinkAppForActiveTab(): Promise<void> {
+  /**
+   * Open (or focus) a WaveLink App tab pinned to the active Salesforce tab.
+   *
+   * Why:
+   * - Users often work with multiple orgs/tabs simultaneously; `tabId` makes the app per-tab.
+   *
+   * Complexity: O(T) where T is the number of open tabs (we scan to find an existing app tab).
+   */
+  const tab = await getActiveTab();
+  if (!tab?.id || !tab.url || !isSalesforceUrl(tab.url)) {
+    alert('Open a logged-in Salesforce tab first.');
+    return;
+  }
+
+  const appBase = chrome.runtime.getURL('app/app.html');
+  const targetUrl = `${appBase}?tabId=${tab.id}`;
+
+  const allTabs = await chrome.tabs.query({});
+  const existing = allTabs.find(t =>
+    typeof t.url === 'string'
+    && t.url.startsWith(appBase)
+    && extractTabIdFromUrl(t.url) === tab.id
+    && typeof t.id === 'number'
+  );
+
+  if (existing?.id) {
+    await chrome.tabs.update(existing.id, { active: true });
+    try {
+      await chrome.windows.update(existing.windowId, { focused: true });
+    } catch {
+      // Not critical; focusing window may not be available in some contexts.
+    }
+    return;
+  }
+
+  await chrome.tabs.create({ url: targetUrl });
+}
+
+function setButtonLoading(btn: HTMLElement, loading: boolean, loadingText: string = 'Connecting...'): void {
   if (loading) {
     btn.setAttribute('disabled', 'true');
     btn.dataset.originalText = btn.textContent ?? '';
-    btn.textContent = 'Connecting...';
+    btn.textContent = loadingText;
   } else {
     btn.removeAttribute('disabled');
     btn.textContent = btn.dataset.originalText ?? btn.textContent;

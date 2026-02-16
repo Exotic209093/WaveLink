@@ -1,3 +1,12 @@
+/**
+ * UI transform catalog.
+ *
+ * What this file does:
+ * - Defines human-friendly labels and badges for transformation keys used by mapping/cleanser UIs.
+ *
+ * Complexity: O(1).
+ */
+
 import type { TransformationType } from '../../core/types/storage';
 
 export const TRANSFORM_OPTIONS: Array<{ key: TransformationType; label: string; badge: string }> = [
@@ -9,4 +18,3 @@ export const TRANSFORM_OPTIONS: Array<{ key: TransformationType; label: string; 
   { key: 'number_format', label: 'Number parse', badge: 'Num' },
   { key: 'date_format', label: 'Date (YYYY-MM-DD)', badge: 'Date' },
 ];
-

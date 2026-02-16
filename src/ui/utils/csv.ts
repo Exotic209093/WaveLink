@@ -1,3 +1,9 @@
+/**
+ * CSV export utilities for UI.
+ *
+ * Complexity: O(N*C) over records/columns.
+ */
+
 import type { FlatRecord } from './records';
 
 function escapeCsvValue(value: unknown): string {
@@ -14,4 +20,3 @@ export function recordsToCsv(records: FlatRecord[], columns: string[]): string {
   const rows = records.map(r => columns.map(c => escapeCsvValue(r[c])).join(','));
   return [header, ...rows].join('\n');
 }
-

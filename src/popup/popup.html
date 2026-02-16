@@ -1,5 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+<!--
+  WaveLink popup UI.
+
+  What this page does:
+  - Hosts a lightweight popup UI wired up by `src/popup/index.ts`.
+  - The popup derives context from the active Salesforce tab (no manual connect).
+-->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,10 +39,10 @@
 
       <!-- Auth Section (shown when not connected) -->
       <section id="auth-section" class="section">
-        <p class="section-description">Open a logged-in Salesforce tab, then connect.</p>
+        <p class="section-description">Open a logged-in Salesforce tab, then click Refresh.</p>
         <div class="auth-buttons">
           <button id="btn-login-prod" class="btn btn-primary">
-            Connect Current Salesforce Tab
+            Refresh Current Tab
           </button>
         </div>
       </section>
@@ -125,7 +132,7 @@
         <!-- Disconnect -->
         <div class="section-footer">
           <button id="btn-disconnect" class="btn btn-danger btn-small">
-            Disconnect
+            Clear
           </button>
         </div>
       </section>
