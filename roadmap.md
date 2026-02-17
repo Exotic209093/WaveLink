@@ -14,18 +14,18 @@
 | 2.1 | Retry Failed Rows | ✅ Complete |
 | 2.2 | Safer Delete Confirmations | ✅ Complete |
 | 2.3 | Push History Detail View | ✅ Complete |
-| 3.1 | Enhanced Query History with Folders | 🔄 In Progress |
-| 3.2 | Cleanser Column Reordering | ⏳ Pending |
-| 3.3 | Bulk Field Updates | ⏳ Pending |
-| 4.1 | Advanced Keyboard Shortcuts | ⏳ Pending |
-| 5.1 | Test Data Generator | ⏳ Pending |
-| 5.2 | Data Templates Library | ⏳ Pending |
-| 5.3 | Schema Comparison | ⏳ Pending |
-| 5.4 | Field Usage Analytics | ⏳ Pending |
-| 6.1 | Duplicate Detection & Merging | ⏳ Pending |
-| 6.2 | Undo/Redo Operations | ⏳ Pending |
-| 7.1 | Data Transformation Pipelines | ⏳ Pending |
-| 7.2 | Cross-Object Data Cloning | ⏳ Pending |
+| 3.1 | Enhanced Query History with Folders | ✅ Complete |
+| 3.2 | Cleanser Column Reordering | ✅ Complete |
+| 3.3 | Bulk Field Updates | ✅ Complete |
+| 4.1 | Advanced Keyboard Shortcuts | ✅ Complete |
+| 5.1 | Test Data Generator | ✅ Complete |
+| 5.2 | Data Templates Library | ✅ Complete |
+| 5.3 | Schema Comparison | ✅ Complete |
+| 5.4 | Field Usage Analytics | ✅ Complete |
+| 6.1 | Duplicate Detection & Merging | ✅ Complete |
+| 6.2 | Undo/Redo Operations | ✅ Complete |
+| 7.1 | Data Transformation Pipelines | ✅ Complete |
+| 7.2 | Cross-Object Data Cloning | ✅ Complete |
 
 ---
 
@@ -95,149 +95,137 @@
 
 ---
 
-## BATCH 3: Power User Features Part 1 🔄
+## BATCH 3: Power User Features Part 1 ✅
 
-### 3.1 Enhanced Query History with Folders 🔄
-**Progress: Storage layer complete, UI pending**
-
-**Completed:**
-- `storage.ts` — `SavedQuery` extended with `folderId`, `favorite`, `tags`, `executionCount`, `lastExecutedAt`
-- `storage.ts` — new `QueryFolder` interface (`id`, `name`, `parentId`, `createdAt`)
-- `LocalStorageSchema` — added `queryFolders` field
-- `constants/index.ts` — added `QUERY_FOLDERS` storage key
-- `StorageService` — `upsertSavedQuery` preserves new fields; added `incrementQueryExecution()`, `getQueryFolders()`, `upsertQueryFolder()`, `deleteQueryFolder()`
-
-**Still to do:**
-- `src/ui/components/QueryManager.tsx` — sidebar panel: folder tree + query list, favorites filter, search, drag-to-folder
-- `src/ui/components/QueryFolderTree.tsx` — collapsible folder tree with create/rename/delete
-- Add `QUERY_FOLDERS_GET`, `QUERY_FOLDERS_UPSERT`, `QUERY_FOLDERS_DELETE` message types + background handlers
-- Add `listQueryFolders()`, `upsertQueryFolder()`, `deleteQueryFolder()` to `SfApi`
-- Integrate QueryManager into `QueryScreen.tsx`
-- Import/export queries as JSON
+### 3.1 Enhanced Query History with Folders ✅
+**What was built:**
+- `src/core/types/storage.ts` — `SavedQuery` extended with `folderId`, `favorite`, `tags`, `executionCount`, `lastExecutedAt`; new `QueryFolder` interface
+- `src/core/types/messaging.ts` — Added `QUERY_FOLDERS_GET`, `QUERY_FOLDERS_UPSERT`, `QUERY_FOLDERS_DELETE` message types
+- `src/services/storage/index.ts` — Added folder CRUD, `incrementQueryExecution()`
+- `src/background/index.ts` — Added 3 folder handlers
+- `src/ui/api/sf.ts` — Added `listQueryFolders()`, `upsertQueryFolder()`, `deleteQueryFolder()`
+- `src/ui/components/QueryFolderTree.tsx` — Recursive collapsible folder tree with expand/collapse, create, rename, delete
+- `src/ui/components/QueryManager.tsx` — 2-column panel: folder tree left, query list right; favorites filter, fuzzy search, drag-to-folder, import/export JSON
+- `src/ui/screens/QueryScreen.tsx` — Integrated QueryManager with "Manage" toggle
 
 ---
 
-### 3.2 Cleanser Column Reordering ⏳
-**Plan:**
-- `src/ui/utils/dragDrop.ts` — reusable drag-drop utilities (HTML5 DnD)
-- `ColumnList.tsx` — drag handle on each row, drop indicator between rows
-- Keyboard accessibility: Alt+Up / Alt+Down to move columns
-- CSS styles in `uiCss.ts`
+### 3.2 Cleanser Column Reordering ✅
+**What was built:**
+- `src/ui/utils/dragDrop.ts` — `reorderByDrag<T>()` pure function + `useDragList<T>()` Preact hook for HTML5 DnD state
+- `src/ui/screens/DataCleanserScreen.tsx` — Drag handles on column rows, drop indicators, keyboard Alt+Up/Down reorder
 
 ---
 
-### 3.3 Bulk Field Updates ⏳
-**Plan:**
-- `src/ui/components/cleanser/BulkUpdateModal.tsx` — select target columns, choose transformation, apply
-- `src/ui/components/cleanser/ConditionalBuilder.tsx` — build IF col == value THEN apply logic
-- `src/ui/utils/formulas.ts` — template interpolation e.g. `{FirstName} {LastName}`
-- Hook into existing cleanser `BulkActions.tsx`
-- Preview affected rows before applying
+### 3.3 Bulk Field Updates ✅
+**What was built:**
+- `src/ui/utils/formulas.ts` — `interpolate()`, `extractTokens()`, `evaluateCondition()`, `applyConditionalRule()`
+- `src/ui/components/ConditionalBuilder.tsx` — IF/THEN/ELSE rule builder (field, operator, value → thenValue/elseValue)
+- `src/ui/components/BulkUpdateModal.tsx` — Formula mode (`{Field}` interpolation) or Conditional mode; 5-row preview; Apply button
+- `src/ui/screens/DataCleanserScreen.tsx` — Integrated BulkUpdateModal with state management
 
 ---
 
-## BATCH 4: Power User Features Part 2
+## BATCH 4: Power User Features Part 2 ✅
 
-### 4.1 Advanced Keyboard Shortcuts ⏳
-**Plan:**
-- `src/ui/utils/shortcuts.ts` — shortcut registry, conflict detection, persistence
-- `src/ui/components/CommandPalette.tsx` — fuzzy-searchable command list, triggered by `Ctrl+K`
-- `src/ui/components/ShortcutEditor.tsx` — customisation UI in Settings
-- Default shortcuts: `Ctrl+K` (palette), `Ctrl+Enter` (run query), `Ctrl+P` (push), `Ctrl+T` (theme toggle)
-- Persist custom bindings to `UiSettings`
-
----
-
-## BATCH 5: Developer Productivity
-
-### 5.1 Test Data Generator ⏳
-**Plan:**
-- `src/ui/utils/testDataGenerator.ts` — maps Salesforce field types to @faker-js/faker generators; relationship-aware (child IDs match parent)
-- `src/ui/components/TestDataGeneratorModal.tsx` — configure record count, null %, per-field generator
-- `src/ui/components/FieldGeneratorConfig.tsx` — per-field type/pattern override
-- `src/ui/components/RelationshipConfig.tsx` — parent ID injection for lookups
-- Button in `ObjectsScreen` + `DataPushScreen`
-
-**Dependencies to add:** `@faker-js/faker`
+### 4.1 Advanced Keyboard Shortcuts ✅
+**What was built:**
+- `src/ui/utils/shortcuts.ts` — Singleton `shortcutRegistry` with `register()`, `setBinding()` with conflict detection, `handleKeydown()`, `normalizeKeys()`
+- `src/ui/components/CommandPalette.tsx` — `Ctrl+K` overlay: search input, fuzzy-filtered command list, arrow-key navigation, Enter to execute
+- `src/ui/components/ShortcutEditor.tsx` — Table of shortcuts with keypress capture rebinding, inline conflict warnings
+- `src/ui/screens/SettingsScreen.tsx` — Integrated ShortcutEditor section
+- `src/ui/app/AppRoot.tsx` — Global keydown listener, default shortcuts (Ctrl+K, Ctrl+Shift+Q, Ctrl+Shift+P, Ctrl+Z), CommandPalette state
+- `src/core/types/storage.ts` — Added `shortcuts` to `UiSettings`
 
 ---
 
-### 5.2 Data Templates Library ⏳
-**Plan:**
-- `src/ui/screens/TemplatesScreen.tsx` — grid of template cards; search, filter by object
-- `src/ui/components/TemplateEditor.tsx` — edit name, description, field mappings, sample data
-- `src/ui/components/TemplateCard.tsx` — card showing object, last used, usage count
-- Extend `DataTemplate` in `storage.ts` with `category`, `usageCount`, `lastUsedAt`
-- Save/load buttons in `DataPushScreen`
+## BATCH 5: Developer Productivity ✅
+
+### 5.1 Test Data Generator ✅
+**What was built:**
+- `src/ui/utils/testDataGenerator.ts` — `generateFieldValue()` maps SF field types to faker calls; `generateRecord()`, `generateDataset()`
+- `src/ui/components/FieldGeneratorConfig.tsx` — Per-field config: Auto/Static/Formula/Faker mode, nullable + null rate
+- `src/ui/components/RelationshipConfig.tsx` — Textarea for lookup IDs (round-robin assignment)
+- `src/ui/screens/TestDataGeneratorScreen.tsx` — Object selector, count input, field configs, Generate Preview, Download CSV, Send to Push
+
+**Dependencies added:** `@faker-js/faker`
 
 ---
 
-### 5.3 Schema Comparison ⏳
-**Plan:**
-- `src/ui/utils/schemaDiff.ts` — diff two describe results; classify each field as added/removed/changed/same
-- `src/ui/screens/SchemaComparisonScreen.tsx` — pick two objects (same or different orgs), run comparison
-- `src/ui/components/SchemaDiffView.tsx` — colour-coded diff table
-- `src/ui/components/FieldDiffDetail.tsx` — expand row to see changed attributes
-- Export comparison to CSV/JSON/HTML
+### 5.2 Data Templates Library ✅
+**What was built:**
+- `src/core/types/storage.ts` — Extended `DataTemplate` with `category?`, `usageCount?`, `lastUsedAt?`
+- `src/core/types/messaging.ts` — Added `TEMPLATES_LIST`, `TEMPLATES_UPSERT`, `TEMPLATES_DELETE`
+- `src/services/storage/index.ts` — Added `upsertDataTemplate()`, `incrementTemplateUsage()`
+- `src/ui/components/TemplateCard.tsx` — Card with name, object badge, category, usage count, actions
+- `src/ui/components/TemplateEditor.tsx` — Form: name, description, objectName, category, fieldMappings JSON editor
+- `src/ui/screens/TemplatesScreen.tsx` — Grid of TemplateCards, search, category filter, New/Edit/Delete
+- `src/ui/screens/DataPushScreen.tsx` — Added "Load Template" / "Save as Template" buttons
 
 ---
 
-### 5.4 Field Usage Analytics ⏳
-**Plan:**
-- `src/ui/utils/fieldAnalytics.ts` — builds SOQL to measure population rates, uniqueness per field
-- `src/ui/screens/FieldAnalyticsScreen.tsx` — run analysis, show progress, render results
-- `src/ui/components/FieldAnalyticsChart.tsx` — horizontal bar chart (population %)
-- `src/ui/components/FieldRecommendations.tsx` — actionable suggestions (make required, consider picklist, candidate for deletion)
+### 5.3 Schema Comparison ✅
+**What was built:**
+- `src/ui/utils/schemaDiff.ts` — `diffSchemas()` → `SchemaDiff` (added/removed/changed/unchanged fields); `diffToCsv()`, `diffToHtml()`
+- `src/ui/components/FieldDiffDetail.tsx` — Row showing field name, status badge, property deltas
+- `src/ui/components/SchemaDiffView.tsx` — Filter toolbar + scrollable diff list
+- `src/ui/screens/SchemaComparisonScreen.tsx` — Two object selectors, Compare button, SchemaDiffView, export CSV/JSON/HTML
 
 ---
 
-## BATCH 6: Advanced Data Operations Part 1
-
-### 6.1 Duplicate Detection & Merging ⏳
-**Plan:**
-- `src/ui/utils/duplicateDetection.ts` — configurable match rules; exact / Levenshtein / Soundex
-- `src/ui/utils/fuzzyMatch.ts` — Levenshtein distance + Soundex implementations
-- `src/ui/screens/DuplicateDetectionScreen.tsx` — configure match fields + weights, run scan, view groups
-- `src/ui/components/MergeWizard.tsx` — 3-step: select master → field values → confirm
-- `src/ui/components/DuplicateGroupView.tsx` — expandable group rows
+### 5.4 Field Usage Analytics ✅
+**What was built:**
+- `src/ui/utils/fieldAnalytics.ts` — `buildAnalyticsQuery()`, `computeFieldMetrics()` → population/unique rates, `generateRecommendations()`
+- `src/ui/components/FieldAnalyticsChart.tsx` — CSS bar chart: field name, population bar, unique rate bar
+- `src/ui/components/FieldRecommendations.tsx` — Recommendation list for low-population/low-unique fields
+- `src/ui/screens/FieldAnalyticsScreen.tsx` — Object selector, sample size, Analyze button, charts, recommendations, export
 
 ---
 
-### 6.2 Undo/Redo Operations ⏳
-**Plan:**
-- `src/ui/utils/undo.ts` — transaction service: capture rollback data, max 10 entries, 1-hour TTL
-- `src/ui/components/UndoHistoryPanel.tsx` — floating panel listing reversible operations
-- `storage.ts` — add `Transaction` interface (operation, objectName, rollbackData, timestamp)
-- `background/index.ts` — capture rollback data (inserted IDs for insert, original values for update, deleted records for delete)
-- Confirmation modal before undo executes
+## BATCH 6: Advanced Data Operations Part 1 ✅
+
+### 6.1 Duplicate Detection & Merging ✅
+**What was built:**
+- `src/ui/utils/duplicateDetection.ts` — `levenshteinDistance()`, `levenshteinSimilarity()`, `soundex()`, `detectDuplicates()` → `DuplicateGroup[]`, `mergeRecords()`
+- `src/ui/components/DuplicateGroupView.tsx` — Table of group records with radio selectors per field for merge resolution
+- `src/ui/components/MergeWizard.tsx` — 3-step wizard: overview → per-group resolution → confirm & apply
+- `src/ui/screens/DuplicateDetectionScreen.tsx` — Object/fields selector, strategy (exact/levenshtein/soundex), threshold, Fetch + Detect, MergeWizard, Send to Push
 
 ---
 
-## BATCH 7: Advanced Data Operations Part 2
-
-### 7.1 Data Transformation Pipelines ⏳
-**Plan:**
-- `src/ui/utils/pipelineExecutor.ts` — step-by-step execution engine; steps: filter, transform, lookup, aggregate, join
-- `src/ui/screens/PipelineBuilderScreen.tsx` — drag-drop canvas for building pipelines
-- `src/ui/components/pipeline/PipelineCanvas.tsx` — visual node graph
-- `src/ui/components/pipeline/StepLibrary.tsx` — side panel of available step types
-- `src/ui/components/pipeline/StepConfigPanel.tsx` — configure selected step
-- Save/load pipelines, preview on sample data
+### 6.2 Undo/Redo Operations ✅
+**What was built:**
+- `src/core/types/storage.ts` — Added `PushTransaction` interface with rollback data, TTL; `pushTransactions` in schema
+- `src/core/constants/index.ts` — Added `MAX_UNDO_ENTRIES`, `UNDO_TTL_MS`, `PUSH_TRANSACTIONS` key
+- `src/ui/utils/undo.ts` — `isTransactionExpired()`, `pruneTransactions()`
+- `src/ui/components/UndoHistoryPanel.tsx` — Fixed bottom-right panel: transaction list with age, Undo button, expired entries greyed out
+- `src/background/index.ts` — Auto-captures `PushTransaction` after insert operations
 
 ---
 
-### 7.2 Cross-Object Data Cloning ⏳
-**Plan:**
-- `src/ui/utils/crossObjectClone.ts` — dependency graph builder; topological sort for correct insert order; ID remapping for lookups
-- `src/ui/screens/CloneWizardScreen.tsx` — 4-step wizard: source → relationships → field mapping → review
-- `src/ui/components/RelationshipTree.tsx` — interactive hierarchy tree showing what will be cloned
-- Handle circular references, required fields, same-org vs cross-org modes
+## BATCH 7: Advanced Data Operations Part 2 ✅
+
+### 7.1 Data Transformation Pipelines ✅
+**What was built:**
+- `src/ui/utils/pipelineExecutor.ts` — Step types: filter, transform, lookup, aggregate, join. `executeStep()`, `executePipeline()` with intermediate outputs
+- `src/ui/components/StepLibrary.tsx` — Vertical list of addable step types
+- `src/ui/components/StepConfigPanel.tsx` — Config form per step type
+- `src/ui/components/PipelineCanvas.tsx` — Vertical flow of steps, drag-to-reorder (reuses `useDragList`), connector lines, active selection
+- `src/ui/screens/PipelineBuilderScreen.tsx` — 3-column layout: StepLibrary | Canvas | ConfigPanel; Run Preview, Save/Load, Send to Push
+
+---
+
+### 7.2 Cross-Object Data Cloning ✅
+**What was built:**
+- `src/ui/utils/crossObjectClone.ts` — `buildDependencyGraph()`, `topologicalSort()` (Kahn's algorithm), `detectCircularReferences()`, `remapIds()`
+- `src/ui/components/RelationshipTree.tsx` — Tree of objects with checkboxes, edge labels, cycle warnings
+- `src/ui/screens/CloneWizardScreen.tsx` — 5-step wizard: select root → configure filters → handle cycles → cross-org toggle → preview & execute
 
 ---
 
 ## Files Changed So Far
 
-### New Files Created
+### New Files Created (Batches 1-2)
 | File | Purpose |
 |------|---------|
 | `src/ui/utils/theme.ts` | Theme management |
@@ -253,7 +241,49 @@
 | `src/ui/components/PushHistoryDetail.tsx` | Push detail + error groups modal |
 | `src/ui/screens/PushHistoryScreen.tsx` | Push history table screen |
 
-### Modified Files
+### New Files Created (Batches 3-7)
+| File | Purpose |
+|------|---------|
+| `src/ui/utils/dragDrop.ts` | Reusable drag-and-drop utilities |
+| `src/ui/utils/formulas.ts` | Template interpolation and conditional rules |
+| `src/ui/utils/shortcuts.ts` | Keyboard shortcut registry with conflict detection |
+| `src/ui/utils/testDataGenerator.ts` | Test data generation with faker.js |
+| `src/ui/utils/schemaDiff.ts` | Schema comparison and diff engine |
+| `src/ui/utils/fieldAnalytics.ts` | Field usage analytics computations |
+| `src/ui/utils/duplicateDetection.ts` | Duplicate detection (Levenshtein, Soundex, exact) |
+| `src/ui/utils/undo.ts` | Transaction expiry and pruning |
+| `src/ui/utils/pipelineExecutor.ts` | Pipeline step execution engine |
+| `src/ui/utils/crossObjectClone.ts` | Dependency graph, topological sort, ID remapping |
+| `src/ui/components/QueryFolderTree.tsx` | Recursive collapsible folder tree |
+| `src/ui/components/QueryManager.tsx` | 2-column query management panel |
+| `src/ui/components/ConditionalBuilder.tsx` | IF/THEN/ELSE rule builder |
+| `src/ui/components/BulkUpdateModal.tsx` | Bulk field update modal |
+| `src/ui/components/CommandPalette.tsx` | Fuzzy-searchable command palette |
+| `src/ui/components/ShortcutEditor.tsx` | Keyboard shortcut customizer |
+| `src/ui/components/FieldGeneratorConfig.tsx` | Per-field test data config |
+| `src/ui/components/RelationshipConfig.tsx` | Lookup ID injection config |
+| `src/ui/components/TemplateCard.tsx` | Template display card |
+| `src/ui/components/TemplateEditor.tsx` | Template edit form |
+| `src/ui/components/FieldDiffDetail.tsx` | Schema diff detail row |
+| `src/ui/components/SchemaDiffView.tsx` | Schema diff list view |
+| `src/ui/components/FieldAnalyticsChart.tsx` | CSS bar chart for field metrics |
+| `src/ui/components/FieldRecommendations.tsx` | Field optimization recommendations |
+| `src/ui/components/DuplicateGroupView.tsx` | Duplicate group record table |
+| `src/ui/components/MergeWizard.tsx` | 3-step merge wizard |
+| `src/ui/components/UndoHistoryPanel.tsx` | Fixed undo history panel |
+| `src/ui/components/StepLibrary.tsx` | Pipeline step type picker |
+| `src/ui/components/StepConfigPanel.tsx` | Pipeline step configuration |
+| `src/ui/components/PipelineCanvas.tsx` | Visual pipeline flow canvas |
+| `src/ui/components/RelationshipTree.tsx` | Object relationship tree |
+| `src/ui/screens/TestDataGeneratorScreen.tsx` | Test data generation screen |
+| `src/ui/screens/TemplatesScreen.tsx` | Data templates library screen |
+| `src/ui/screens/SchemaComparisonScreen.tsx` | Schema comparison screen |
+| `src/ui/screens/FieldAnalyticsScreen.tsx` | Field usage analytics screen |
+| `src/ui/screens/DuplicateDetectionScreen.tsx` | Duplicate detection & merging screen |
+| `src/ui/screens/PipelineBuilderScreen.tsx` | Pipeline builder screen |
+| `src/ui/screens/CloneWizardScreen.tsx` | Cross-object clone wizard screen |
+
+### Modified Files (Batches 1-2)
 | File | What Changed |
 |------|-------------|
 | `src/core/types/storage.ts` | Added `QueryFolder`; extended `SavedQuery` with folder/favorite/tags/execution fields; added `queryFolders` to schema |
@@ -270,18 +300,82 @@
 | `src/ui/components/cleanser/DatasetHeader.tsx` | DropZone empty state |
 | `src/background/index.ts` | `DATA_PUSH_COMPLETE` includes `errors[]`; `PUSH_HISTORY_GET` handler |
 
+### Modified Files (Batches 3-7)
+| File | What Changed |
+|------|-------------|
+| `src/core/types/storage.ts` | Added `PushTransaction`, `Pipeline`, `DataTemplate` extensions, `UiSettings.shortcuts` |
+| `src/core/types/messaging.ts` | Added folder, template, pipeline, transaction message types |
+| `src/core/constants/index.ts` | Added `PIPELINES`, `PUSH_TRANSACTIONS`, `MAX_UNDO_ENTRIES`, `UNDO_TTL_MS` keys |
+| `src/services/storage/index.ts` | Added pipeline, template, transaction CRUD methods |
+| `src/background/index.ts` | Added ~12 new message handlers for folders, templates, pipelines, transactions |
+| `src/ui/api/sf.ts` | Added methods for folders, templates, pipelines, transactions |
+| `src/ui/app/AppRoot.tsx` | 13 nav items, CommandPalette, UndoHistoryPanel, global keyboard shortcuts |
+| `src/ui/screens/QueryScreen.tsx` | Integrated QueryManager with "Manage" toggle |
+| `src/ui/screens/DataCleanserScreen.tsx` | Drag-and-drop column reordering, BulkUpdateModal integration |
+| `src/ui/screens/DataPushScreen.tsx` | "Load Template" / "Save as Template" buttons |
+| `src/ui/screens/SettingsScreen.tsx` | ShortcutEditor section |
+| `src/ui/styles/uiCss.ts` | Added all new component styles and dark theme overrides |
+
 ---
 
 ## Future Possibilities
 
-> These features were discussed during brainstorming but have no implementation plan yet.
-> They are not scheduled — listing them here so nothing gets forgotten.
+> Features from the brainstorming backlog. Implemented features are marked with ✅.
 
 ---
 
-### Phase 4 (Deferred — needs more thought)
+### Implemented Future Possibilities ✅
 
-These were explicitly set aside for further exploration before committing to an approach.
+#### Popup UI Modernisation ✅
+**What was built:**
+- Rewrote the popup from vanilla JS/DOM to Preact, using the same component system and design tokens as the full app
+- `src/ui/popup/PopupRoot.tsx` — Preact popup root with auto-detection of active Salesforce tab
+- `src/popup/index.tsx` — Mounts Preact PopupRoot (replaces old vanilla DOM entry)
+- `src/popup/popup.html` — Simplified to minimal container (like app.html)
+- `src/ui/components/AppShell.tsx` — Extended to support `mode: 'popup'` with compact nav
+- Popup now has: Data Push, Templates, History, Settings + quick actions (Open Full App, Toggle Panel)
+
+#### Data Quality Scorecards ✅
+**What was built:**
+- `src/ui/utils/dataQuality.ts` — Quality rule evaluation engine (`evaluateRule`, `scoreDataset`, `getDefaultRulesForField`); supports required/format/range/picklist/unique/custom rules
+- `src/ui/components/QualityRuleEditor.tsx` — Interactive rule editor with field/type/severity/config inputs
+- `src/ui/components/QualityScorecard.tsx` — Visual score display with grade circle, summary stats, field breakdown
+- `src/ui/screens/DataQualityScorecardScreen.tsx` — Object selector, rule set management (save/load), auto-suggest rules, fetch & score, export
+- Storage: `QualityRuleSet` type, CRUD methods in StorageService/background/SfApi
+
+#### Query Performance Metrics ✅
+**What was built:**
+- `src/ui/utils/queryMetrics.ts` — `QueryMetricsStore` singleton tracking last 50 queries; `formatDuration`, `estimateApiCost`; average time, slowest queries, per-object filtering
+- `src/ui/components/QueryMetricsPanel.tsx` — Inline panel showing execution times, record counts, averages
+
+#### API Usage Dashboard ✅
+**What was built:**
+- `src/ui/screens/ApiUsageDashboardScreen.tsx` — Fetches Salesforce org limits via `SF_LIMITS_GET`; color-coded usage bars (green/yellow/red); search/filter, refresh
+
+#### Bulk Object Operations ✅
+**What was built:**
+- `src/ui/screens/BulkObjectOpsScreen.tsx` — Object selector, count records, delete all records with TypedConfirmModal safety confirmation, production org warning
+
+#### Visual Relationship Explorer ✅
+**What was built:**
+- `src/ui/utils/schemaGraph.ts` — `buildSchemaGraph`, `getRelatedObjects` (BFS), `getFieldRelationships`, `computeLayout` (hierarchical positioning)
+- `src/ui/components/SchemaGraphView.tsx` — CSS + SVG node graph with positioned cards, edge lines, click selection
+- `src/ui/screens/RelationshipExplorerScreen.tsx` — Object selector, depth control, explore button, split layout (graph | detail panel)
+
+#### Onboarding & Help System ✅
+**What was built:**
+- `src/ui/utils/onboarding.ts` — `ONBOARDING_STEPS` array (~12 tutorial steps), progress helpers (`getNextStep`, `getCategoryProgress`, `isOnboardingComplete`)
+- `src/ui/components/OnboardingWizard.tsx` — Step-by-step tutorial overlay with category tabs, progress bar, navigation, "Go to [feature]" buttons
+- `src/ui/components/HelpTooltip.tsx` — Contextual "?" icon with hover tooltip
+- `src/ui/screens/HelpScreen.tsx` — Help center with category cards, topic links, search, "Restart Tutorial" button
+- Storage: `OnboardingProgress` type, get/set methods in StorageService/background/SfApi
+- Auto-shows on first use; dismissible
+
+---
+
+### Remaining Future Possibilities (Not Yet Implemented)
+
+#### Phase 4 (Deferred — needs more thought)
 
 | Feature | Description |
 |---------|-------------|
@@ -290,40 +384,22 @@ These were explicitly set aside for further exploration before committing to an 
 | **Team Sharing Features** | Export/import queries, datasets, and templates between team members; optional cloud sync; collaborative data review with comments and approvals |
 | **Notification Integrations** | Slack/Teams notifications when a long-running push job completes; email notifications; webhook support for custom integrations |
 
----
-
-### Data Management & Operations
+#### Data Management & Operations
 
 | Feature | Description |
 |---------|-------------|
 | **Scheduled / Recurring Data Imports** | Set up recurring imports on a schedule; auto-refresh from external CSV URLs or Google Sheets; background sync status notifications |
-| **Relationship Visualisation & Bulk Relationship Updates** | Visual graph of parent-child relationships in loaded data; mass-update lookup/master-detail fields; reparent multiple records at once |
+| **Relationship Visualisation & Bulk Relationship Updates** | Mass-update lookup/master-detail fields; reparent multiple records at once |
 | **Backup & Restore** | One-click backup of a Salesforce object's data; scheduled backups with versioning; point-in-time restore for pre-deployment safety |
-| **Bulk Object Operations** | Delete all records from an object with confirmation; truncate object data; mass enable/disable triggers for sandbox management |
 
----
-
-### Query, Analysis & Reporting
-
-| Feature | Description |
-|---------|-------------|
-| **Query Performance Metrics** | Execution time, records scanned, API cost per query; optimisation suggestions; index usage hints |
-| **Visual Relationship Explorer** | Interactive schema diagram; click to navigate object relationships; filter by type and visibility |
-| **Data Quality Scorecards** | Define quality rules (required fields, value formats, ranges); score a dataset before pushing; highlight issues with fix suggestions |
-
----
-
-### Developer Tools
+#### Developer Tools
 
 | Feature | Description |
 |---------|-------------|
 | **Permission Set Viewer/Editor** | View and compare permission sets; clone or modify permissions; security audit helper |
 | **Apex Log Viewer** | View debug logs in-extension; filter by type, user, and time; full-text search within logs; download logs |
-| **API Usage Dashboard** | Track API call usage over time; break down by operation type; alert when approaching governor limits; optimisation suggestions |
 
----
-
-### Integration & Automation
+#### Integration & Automation
 
 | Feature | Description |
 |---------|-------------|
@@ -331,11 +407,3 @@ These were explicitly set aside for further exploration before committing to an 
 | **Git Integration for Data Versioning** | Version-control datasets; commit/diff data changes alongside code; branch-based data management for audit trails |
 | **Custom Scripting Hooks** | JavaScript pre/post-push hooks; sandboxed execution environment; advanced transformation customisation |
 | **CI/CD Pipeline Integration** | Headless CLI mode for Jenkins/GitHub Actions; automated data seeding in deployment pipelines |
-
----
-
-### User Experience
-
-| Feature | Description |
-|---------|-------------|
-| **Onboarding & Help System** | Interactive tutorial for new users; contextual help tooltips on every panel; embedded short video walkthroughs |
