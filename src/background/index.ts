@@ -931,6 +931,7 @@ async function executeRestPush(
     processedRecords,
     failedRecords,
     status: cancelled ? 'cancelled' : 'complete',
+    errors: errors.length > 0 ? errors : undefined,
   });
 }
 
@@ -1202,6 +1203,26 @@ messageBus.on('DATA_PUSH_RESULT_GET', async (message): Promise<MessageResponse> 
       error: {
         code: 'DATA_PUSH_RESULT_GET_ERROR',
         message: error instanceof Error ? error.message : 'Failed to fetch data push result',
+      },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('PUSH_HISTORY_GET', async (message): Promise<MessageResponse> => {
+  try {
+    const history = await storage.getPushHistory();
+    return {
+      success: true,
+      data: { history },
+      requestId: message.requestId,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        code: 'PUSH_HISTORY_GET_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to get push history',
       },
       requestId: message.requestId,
     };

@@ -81,5 +81,6 @@ export const STORAGE_KEYS = {
   ACTIVE_TOKENS: 'activeTokens',
   ACTIVE_PUSHES: 'activePushes',
   SAVED_QUERIES: 'savedQueries',
+  QUERY_FOLDERS: 'queryFolders',
   UI_SETTINGS: 'uiSettings',
 } as const;

@@ -4,6 +4,8 @@
  * What this file does:
  * - Runs SOQL queries against the selected Salesforce tab/org.
  * - Supports pagination (queryMore), exporting results (CSV/JSON), and saved queries.
+ * - Visual Query Builder for generating SOQL from structured inputs.
+ * - Smart SOQL autocomplete with object/field/value suggestions.
  *
  * Why:
  * - This is the fastest "Inspector-like" workflow for verifying data and troubleshooting pushes.
@@ -15,7 +17,7 @@
 
 import type { VNode } from 'preact';
 import { h } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { SfApi, SfContext } from '../api/sf';
 import { Toast } from '../components/Toast';
 import { deriveColumns, flattenRecord } from '../utils/records';
@@ -23,6 +25,12 @@ import type { FlatRecord } from '../utils/records';
 import { recordsToCsv } from '../utils/csv';
 import { downloadTextFile } from '../utils/download';
 import { ResultsGrid } from '../components/ResultsGrid';
+import { QueryBuilder } from '../components/query-builder/QueryBuilder';
+import { SoqlAutocomplete } from '../components/SoqlAutocomplete';
+import type { Suggestion } from '../components/SoqlAutocomplete';
+import { useSchemaLoader } from '../hooks/useSchemaLoader';
+import { parseSoqlContext, isKeywordPrefix } from '../utils/soqlParser';
+import { fuzzyFilter } from '../utils/fuzzyMatch';
 
 export function QueryScreen(props: {
   sf: SfApi;
@@ -46,6 +54,82 @@ export function QueryScreen(props: {
 
   const [savedQueries, setSavedQueries] = useState<Array<{ id: string; name: string; soql: string }>>([]);
   const [selectedSaved, setSelectedSaved] = useState<string>('');
+
+  // Builder & autocomplete state
+  const [builderVisible, setBuilderVisible] = useState(false);
+  const [cursorPos, setCursorPos] = useState(0);
+  const [acDismissed, setAcDismissed] = useState(false);
+  const [acActiveIndex, setAcActiveIndex] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Shared schema loader
+  const schema = useSchemaLoader(sf, tabId);
+
+  // Autocomplete context & suggestions (single source of truth)
+  const acCtx = useMemo(() => parseSoqlContext(soql, cursorPos), [soql, cursorPos]);
+  const acSuggestions = useMemo((): Suggestion[] => {
+    if (acCtx.clause === 'UNKNOWN') return [];
+
+    // Suppress suggestions when the user is typing a SOQL keyword (e.g. "LIM" before LIMIT)
+    if (acCtx.partialToken && isKeywordPrefix(acCtx.partialToken)) return [];
+
+    // WHERE value position — suggest picklist values or booleans
+    if (acCtx.clause === 'WHERE' && acCtx.whereField) {
+      const field = schema.fields.find(f => f.name === acCtx.whereField);
+      if (field?.type === 'boolean') {
+        const vals: Suggestion[] = [
+          { text: 'true', label: 'true', kind: 'value' },
+          { text: 'false', label: 'false', kind: 'value' },
+        ];
+        return vals.filter(s => !acCtx.partialToken || s.text.startsWith(acCtx.partialToken));
+      }
+      if (field?.picklistValues && field.picklistValues.length > 0) {
+        const active = field.picklistValues.filter(p => p.active);
+        return fuzzyFilter(active, acCtx.partialToken, p => p.value)
+          .slice(0, 40)
+          .map(p => ({ text: p.value, label: p.value, detail: p.label !== p.value ? p.label : undefined, kind: 'value' }));
+      }
+      return [];
+    }
+
+    switch (acCtx.clause) {
+      case 'FROM':
+        return fuzzyFilter(schema.objects, acCtx.partialToken, o => o.name)
+          .slice(0, 50)
+          .map(o => ({ text: o.name, label: o.name, detail: o.label, kind: 'object' }));
+      case 'SELECT':
+      case 'WHERE':
+      case 'ORDER_BY':
+      case 'GROUP_BY':
+      case 'HAVING':
+        if (!acCtx.fromObject) return [];
+        return fuzzyFilter(schema.fields, acCtx.partialToken, f => f.name)
+          .slice(0, 50)
+          .map(f => ({ text: f.name, label: f.name, detail: f.type, kind: 'field' }));
+      case 'LIMIT':
+        return ['10', '50', '100', '200', '1000', '2000']
+          .filter(v => v.startsWith(acCtx.partialToken))
+          .map(v => ({ text: v, label: v, kind: 'value' }));
+      default:
+        return [];
+    }
+  }, [acCtx, schema.objects, schema.fields]);
+
+  // Autocomplete is visible when we have suggestions and the user hasn't dismissed
+  const acVisible = acSuggestions.length > 0 && !acDismissed;
+
+  // Auto-load fields when FROM object is detected
+  useEffect(() => {
+    if (acCtx.fromObject && acCtx.fromObject !== schema.describedObject) {
+      schema.loadFields(acCtx.fromObject);
+    }
+  }, [acCtx.fromObject]);
+
+  // Reset active index and un-dismiss when suggestions change
+  useEffect(() => {
+    setAcActiveIndex(0);
+    setAcDismissed(false);
+  }, [acSuggestions]);
 
   useEffect(() => {
     sf.listSavedQueries()
@@ -122,12 +206,70 @@ export function QueryScreen(props: {
     props.onSoqlChange?.(q.soql);
   }
 
+  function acceptSuggestion(index: number): void {
+    const s = acSuggestions[index];
+    if (!s) return;
+    const before = soql.substring(0, acCtx.tokenStart);
+    const after = soql.substring(cursorPos);
+    const newSoql = before + s.text + after;
+    const newCursor = acCtx.tokenStart + s.text.length;
+    setSoql(newSoql);
+    setCursorPos(newCursor);
+    setAcDismissed(true);
+    // Restore focus and cursor position
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (ta) {
+        ta.focus();
+        ta.setSelectionRange(newCursor, newCursor);
+      }
+    });
+  }
+
+  function handleKeyDown(e: KeyboardEvent): void {
+    if (acVisible) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setAcActiveIndex(i => Math.min(i + 1, acSuggestions.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setAcActiveIndex(i => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault();
+        acceptSuggestion(acActiveIndex);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setAcDismissed(true);
+        return;
+      }
+    }
+
+    // Ctrl+Enter to run query
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      runQuery();
+    }
+  }
+
   return (
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="wl-card">
         <div class="wl-cardHeader">
           <h2>SOQL</h2>
           <div class="wl-actions">
+            <button
+              class="wl-btn"
+              data-active={builderVisible ? 'true' : undefined}
+              onClick={() => setBuilderVisible(v => !v)}
+            >
+              Builder
+            </button>
             <button class="wl-btn wl-btnPrimary" onClick={runQuery} disabled={busy || !context}>
               {busy ? 'Running...' : 'Run'}
             </button>
@@ -137,6 +279,16 @@ export function QueryScreen(props: {
             <button class="wl-btn" onClick={exportJson} disabled={rawRecords.length === 0}>JSON</button>
           </div>
         </div>
+
+        {builderVisible && (
+          <QueryBuilder
+            schema={schema}
+            onApply={(generated) => {
+              setSoql(generated);
+              props.onSoqlChange?.(generated);
+            }}
+          />
+        )}
 
         <div class="wl-row">
           <div class="wl-row2">
@@ -158,15 +310,39 @@ export function QueryScreen(props: {
               disabled
             />
           </div>
-          <textarea
-            class="wl-textarea"
-            value={soql}
-            onInput={(e) => setSoql((e.currentTarget as HTMLTextAreaElement).value)}
-            spellcheck={false}
-          />
+          <div style="position:relative">
+            <textarea
+              ref={textareaRef}
+              class="wl-textarea"
+              value={soql}
+              onInput={(e) => {
+                const ta = e.currentTarget as HTMLTextAreaElement;
+                setSoql(ta.value);
+                setCursorPos(ta.selectionStart);
+              }}
+              onClick={(e) => {
+                setCursorPos((e.currentTarget as HTMLTextAreaElement).selectionStart);
+              }}
+              onKeyDown={handleKeyDown}
+              onBlur={() => {
+                // Delay to allow dropdown mousedown to fire
+                setTimeout(() => setAcDismissed(true), 200);
+              }}
+              spellcheck={false}
+            />
+            {acVisible && (
+              <SoqlAutocomplete
+                suggestions={acSuggestions}
+                activeIndex={acActiveIndex}
+                onAccept={acceptSuggestion}
+                onHover={setAcActiveIndex}
+              />
+            )}
+          </div>
           <div class="wl-muted">
             {totalSize !== null ? `${rawRecords.length} loaded (totalSize: ${totalSize})` : `${rawRecords.length} loaded`}
             {nextUrl ? ' - more available' : ''}
+            <span style="margin-left:8px;opacity:0.6">Ctrl+Enter to run</span>
           </div>
         </div>
       </div>

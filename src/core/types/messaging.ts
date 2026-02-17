@@ -23,6 +23,7 @@ export type MessageType =
   | 'DATA_PUSH_ERROR'
   | 'DATA_PUSH_CANCEL'
   | 'DATA_PUSH_RESULT_GET'
+  | 'PUSH_HISTORY_GET'
   // Schema messages
   | 'SCHEMA_DESCRIBE'
   | 'SCHEMA_DESCRIBE_SOBJECT'
@@ -121,6 +122,7 @@ export interface DataPushProgressPayload {
   processedRecords: number;
   failedRecords: number;
   status: 'processing' | 'complete' | 'error' | 'cancelled';
+  errors?: Array<{ recordIndex: number; message: string }>;
 }
 
 export interface DataPushCancelPayload {
@@ -141,6 +143,23 @@ export interface DataPushResultGetResponse {
   operation: 'insert' | 'update' | 'upsert' | 'delete';
   ids: string[];
   capturedAt: number;
+}
+
+export interface PushHistoryGetResponse {
+  history: Array<{
+    id: string;
+    orgId: string;
+    objectName: string;
+    operation: 'insert' | 'update' | 'upsert' | 'delete';
+    strategy?: 'bulk' | 'rest';
+    externalIdField?: string;
+    totalRecords: number;
+    successCount: number;
+    failureCount: number;
+    startedAt: number;
+    completedAt: number;
+    errors?: Array<{ recordIndex: number; message: string }>;
+  }>;
 }
 
 /** Schema payloads */

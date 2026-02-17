@@ -10,6 +10,7 @@
 
 import type { VNode } from 'preact';
 import { h } from 'preact';
+import { DropZone } from '../DropZone';
 
 export function DatasetHeader(props: {
   title?: string;
@@ -71,6 +72,7 @@ export function DatasetHeader(props: {
           <div class="wl-bannerDanger">{blockingMessage}</div>
         ) : null}
 
+        {dataset ? (
         <div class="wl-chipRow">
           <span class="wl-chip">
             <span>Rows</span>
@@ -98,10 +100,17 @@ export function DatasetHeader(props: {
               <strong title={dataset.filename}>{dataset.filename}</strong>
               {sizeText ? <span class="wl-muted">({sizeText})</span> : null}
             </span>
-          ) : (
-            <span class="wl-muted">Upload a file to start.</span>
-          )}
+          ) : null}
         </div>
+        ) : (
+          <DropZone accept={['.csv', '.json']} onDrop={onUpload}>
+            <div style="text-align:center;padding:20px">
+              <div style="font-size:48px;margin-bottom:12px">📂</div>
+              <div style="font-weight:900;font-size:14px;margin-bottom:6px">Drag & Drop CSV or JSON</div>
+              <div class="wl-muted">Or click to browse files</div>
+            </div>
+          </DropZone>
+        )}
       </div>
     </div>
   );

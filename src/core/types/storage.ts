@@ -19,6 +19,8 @@ export interface LocalStorageSchema {
   pushHistory: PushHistoryEntry[];
   /** Saved SOQL queries */
   savedQueries: SavedQuery[];
+  /** Query folders for organization */
+  queryFolders: QueryFolder[];
   /** UI settings for panel/app */
   uiSettings: UiSettings;
 }
@@ -48,6 +50,18 @@ export interface SavedQuery {
   soql: string;
   createdAt: number;
   updatedAt: number;
+  folderId?: string;
+  favorite?: boolean;
+  tags?: string[];
+  executionCount?: number;
+  lastExecutedAt?: number;
+}
+
+export interface QueryFolder {
+  id: string;
+  name: string;
+  parentId?: string;
+  createdAt: number;
 }
 
 export interface UiSettings {
@@ -55,6 +69,7 @@ export interface UiSettings {
   panelDock: 'right' | 'left';
   panelPinned: boolean;
   lastTabId?: number;
+  theme?: 'light' | 'dark' | 'auto';
 }
 
 /** Saved data template for reusable data pushes */

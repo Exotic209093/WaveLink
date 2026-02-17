@@ -17,7 +17,7 @@
 
 import { StorageError } from '../../core/errors';
 import { STORAGE_KEYS, MAX_PUSH_HISTORY } from '../../core/constants';
-import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry, PushResult, SavedQuery, UiSettings } from '../../core/types/storage';
+import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry, PushResult, SavedQuery, QueryFolder, UiSettings } from '../../core/types/storage';
 import type { SalesforceOrg } from '../../core/types/salesforce';
 
 /**
@@ -104,12 +104,18 @@ export class StorageService {
     const now = Date.now();
     const queries = await this.getSavedQueries();
     const idx = queries.findIndex(q => q.id === query.id);
+    const existing = idx >= 0 ? queries[idx] : null;
     const next: SavedQuery = {
       id: query.id,
       name: query.name,
       soql: query.soql,
-      createdAt: query.createdAt ?? (idx >= 0 ? queries[idx].createdAt : now),
+      createdAt: query.createdAt ?? existing?.createdAt ?? now,
       updatedAt: now,
+      folderId: query.folderId ?? existing?.folderId,
+      favorite: query.favorite ?? existing?.favorite,
+      tags: query.tags ?? existing?.tags,
+      executionCount: query.executionCount ?? existing?.executionCount,
+      lastExecutedAt: query.lastExecutedAt ?? existing?.lastExecutedAt,
     };
     if (idx >= 0) {
       queries[idx] = next;
@@ -123,6 +129,59 @@ export class StorageService {
   async deleteSavedQuery(id: string): Promise<void> {
     const queries = await this.getSavedQueries();
     await this.setLocal(STORAGE_KEYS.SAVED_QUERIES, queries.filter(q => q.id !== id));
+  }
+
+  async incrementQueryExecution(id: string): Promise<void> {
+    const queries = await this.getSavedQueries();
+    const idx = queries.findIndex(q => q.id === id);
+    if (idx >= 0) {
+      queries[idx].executionCount = (queries[idx].executionCount ?? 0) + 1;
+      queries[idx].lastExecutedAt = Date.now();
+      await this.setLocal(STORAGE_KEYS.SAVED_QUERIES, queries);
+    }
+  }
+
+  // ── Query Folders ─────────────────────────────────────────────────
+
+  async getQueryFolders(): Promise<QueryFolder[]> {
+    return (await this.getLocal<QueryFolder[]>(STORAGE_KEYS.QUERY_FOLDERS)) ?? [];
+  }
+
+  async upsertQueryFolder(folder: Omit<QueryFolder, 'createdAt'> & Partial<Pick<QueryFolder, 'createdAt'>>): Promise<QueryFolder> {
+    const now = Date.now();
+    const folders = await this.getQueryFolders();
+    const idx = folders.findIndex(f => f.id === folder.id);
+    const next: QueryFolder = {
+      id: folder.id,
+      name: folder.name,
+      parentId: folder.parentId,
+      createdAt: folder.createdAt ?? (idx >= 0 ? folders[idx].createdAt : now),
+    };
+    if (idx >= 0) {
+      folders[idx] = next;
+    } else {
+      folders.push(next);
+    }
+    await this.setLocal(STORAGE_KEYS.QUERY_FOLDERS, folders);
+    return next;
+  }
+
+  async deleteQueryFolder(id: string): Promise<void> {
+    const folders = await this.getQueryFolders();
+    const queries = await this.getSavedQueries();
+
+    // Remove folder
+    await this.setLocal(STORAGE_KEYS.QUERY_FOLDERS, folders.filter(f => f.id !== id));
+
+    // Remove folderId from queries in this folder
+    const updated = queries.map(q => {
+      if (q.folderId === id) {
+        const { folderId, ...rest } = q;
+        return rest;
+      }
+      return q;
+    });
+    await this.setLocal(STORAGE_KEYS.SAVED_QUERIES, updated);
   }
 
   // ── UI Settings ───────────────────────────────────────────────────
