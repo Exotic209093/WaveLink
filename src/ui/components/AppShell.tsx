@@ -30,7 +30,7 @@ export interface AppShellContext {
 }
 
 export function AppShell(props: {
-  mode: 'app' | 'panel';
+  mode: 'app' | 'panel' | 'popup';
   context?: AppShellContext;
   titleRight?: ComponentChildren;
   navItems: NavItem[];
@@ -51,10 +51,12 @@ export function AppShell(props: {
       <div class="wl-topbar">
         <div class="wl-brand">
           <h1>WaveLink</h1>
-          <span class="wl-chip" title={context?.orgId ?? ''}>
-            <span>{chipText}</span>
-            {context?.username ? <span> - {context.username}</span> : null}
-          </span>
+          {mode !== 'popup' ? (
+            <span class="wl-chip" title={context?.orgId ?? ''}>
+              <span>{chipText}</span>
+              {context?.username ? <span> - {context.username}</span> : null}
+            </span>
+          ) : null}
         </div>
         <div class="wl-actions">
           {theme && onThemeChange ? <ThemeToggle initialTheme={theme} onThemeChange={onThemeChange} compact /> : null}
@@ -62,7 +64,20 @@ export function AppShell(props: {
         </div>
       </div>
 
-      {mode === 'app' ? (
+      {mode === 'popup' ? (
+        <div class="wl-popupNav">
+          {navItems.map(item => (
+            <button
+              key={item.key}
+              class="wl-popupNavBtn"
+              data-active={route === item.key}
+              onClick={() => onRouteChange(item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : mode === 'app' ? (
         <div class="wl-topNav">
           {navItems.map(item => (
             <button

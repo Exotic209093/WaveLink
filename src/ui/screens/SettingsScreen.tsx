@@ -15,8 +15,9 @@ import type { SfApi } from '../api/sf';
 import type { UiSettings } from '../../core/types/storage';
 import { Toast } from '../components/Toast';
 import { TypedConfirmModal } from '../components/TypedConfirmModal';
+import { ShortcutEditor } from '../components/ShortcutEditor';
 
-export function SettingsScreen(props: { sf: SfApi; mode: 'app' | 'panel' }): VNode {
+export function SettingsScreen(props: { sf: SfApi; mode: 'app' | 'panel' | 'popup' }): VNode {
   const { sf, mode } = props;
   const [settings, setSettings] = useState<UiSettings | null>(null);
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
@@ -95,6 +96,11 @@ export function SettingsScreen(props: { sf: SfApi; mode: 'app' | 'panel' }): VNo
               >
                 Keyboard Shortcut
               </button>
+            </div>
+
+            <div style="margin-top:16px">
+              <div style="font-weight:900;margin-bottom:8px">Keyboard Shortcuts</div>
+              <ShortcutEditor sf={sf} />
             </div>
           </>
         ) : (
