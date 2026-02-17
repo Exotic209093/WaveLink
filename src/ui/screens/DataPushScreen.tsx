@@ -22,6 +22,10 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import { Toast } from '../components/Toast';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { TypedConfirmModal } from '../components/TypedConfirmModal';
+import { DropZone } from '../components/DropZone';
+import { RetryModal } from '../components/RetryModal';
+import { buildRetryDataset } from '../utils/pushRetry';
 import { parseCsvFile, parseJsonFile } from '../utils/fileParse';
 import { DataMapper } from '../../data/mappers';
 import { DataValidator } from '../../data/validators';
@@ -81,6 +85,7 @@ export function DataPushScreen(props: {
   const [batchSize, setBatchSize] = useState<number>(200);
   const [threads, setThreads] = useState<number>(1);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [retryModalOpen, setRetryModalOpen] = useState(false);
 
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean }>>([]);
   const [describeFields, setDescribeFields] = useState<SObjectField[] | null>(null);
@@ -97,6 +102,11 @@ export function DataPushScreen(props: {
 
   const [push, setPush] = useState<{ pushId: string; status: string; processed: number; failed: number; total: number; error?: string } | null>(null);
   const [pushResult, setPushResult] = useState<{ ids: string[]; capturedAt: number } | null>(null);
+  const [pushErrors, setPushErrors] = useState<Array<{ recordIndex: number; message: string }> | null>(null);
+  const [lastPushConfig, setLastPushConfig] = useState<{
+    sourceRecords: Record<string, unknown>[];
+    mappings: FieldMapping[];
+  } | null>(null);
   const busRef = useRef<MessageBus | null>(null);
 
   useEffect(() => {
@@ -113,7 +123,7 @@ export function DataPushScreen(props: {
     });
 
     bus.on('DATA_PUSH_COMPLETE', async (message) => {
-      const data = message.payload as { pushId: string; totalRecords: number; processedRecords: number; failedRecords: number; status?: string };
+      const data = message.payload as { pushId: string; totalRecords: number; processedRecords: number; failedRecords: number; status?: string; errors?: Array<{ recordIndex: number; message: string }> };
       setPush(prev => {
         if (!prev || prev.pushId !== data.pushId) return prev;
         return {
@@ -124,6 +134,9 @@ export function DataPushScreen(props: {
           total: data.totalRecords,
         };
       });
+      if (data.errors && data.errors.length > 0) {
+        setPushErrors(data.errors);
+      }
       return { success: true, requestId: message.requestId };
     });
 
@@ -330,6 +343,33 @@ export function DataPushScreen(props: {
     }
   }
 
+  function handleRetry(): void {
+    if (!pushErrors || !lastPushConfig) {
+      setToast({ title: 'Retry Failed', body: 'Missing error data or push configuration.' });
+      return;
+    }
+
+    try {
+      const retryData = buildRetryDataset(lastPushConfig.sourceRecords, pushErrors);
+
+      // Load retry dataset
+      props.onDataset({
+        sourceRecords: retryData.records,
+        filename: `retry-${push?.pushId || 'failed'}.json`,
+        format: 'json',
+        headers: retryData.headers,
+      });
+
+      // Restore field mappings from original push
+      setMappings(lastPushConfig.mappings);
+
+      setRetryModalOpen(false);
+      setToast({ title: 'Retry Dataset Loaded', body: `${retryData.records.length} failed records loaded. Review mappings and push again.` });
+    } catch (e) {
+      setToast({ title: 'Retry Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+    }
+  }
+
   const hasDataset = !!dataset;
   const datasetTooLarge = hasDataset ? estimateTooLarge(datasetBytes, sourceRecords.length) : null;
   const idFirstError = hasDataset ? validateIdFirst(sourceHeaders, operation) : null;
@@ -513,7 +553,15 @@ export function DataPushScreen(props: {
             </table>
           </div>
         ) : (
-          <div class="wl-row"><div class="wl-muted">Upload data to configure mapping.</div></div>
+          <div class="wl-row">
+            <DropZone accept={['.csv', '.json']} onDrop={onFileSelected}>
+              <div style="text-align:center;padding:20px">
+                <div style="font-size:48px;margin-bottom:12px">📂</div>
+                <div style="font-weight:900;font-size:14px;margin-bottom:6px">Drag & Drop CSV or JSON</div>
+                <div class="wl-muted">Or click to browse files</div>
+              </div>
+            </DropZone>
+          </div>
         )}
       </div>
 
@@ -598,6 +646,9 @@ export function DataPushScreen(props: {
               <>
                 <button class="wl-btn" disabled={busy} onClick={loadPushIds}>View IDs</button>
                 <button class="wl-btn wl-btnPrimary" disabled={busy} onClick={prepareDeletePushFromIds}>Prepare Delete Push</button>
+                {push.failed > 0 && pushErrors && pushErrors.length > 0 ? (
+                  <button class="wl-btn wl-btnPrimary" disabled={busy} onClick={() => setRetryModalOpen(true)}>Retry Failed Rows</button>
+                ) : null}
               </>
             ) : null}
           </div>
@@ -616,79 +667,159 @@ export function DataPushScreen(props: {
         </div>
       ) : null}
 
-      <ConfirmModal
-        open={confirmOpen}
-        title="Confirm Data Push"
-        busy={busy}
-        confirmDisabled={
-          !mappedRecords
-          || !dataset
-          || isBlocked
-          || (validationErrors !== null && validationErrors.length > 0)
-          || (operation === 'upsert' && !externalIdField)
-        }
-        confirmText="Start Push"
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={async () => {
-          if (!mappedRecords || !dataset) return;
-          if (validationErrors && validationErrors.length > 0) {
-            setToast({ title: 'Blocked', body: 'Fix validation errors before pushing.' });
-            return;
-          }
-          if (idFirstError) {
-            setToast({ title: 'Blocked', body: idFirstError });
-            return;
-          }
-          if (operation === 'upsert' && !externalIdField) {
-            setToast({ title: 'Blocked', body: 'Select an external ID field for upsert.' });
-            return;
-          }
+      {operation === 'delete' ? (
+        <TypedConfirmModal
+          open={confirmOpen}
+          title="Confirm Delete Operation"
+          confirmationPhrase={`DELETE ${mappedRecords ? mappedRecords.length : 0} RECORDS`}
+          busy={busy}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={async () => {
+            if (!mappedRecords || !dataset) return;
+            if (validationErrors && validationErrors.length > 0) {
+              setToast({ title: 'Blocked', body: 'Fix validation errors before pushing.' });
+              return;
+            }
+            if (idFirstError) {
+              setToast({ title: 'Blocked', body: idFirstError });
+              return;
+            }
 
-          setBusy(true);
-          try {
-            const useBulkApi = strategy === 'auto' ? undefined : strategy === 'bulk';
-            const res = await sf.startDataPush({
-              tabId,
-              objectName,
-              operation,
-              records: mappedRecords,
-              externalIdField: operation === 'upsert' ? (externalIdField || undefined) : undefined,
-              batchSize: operation === 'upsert' ? undefined : clampBatchSize(batchSize),
-              threads: clampThreads(threads),
-              useBulkApi,
-            });
-            setConfirmOpen(false);
-            setPush({ pushId: res.pushId, status: 'processing', processed: 0, failed: 0, total: mappedRecords.length });
-            setPushResult(null);
-            setToast({ title: 'Push Started', body: `${res.strategy.toUpperCase()} - ${res.pushId}` });
-          } catch (e) {
-            setToast({ title: 'Push Failed', body: e instanceof Error ? e.message : 'Unknown error' });
-          } finally {
-            setBusy(false);
+            setBusy(true);
+            try {
+              const useBulkApi = strategy === 'auto' ? undefined : strategy === 'bulk';
+              const res = await sf.startDataPush({
+                tabId,
+                objectName,
+                operation,
+                records: mappedRecords,
+                externalIdField: undefined,
+                batchSize: clampBatchSize(batchSize),
+                threads: clampThreads(threads),
+                useBulkApi,
+              });
+              setConfirmOpen(false);
+              setPush({ pushId: res.pushId, status: 'processing', processed: 0, failed: 0, total: mappedRecords.length });
+              setPushResult(null);
+              setPushErrors(null);
+              // Save push config for retry
+              setLastPushConfig({
+                sourceRecords,
+                mappings: [...mappings],
+              });
+              setToast({ title: 'Push Started', body: `${res.strategy.toUpperCase()} - ${res.pushId}` });
+            } catch (e) {
+              setToast({ title: 'Push Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <div style="font-size:14px;margin-bottom:16px">
+            <div style="font-weight:900;margin-bottom:8px;color:var(--wl-danger)">⚠️ Warning: Permanent Deletion</div>
+            <div class="wl-muted">
+              You are about to <strong>permanently delete {mappedRecords ? mappedRecords.length : 0} records</strong> from <strong>{objectName}</strong> in Salesforce. This action cannot be undone.
+            </div>
+          </div>
+          <div class="wl-chipRow">
+            <span class="wl-chip"><span style="font-weight:900">Object:</span> {objectName}</span>
+            <span class="wl-chip"><span style="font-weight:900">Op:</span> {operation}</span>
+            <span class="wl-chip"><span style="font-weight:900">Records:</span> {mappedRecords ? mappedRecords.length : 0}</span>
+            <span class="wl-chip"><span style="font-weight:900">Strategy:</span> {strategy.toUpperCase()}</span>
+            <span class="wl-chip"><span style="font-weight:900">Batch:</span> {clampBatchSize(batchSize)}</span>
+            <span class="wl-chip"><span style="font-weight:900">Threads:</span> {clampThreads(threads)}</span>
+          </div>
+          <div class="wl-muted" style="margin-top:8px">Delete safety: the first dataset column header must be "Id".</div>
+        </TypedConfirmModal>
+      ) : (
+        <ConfirmModal
+          open={confirmOpen}
+          title="Confirm Data Push"
+          busy={busy}
+          confirmDisabled={
+            !mappedRecords
+            || !dataset
+            || isBlocked
+            || (validationErrors !== null && validationErrors.length > 0)
+            || (operation === 'upsert' && !externalIdField)
           }
-        }}
-      >
-        <div class="wl-chipRow">
-          <span class="wl-chip"><span style="font-weight:900">Object:</span> {objectName}</span>
-          <span class="wl-chip"><span style="font-weight:900">Op:</span> {operation}</span>
-          <span class="wl-chip"><span style="font-weight:900">Records:</span> {mappedRecords ? mappedRecords.length : 0}</span>
-          <span class="wl-chip"><span style="font-weight:900">Strategy:</span> {strategy.toUpperCase()}</span>
+          confirmText="Start Push"
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={async () => {
+            if (!mappedRecords || !dataset) return;
+            if (validationErrors && validationErrors.length > 0) {
+              setToast({ title: 'Blocked', body: 'Fix validation errors before pushing.' });
+              return;
+            }
+            if (idFirstError) {
+              setToast({ title: 'Blocked', body: idFirstError });
+              return;
+            }
+            if (operation === 'upsert' && !externalIdField) {
+              setToast({ title: 'Blocked', body: 'Select an external ID field for upsert.' });
+              return;
+            }
+
+            setBusy(true);
+            try {
+              const useBulkApi = strategy === 'auto' ? undefined : strategy === 'bulk';
+              const res = await sf.startDataPush({
+                tabId,
+                objectName,
+                operation,
+                records: mappedRecords,
+                externalIdField: operation === 'upsert' ? (externalIdField || undefined) : undefined,
+                batchSize: operation === 'upsert' ? undefined : clampBatchSize(batchSize),
+                threads: clampThreads(threads),
+                useBulkApi,
+              });
+              setConfirmOpen(false);
+              setPush({ pushId: res.pushId, status: 'processing', processed: 0, failed: 0, total: mappedRecords.length });
+              setPushResult(null);
+              setPushErrors(null);
+              // Save push config for retry
+              setLastPushConfig({
+                sourceRecords,
+                mappings: [...mappings],
+              });
+              setToast({ title: 'Push Started', body: `${res.strategy.toUpperCase()} - ${res.pushId}` });
+            } catch (e) {
+              setToast({ title: 'Push Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <div class="wl-chipRow">
+            <span class="wl-chip"><span style="font-weight:900">Object:</span> {objectName}</span>
+            <span class="wl-chip"><span style="font-weight:900">Op:</span> {operation}</span>
+            <span class="wl-chip"><span style="font-weight:900">Records:</span> {mappedRecords ? mappedRecords.length : 0}</span>
+            <span class="wl-chip"><span style="font-weight:900">Strategy:</span> {strategy.toUpperCase()}</span>
+            {operation === 'upsert' ? (
+              <span class="wl-chip"><span style="font-weight:900">External ID:</span> {externalIdField || '(not set)'}</span>
+            ) : null}
+            <span class="wl-chip"><span style="font-weight:900">Batch:</span> {operation === 'upsert' ? '25 (fixed)' : clampBatchSize(batchSize)}</span>
+            <span class="wl-chip"><span style="font-weight:900">Threads:</span> {clampThreads(threads)}</span>
+          </div>
           {operation === 'upsert' ? (
-            <span class="wl-chip"><span style="font-weight:900">External ID:</span> {externalIdField || '(not set)'}</span>
+            <div class="wl-muted">Upsert requires an External ID field; upsert requests are sent in batches of 25 (Composite API limit).</div>
           ) : null}
-          <span class="wl-chip"><span style="font-weight:900">Batch:</span> {operation === 'upsert' ? '25 (fixed)' : clampBatchSize(batchSize)}</span>
-          <span class="wl-chip"><span style="font-weight:900">Threads:</span> {clampThreads(threads)}</span>
-        </div>
-        {operation === 'upsert' ? (
-          <div class="wl-muted">Upsert requires an External ID field; upsert requests are sent in batches of 25 (Composite API limit).</div>
-        ) : null}
-        {(operation === 'update' || operation === 'delete') ? (
-          <div class="wl-muted">Update/Delete safety: the first dataset column header must be "Id".</div>
-        ) : null}
-        {strategy === 'bulk' ? (
-          <div class="wl-muted">Bulk strategy ignores batch size and threads settings.</div>
-        ) : null}
-      </ConfirmModal>
+          {operation === 'update' ? (
+            <div class="wl-muted">Update safety: the first dataset column header must be "Id".</div>
+          ) : null}
+          {strategy === 'bulk' ? (
+            <div class="wl-muted">Bulk strategy ignores batch size and threads settings.</div>
+          ) : null}
+        </ConfirmModal>
+      )}
+
+      <RetryModal
+        open={retryModalOpen}
+        totalFailed={push?.failed ?? 0}
+        errors={pushErrors ?? []}
+        onRetry={handleRetry}
+        onClose={() => setRetryModalOpen(false)}
+      />
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </div>
