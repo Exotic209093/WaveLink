@@ -32,6 +32,22 @@ import { DataPushScreen } from '../screens/DataPushScreen';
 import { parseTabIdFromSearch } from '../../core/utils';
 import type { Theme } from '../utils/theme';
 import { resolveTheme, applyTheme, watchSystemTheme } from '../utils/theme';
+import { TestDataGeneratorScreen } from '../screens/TestDataGeneratorScreen';
+import { TemplatesScreen } from '../screens/TemplatesScreen';
+import { SchemaComparisonScreen } from '../screens/SchemaComparisonScreen';
+import { FieldAnalyticsScreen } from '../screens/FieldAnalyticsScreen';
+import { DuplicateDetectionScreen } from '../screens/DuplicateDetectionScreen';
+import { PipelineBuilderScreen } from '../screens/PipelineBuilderScreen';
+import { CloneWizardScreen } from '../screens/CloneWizardScreen';
+import { CommandPalette } from '../components/CommandPalette';
+import { UndoHistoryPanel } from '../components/UndoHistoryPanel';
+import { shortcutRegistry } from '../utils/shortcuts';
+import { DataQualityScorecardScreen } from '../screens/DataQualityScorecardScreen';
+import { ApiUsageDashboardScreen } from '../screens/ApiUsageDashboardScreen';
+import { BulkObjectOpsScreen } from '../screens/BulkObjectOpsScreen';
+import { RelationshipExplorerScreen } from '../screens/RelationshipExplorerScreen';
+import { HelpScreen } from '../screens/HelpScreen';
+import { OnboardingWizard } from '../components/OnboardingWizard';
 
 export function AppRoot(): VNode {
   const sf = useMemo(() => new SfApi('app'), []);
@@ -53,6 +69,9 @@ export function AppRoot(): VNode {
   const [cleaned, setCleaned] = useState<{ records: Record<string, unknown>[]; headers: string[] } | null>(null);
 
   const [theme, setTheme] = useState<Theme>('light');
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [undoPanelOpen, setUndoPanelOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   async function refreshTabs(): Promise<void> {
     /**
@@ -103,6 +122,13 @@ export function AppRoot(): VNode {
       console.error('Failed to load theme:', e);
       applyTheme('light');
     });
+
+    // Check onboarding status
+    sf.getOnboarding().then(progress => {
+      if (!progress.dismissedAt && progress.completedSteps.length === 0) {
+        setShowOnboarding(true);
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -151,6 +177,42 @@ export function AppRoot(): VNode {
     }
   }, [theme]);
 
+  useEffect(() => {
+    const cleanups = [
+      shortcutRegistry.register(
+        { id: 'command-palette', defaultKeys: 'ctrl+k', description: 'Open command palette', scope: 'global' },
+        () => setCommandPaletteOpen(v => !v),
+      ),
+      shortcutRegistry.register(
+        { id: 'goto-query', defaultKeys: 'ctrl+shift+q', description: 'Go to Query', scope: 'global' },
+        () => setRoute('query'),
+      ),
+      shortcutRegistry.register(
+        { id: 'goto-push', defaultKeys: 'ctrl+shift+p', description: 'Go to Data Push', scope: 'global' },
+        () => setRoute('push'),
+      ),
+      shortcutRegistry.register(
+        { id: 'toggle-undo', defaultKeys: 'ctrl+z', description: 'Toggle undo panel', scope: 'global' },
+        () => setUndoPanelOpen(v => !v),
+      ),
+    ];
+
+    // Load saved bindings
+    sf.getUiSettings().then(settings => {
+      if (settings.shortcuts) {
+        shortcutRegistry.loadBindings(settings.shortcuts);
+      }
+    }).catch(() => {});
+
+    const handler = (e: KeyboardEvent) => shortcutRegistry.handleKeydown(e);
+    document.addEventListener('keydown', handler);
+
+    return () => {
+      cleanups.forEach(fn => fn());
+      document.removeEventListener('keydown', handler);
+    };
+  }, []);
+
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
     // Save to storage
@@ -190,6 +252,18 @@ export function AppRoot(): VNode {
     { key: 'push', label: 'Data Push' },
     { key: 'history', label: 'Push History' },
     { key: 'cleanse', label: 'Cleanser' },
+    { key: 'templates', label: 'Templates' },
+    { key: 'testData', label: 'Test Data' },
+    { key: 'schemaCompare', label: 'Schema' },
+    { key: 'fieldAnalytics', label: 'Analytics' },
+    { key: 'duplicates', label: 'Duplicates' },
+    { key: 'pipeline', label: 'Pipeline' },
+    { key: 'clone', label: 'Clone' },
+    { key: 'quality', label: 'Quality' },
+    { key: 'apiUsage', label: 'API Usage' },
+    { key: 'bulkOps', label: 'Bulk Ops' },
+    { key: 'relationships', label: 'Explorer' },
+    { key: 'help', label: 'Help' },
     { key: 'settings', label: 'Settings' },
   ];
 
@@ -249,10 +323,58 @@ export function AppRoot(): VNode {
           />
         ) : route === 'history' ? (
           <PushHistoryScreen sf={sf} />
+        ) : route === 'templates' ? (
+          <TemplatesScreen sf={sf} />
+        ) : route === 'testData' ? (
+          <TestDataGeneratorScreen sf={sf} tabId={selectedTabId} />
+        ) : route === 'schemaCompare' ? (
+          <SchemaComparisonScreen sf={sf} tabId={selectedTabId} />
+        ) : route === 'fieldAnalytics' ? (
+          <FieldAnalyticsScreen sf={sf} tabId={selectedTabId} />
+        ) : route === 'duplicates' ? (
+          <DuplicateDetectionScreen sf={sf} tabId={selectedTabId} />
+        ) : route === 'pipeline' ? (
+          <PipelineBuilderScreen sf={sf} tabId={selectedTabId} dataset={cleaned ? { records: cleaned.records, headers: cleaned.headers } : null} />
+        ) : route === 'clone' ? (
+          <CloneWizardScreen sf={sf} tabId={selectedTabId} />
+        ) : route === 'quality' ? (
+          <DataQualityScorecardScreen sf={sf} tabId={selectedTabId} />
+        ) : route === 'apiUsage' ? (
+          <ApiUsageDashboardScreen sf={sf} tabId={selectedTabId} />
+        ) : route === 'bulkOps' ? (
+          <BulkObjectOpsScreen sf={sf} tabId={selectedTabId} />
+        ) : route === 'relationships' ? (
+          <RelationshipExplorerScreen sf={sf} tabId={selectedTabId} />
+        ) : route === 'help' ? (
+          <HelpScreen sf={sf} onNavigate={setRoute} />
         ) : (
           <SettingsScreen sf={sf} mode="app" />
         )}
       </AppShell>
+
+      <CommandPalette
+        open={commandPaletteOpen}
+        commands={navItems.map(n => ({
+          id: n.key,
+          label: n.label,
+          description: `Navigate to ${n.label}`,
+          action: () => { setRoute(n.key); setCommandPaletteOpen(false); },
+        }))}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
+
+      <UndoHistoryPanel sf={sf} open={undoPanelOpen} onClose={() => setUndoPanelOpen(false)} />
+
+      {showOnboarding ? (
+        <OnboardingWizard
+          sf={sf}
+          onDismiss={() => {
+            setShowOnboarding(false);
+            sf.setOnboarding({ dismissedAt: Date.now() }).catch(() => {});
+          }}
+          onNavigate={(r) => { setRoute(r); setShowOnboarding(false); }}
+        />
+      ) : null}
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </>
