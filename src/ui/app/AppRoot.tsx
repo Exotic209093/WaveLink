@@ -25,10 +25,13 @@ import type { NavItem } from '../components/AppShell';
 import { QueryScreen } from '../screens/QueryScreen';
 import { ObjectsScreen } from '../screens/ObjectsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { PushHistoryScreen } from '../screens/PushHistoryScreen';
 import { Toast } from '../components/Toast';
 import { DataCleanserScreen } from '../screens/DataCleanserScreen';
 import { DataPushScreen } from '../screens/DataPushScreen';
 import { parseTabIdFromSearch } from '../../core/utils';
+import type { Theme } from '../utils/theme';
+import { resolveTheme, applyTheme, watchSystemTheme } from '../utils/theme';
 
 export function AppRoot(): VNode {
   const sf = useMemo(() => new SfApi('app'), []);
@@ -48,6 +51,8 @@ export function AppRoot(): VNode {
     bytes?: number;
   } | null>(null);
   const [cleaned, setCleaned] = useState<{ records: Record<string, unknown>[]; headers: string[] } | null>(null);
+
+  const [theme, setTheme] = useState<Theme>('light');
 
   async function refreshTabs(): Promise<void> {
     /**
@@ -87,6 +92,17 @@ export function AppRoot(): VNode {
   useEffect(() => {
     // Initial load: populate the tab selector.
     refreshTabs();
+
+    // Load theme from storage
+    sf.getUiSettings().then(settings => {
+      const savedTheme = settings.theme ?? 'light';
+      setTheme(savedTheme);
+      const resolved = resolveTheme(savedTheme);
+      applyTheme(resolved);
+    }).catch(e => {
+      console.error('Failed to load theme:', e);
+      applyTheme('light');
+    });
   }, []);
 
   useEffect(() => {
@@ -118,6 +134,31 @@ export function AppRoot(): VNode {
     document.title = `WaveLink - ${hostname} (${context.orgId})`;
   }, [context, selectedTabId, tabs]);
 
+  useEffect(() => {
+    /**
+     * Apply theme whenever it changes and watch for system theme changes in auto mode.
+     *
+     * Complexity: O(1).
+     */
+    const resolved = resolveTheme(theme);
+    applyTheme(resolved);
+
+    // If theme is auto, watch for system changes
+    if (theme === 'auto') {
+      return watchSystemTheme((systemTheme) => {
+        applyTheme(systemTheme);
+      });
+    }
+  }, [theme]);
+
+  const handleThemeChange = (newTheme: Theme) => {
+    setTheme(newTheme);
+    // Save to storage
+    sf.setUiSettings({ theme: newTheme }).catch(e => {
+      console.error('Failed to save theme:', e);
+    });
+  };
+
   const titleRight = (
     <>
       <select
@@ -147,6 +188,7 @@ export function AppRoot(): VNode {
     { key: 'query', label: 'Query' },
     { key: 'objects', label: 'Objects' },
     { key: 'push', label: 'Data Push' },
+    { key: 'history', label: 'Push History' },
     { key: 'cleanse', label: 'Cleanser' },
     { key: 'settings', label: 'Settings' },
   ];
@@ -160,6 +202,8 @@ export function AppRoot(): VNode {
         navItems={navItems}
         route={route}
         onRouteChange={setRoute}
+        theme={theme}
+        onThemeChange={handleThemeChange}
       >
         {!selectedTabId ? (
           <div class="wl-card">
@@ -203,6 +247,8 @@ export function AppRoot(): VNode {
             onDataset={setDataset}
             onRequestCleanser={() => setRoute('cleanse')}
           />
+        ) : route === 'history' ? (
+          <PushHistoryScreen sf={sf} />
         ) : (
           <SettingsScreen sf={sf} mode="app" />
         )}

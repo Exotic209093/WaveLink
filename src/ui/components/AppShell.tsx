@@ -14,6 +14,8 @@
 
 import type { ComponentChildren, VNode } from 'preact';
 import { h } from 'preact';
+import { ThemeToggle } from './ThemeToggle';
+import type { Theme } from '../utils/theme';
 
 export interface NavItem {
   key: string;
@@ -35,8 +37,10 @@ export function AppShell(props: {
   route: string;
   onRouteChange: (route: string) => void;
   children: ComponentChildren;
+  theme?: Theme;
+  onThemeChange?: (theme: Theme) => void;
 }): VNode {
-  const { mode, context, titleRight, navItems, route, onRouteChange, children } = props;
+  const { mode, context, titleRight, navItems, route, onRouteChange, children, theme, onThemeChange } = props;
 
   const chipText = context?.instanceUrl
     ? `${new URL(context.instanceUrl).hostname}${context.environment === 'sandbox' ? ' (Sandbox)' : ''}`
@@ -53,6 +57,7 @@ export function AppShell(props: {
           </span>
         </div>
         <div class="wl-actions">
+          {theme && onThemeChange ? <ThemeToggle initialTheme={theme} onThemeChange={onThemeChange} compact /> : null}
           {titleRight}
         </div>
       </div>
