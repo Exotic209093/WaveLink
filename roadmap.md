@@ -269,3 +269,73 @@
 | `src/ui/screens/SettingsScreen.tsx` | TypedConfirmModal for Clear Saved Queries |
 | `src/ui/components/cleanser/DatasetHeader.tsx` | DropZone empty state |
 | `src/background/index.ts` | `DATA_PUSH_COMPLETE` includes `errors[]`; `PUSH_HISTORY_GET` handler |
+
+---
+
+## Future Possibilities
+
+> These features were discussed during brainstorming but have no implementation plan yet.
+> They are not scheduled — listing them here so nothing gets forgotten.
+
+---
+
+### Phase 4 (Deferred — needs more thought)
+
+These were explicitly set aside for further exploration before committing to an approach.
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-Org Workspace** | Switch between multiple Salesforce orgs without leaving the extension; side-by-side org comparison; org-specific settings and preferences |
+| **Data Comparison Between Orgs** | Diff records between sandbox and production; highlight field-level differences; sync specific records from one org to another |
+| **Team Sharing Features** | Export/import queries, datasets, and templates between team members; optional cloud sync; collaborative data review with comments and approvals |
+| **Notification Integrations** | Slack/Teams notifications when a long-running push job completes; email notifications; webhook support for custom integrations |
+
+---
+
+### Data Management & Operations
+
+| Feature | Description |
+|---------|-------------|
+| **Scheduled / Recurring Data Imports** | Set up recurring imports on a schedule; auto-refresh from external CSV URLs or Google Sheets; background sync status notifications |
+| **Relationship Visualisation & Bulk Relationship Updates** | Visual graph of parent-child relationships in loaded data; mass-update lookup/master-detail fields; reparent multiple records at once |
+| **Backup & Restore** | One-click backup of a Salesforce object's data; scheduled backups with versioning; point-in-time restore for pre-deployment safety |
+| **Bulk Object Operations** | Delete all records from an object with confirmation; truncate object data; mass enable/disable triggers for sandbox management |
+
+---
+
+### Query, Analysis & Reporting
+
+| Feature | Description |
+|---------|-------------|
+| **Query Performance Metrics** | Execution time, records scanned, API cost per query; optimisation suggestions; index usage hints |
+| **Visual Relationship Explorer** | Interactive schema diagram; click to navigate object relationships; filter by type and visibility |
+| **Data Quality Scorecards** | Define quality rules (required fields, value formats, ranges); score a dataset before pushing; highlight issues with fix suggestions |
+
+---
+
+### Developer Tools
+
+| Feature | Description |
+|---------|-------------|
+| **Permission Set Viewer/Editor** | View and compare permission sets; clone or modify permissions; security audit helper |
+| **Apex Log Viewer** | View debug logs in-extension; filter by type, user, and time; full-text search within logs; download logs |
+| **API Usage Dashboard** | Track API call usage over time; break down by operation type; alert when approaching governor limits; optimisation suggestions |
+
+---
+
+### Integration & Automation
+
+| Feature | Description |
+|---------|-------------|
+| **External Data Source Integration** | Import from Google Sheets, Airtable, or Excel Online; live sync with OAuth; no CSV download required |
+| **Git Integration for Data Versioning** | Version-control datasets; commit/diff data changes alongside code; branch-based data management for audit trails |
+| **Custom Scripting Hooks** | JavaScript pre/post-push hooks; sandboxed execution environment; advanced transformation customisation |
+| **CI/CD Pipeline Integration** | Headless CLI mode for Jenkins/GitHub Actions; automated data seeding in deployment pipelines |
+
+---
+
+### User Experience
+
+| Feature | Description |
+|---------|-------------|
+| **Onboarding & Help System** | Interactive tutorial for new users; contextual help tooltips on every panel; embedded short video walkthroughs |
