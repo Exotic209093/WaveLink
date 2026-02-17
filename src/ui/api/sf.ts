@@ -14,9 +14,9 @@
 
 import { MessageBus } from '../../services/messaging';
 import type { SObjectDescribe } from '../../core/types/salesforce';
-import type { UiSettings, SavedQuery } from '../../core/types/storage';
+import type { UiSettings, SavedQuery, PushHistoryEntry } from '../../core/types/storage';
 import type { DescribeGlobalResult, QueryResult } from '../../services/salesforce/api-client';
-import type { DataPushCancelResponse, DataPushResultGetResponse } from '../../core/types/messaging';
+import type { DataPushCancelResponse, DataPushResultGetResponse, PushHistoryGetResponse } from '../../core/types/messaging';
 
 export interface SfTabInfo {
   tabId: number;
@@ -167,5 +167,11 @@ export class SfApi {
     const res = await this.bus.send<{ pushId: string }, DataPushResultGetResponse | null>('DATA_PUSH_RESULT_GET', { pushId });
     if (!res.success) throw new Error(res.error?.message ?? 'Failed to fetch data push result');
     return (res.data ?? null) as DataPushResultGetResponse | null;
+  }
+
+  async getPushHistory(): Promise<PushHistoryEntry[]> {
+    const res = await this.bus.send<object, PushHistoryGetResponse>('PUSH_HISTORY_GET', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to fetch push history');
+    return res.data.history;
   }
 }
