@@ -19,6 +19,7 @@ import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { SfApi, SfContext } from '../api/sf';
+import type { SavedQuery, QueryFolder } from '../../core/types/storage';
 import { Toast } from '../components/Toast';
 import { deriveColumns, flattenRecord } from '../utils/records';
 import type { FlatRecord } from '../utils/records';
@@ -31,6 +32,7 @@ import type { Suggestion } from '../components/SoqlAutocomplete';
 import { useSchemaLoader } from '../hooks/useSchemaLoader';
 import { parseSoqlContext, isKeywordPrefix } from '../utils/soqlParser';
 import { fuzzyFilter } from '../utils/fuzzyMatch';
+import { QueryManager } from '../components/QueryManager';
 
 export function QueryScreen(props: {
   sf: SfApi;
@@ -52,8 +54,11 @@ export function QueryScreen(props: {
   const columns = useMemo(() => deriveColumns(rawRecords), [rawRecords]);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
 
-  const [savedQueries, setSavedQueries] = useState<Array<{ id: string; name: string; soql: string }>>([]);
+  const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([]);
   const [selectedSaved, setSelectedSaved] = useState<string>('');
+
+  const [managerVisible, setManagerVisible] = useState(false);
+  const [queryFolders, setQueryFolders] = useState<QueryFolder[]>([]);
 
   // Builder & autocomplete state
   const [builderVisible, setBuilderVisible] = useState(false);
@@ -134,6 +139,11 @@ export function QueryScreen(props: {
   useEffect(() => {
     sf.listSavedQueries()
       .then(q => setSavedQueries(q))
+      .catch(() => {
+        // Ignore
+      });
+    sf.listQueryFolders()
+      .then(f => setQueryFolders(f))
       .catch(() => {
         // Ignore
       });
@@ -275,6 +285,7 @@ export function QueryScreen(props: {
             </button>
             <button class="wl-btn" onClick={loadMore} disabled={busy || !nextUrl}>Load More</button>
             <button class="wl-btn" onClick={saveQuery} disabled={!soql.trim()}>Save</button>
+            <button class="wl-btn" data-active={managerVisible ? 'true' : undefined} onClick={() => setManagerVisible(v => !v)}>Manage</button>
             <button class="wl-btn" onClick={exportCsv} disabled={flatRecords.length === 0}>CSV</button>
             <button class="wl-btn" onClick={exportJson} disabled={rawRecords.length === 0}>JSON</button>
           </div>
@@ -346,6 +357,17 @@ export function QueryScreen(props: {
           </div>
         </div>
       </div>
+
+      {managerVisible ? (
+        <QueryManager
+          sf={sf}
+          queries={savedQueries}
+          folders={queryFolders}
+          onLoadQuery={(soql) => { setSoql(soql); props.onSoqlChange?.(soql); }}
+          onQueriesChange={() => { sf.listSavedQueries().then(q => setSavedQueries(q)).catch(() => {}); }}
+          onFoldersChange={() => { sf.listQueryFolders().then(f => setQueryFolders(f)).catch(() => {}); }}
+        />
+      ) : null}
 
       {flatRecords.length > 0 ? (
         <ResultsGrid

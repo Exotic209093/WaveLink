@@ -35,6 +35,8 @@ import { recordsToCsv } from '../utils/csv';
 import { DataValidator } from '../../data/validators';
 import { OrgHealthScreen } from './OrgHealthScreen';
 import { CoverageScreen } from './CoverageScreen';
+import { useDragList } from '../utils/dragDrop';
+import { BulkUpdateModal } from '../components/BulkUpdateModal';
 
 type Operation = 'insert' | 'update' | 'upsert' | 'delete';
 
@@ -100,6 +102,17 @@ export function DataCleanserScreen(props: {
   const [validationErrors, setValidationErrors] = useState<Array<{ field: string; message: string; value?: unknown }> | null>(null);
   const [objects, setObjects] = useState<Array<{ name: string; label: string }>>([]);
   const [showOnlyErrorFields, setShowOnlyErrorFields] = useState(false);
+  const [bulkUpdateModalOpen, setBulkUpdateModalOpen] = useState(false);
+
+  const { dragHandlers, dragOverIndex } = useDragList({
+    items: ops,
+    onReorder: (newOps) => {
+      setOps(newOps);
+      setSnapshot(null);
+      props.onCleaned(null);
+    },
+    getDragId: (op) => op.source,
+  });
 
   // Clear local state if dataset is cleared from above (e.g., Data Push "Clear")
   useEffect(() => {
@@ -507,6 +520,7 @@ export function DataCleanserScreen(props: {
               }}
             />
           ) : null}
+          <button class="wl-btn wl-btnPrimary" onClick={() => setBulkUpdateModalOpen(true)} disabled={!dataset}>Bulk Update</button>
 
           {singleSelectedOp ? (
             <ColumnEditor
@@ -553,6 +567,22 @@ export function DataCleanserScreen(props: {
       />
         </>
       )}
+
+      <BulkUpdateModal
+        open={bulkUpdateModalOpen && !!dataset}
+        fields={dataset?.headers ?? []}
+        records={previewSourceRows}
+        onApply={(updatedRecords) => {
+          if (!dataset) return;
+          const recs = [...dataset.sourceRecords];
+          for (let i = 0; i < Math.min(updatedRecords.length, recs.length); i++) {
+            recs[i] = { ...recs[i], ...updatedRecords[i] };
+          }
+          props.onDataset({ ...dataset, sourceRecords: recs });
+          setBulkUpdateModalOpen(false);
+        }}
+        onClose={() => setBulkUpdateModalOpen(false)}
+      />
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </div>
