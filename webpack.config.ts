@@ -1,16 +1,12 @@
 import path from 'path';
-import { fileURLToPath } from 'url';
 import CopyWebpackPlugin from 'copy-webpack-plugin';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import type { Configuration } from 'webpack';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const config: Configuration = {
   entry: {
     background: path.resolve(__dirname, 'src/background/index.ts'),
-    popup: path.resolve(__dirname, 'src/popup/index.ts'),
+    popup: path.resolve(__dirname, 'src/popup/index.tsx'),
     content: path.resolve(__dirname, 'src/content/index.ts'),
     app: path.resolve(__dirname, 'src/app/index.tsx'),
   },
@@ -47,7 +43,6 @@ const config: Configuration = {
     new CopyWebpackPlugin({
       patterns: [
         { from: 'public', to: '.' },
-        { from: 'src/popup/styles', to: 'popup/styles' },
       ],
     }),
     new HtmlWebpackPlugin({
