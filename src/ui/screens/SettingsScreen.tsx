@@ -14,11 +14,14 @@ import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { UiSettings } from '../../core/types/storage';
 import { Toast } from '../components/Toast';
+import { TypedConfirmModal } from '../components/TypedConfirmModal';
 
 export function SettingsScreen(props: { sf: SfApi; mode: 'app' | 'panel' }): VNode {
   const { sf, mode } = props;
   const [settings, setSettings] = useState<UiSettings | null>(null);
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
+  const [clearQueriesModalOpen, setClearQueriesModalOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     sf.getUiSettings()
@@ -81,12 +84,8 @@ export function SettingsScreen(props: { sf: SfApi; mode: 'app' | 'panel' }): VNo
             <div class="wl-row2">
               <button
                 class="wl-btn wl-btnDanger"
-                onClick={async () => {
-                  if (!confirm('Clear all saved queries?')) return;
-                  const queries = await sf.listSavedQueries();
-                  await Promise.all(queries.map(q => sf.deleteSavedQuery(q.id).catch(() => undefined)));
-                  setToast({ title: 'Cleared', body: 'Saved queries cleared.' });
-                }}
+                onClick={() => setClearQueriesModalOpen(true)}
+                disabled={busy}
               >
                 Clear Saved Queries
               </button>
@@ -102,6 +101,31 @@ export function SettingsScreen(props: { sf: SfApi; mode: 'app' | 'panel' }): VNo
           <div class="wl-muted">Loading...</div>
         )}
       </div>
+
+      <TypedConfirmModal
+        open={clearQueriesModalOpen}
+        title="Clear All Saved Queries"
+        confirmationPhrase="CLEAR QUERIES"
+        busy={busy}
+        onCancel={() => setClearQueriesModalOpen(false)}
+        onConfirm={async () => {
+          setBusy(true);
+          try {
+            const queries = await sf.listSavedQueries();
+            await Promise.all(queries.map(q => sf.deleteSavedQuery(q.id).catch(() => undefined)));
+            setToast({ title: 'Cleared', body: `${queries.length} saved queries cleared.` });
+            setClearQueriesModalOpen(false);
+          } catch (e) {
+            setToast({ title: 'Clear Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <div class="wl-muted">
+          This will permanently delete all of your saved queries. This action cannot be undone.
+        </div>
+      </TypedConfirmModal>
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </div>
