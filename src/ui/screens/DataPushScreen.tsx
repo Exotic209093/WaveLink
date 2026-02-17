@@ -86,6 +86,7 @@ export function DataPushScreen(props: {
   const [threads, setThreads] = useState<number>(1);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [retryModalOpen, setRetryModalOpen] = useState(false);
+  const [templateName, setTemplateName] = useState('');
 
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean }>>([]);
   const [describeFields, setDescribeFields] = useState<SObjectField[] | null>(null);
@@ -395,6 +396,31 @@ export function DataPushScreen(props: {
               />
             </label>
             <button class="wl-btn" onClick={props.onRequestCleanser} disabled={!hasDataset}>Open Cleanser</button>
+            <button class="wl-btn" onClick={async () => {
+              try {
+                const templates = await sf.listTemplates();
+                const choice = prompt('Enter template name to load:\n' + templates.map(t => t.name).join('\n'));
+                if (!choice) return;
+                const tmpl = templates.find(t => t.name === choice);
+                if (!tmpl) { setToast({ title: 'Not Found', body: `No template named "${choice}"` }); return; }
+                if (tmpl.objectName) setObjectName(tmpl.objectName);
+                if (tmpl.fieldMappings) setMappings(tmpl.fieldMappings);
+                setToast({ title: 'Template Loaded', body: tmpl.name });
+              } catch (e) { setToast({ title: 'Load Failed', body: e instanceof Error ? e.message : 'Unknown error' }); }
+            }} disabled={!hasDataset}>Load Template</button>
+            <button class="wl-btn" onClick={async () => {
+              const name = prompt('Template name?');
+              if (!name) return;
+              try {
+                await sf.upsertTemplate({
+                  id: `tmpl_${Date.now()}`,
+                  name,
+                  objectName,
+                  fieldMappings: mappings,
+                });
+                setToast({ title: 'Saved', body: `Template "${name}" saved.` });
+              } catch (e) { setToast({ title: 'Save Failed', body: e instanceof Error ? e.message : 'Unknown error' }); }
+            }} disabled={!hasDataset || mappings.length === 0}>Save Template</button>
             <button class="wl-btn wl-btnDanger" onClick={() => props.onDataset(null)} disabled={!hasDataset}>Clear</button>
           </div>
         </div>
