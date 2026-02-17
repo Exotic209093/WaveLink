@@ -15,6 +15,7 @@ import type { VNode } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import { Toast } from '../components/Toast';
+import { Skeleton } from '../components/Skeleton';
 
 type Limits = Record<string, { Max: number; Remaining: number }>;
 
@@ -142,7 +143,7 @@ export function ApiUsageDashboardScreen(props: { sf: SfApi; tabId: number }): VN
           </div>
         ) : loading && !limits ? (
           <div class="wl-row">
-            <div class="wl-muted">Loading limits...</div>
+            <Skeleton variant="table" rows={5} columns={4} />
           </div>
         ) : filteredRows.length === 0 ? (
           <div class="wl-row">

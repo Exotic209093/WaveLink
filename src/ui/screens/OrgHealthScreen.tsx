@@ -3,6 +3,7 @@ import { h } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { SfApi, SfContext } from '../api/sf';
 import { Toast } from '../components/Toast';
+import { Skeleton } from '../components/Skeleton';
 import { recordsToCsv } from '../utils/csv';
 import { downloadTextFile } from '../utils/download';
 
@@ -124,7 +125,7 @@ export function OrgHealthScreen(props: { sf: SfApi; tabId: number }): VNode {
               <span class="wl-chip"><span style="font-weight:900">API:</span> {context.apiVersion}</span>
             </div>
           ) : (
-            <div class="wl-muted">Loading context...</div>
+            <Skeleton variant="card" />
           )}
 
           <div class="wl-muted">
@@ -207,7 +208,7 @@ export function OrgHealthScreen(props: { sf: SfApi; tabId: number }): VNode {
           </>
         ) : (
           <div class="wl-row">
-            <div class="wl-muted">Loading limits...</div>
+            <Skeleton variant="table" rows={5} columns={4} />
           </div>
         )}
       </div>

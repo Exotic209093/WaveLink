@@ -20,11 +20,18 @@ import type { VNode } from 'preact';
 import type { PipelineStep } from '../utils/pipelineExecutor';
 import { useDragList } from '../utils/dragDrop';
 
+export interface DebugStepState {
+  status: 'pending' | 'done' | 'error' | 'current';
+  recordsOut?: number;
+}
+
 export interface PipelineCanvasProps {
   steps: PipelineStep[];
   selectedStepId: string | null;
   onSelectStep: (id: string) => void;
   onReorder: (steps: PipelineStep[]) => void;
+  /** Optional debug state per step (keyed by step index). */
+  debugStates?: Map<number, DebugStepState>;
 }
 
 /** Map step types to display badges. O(1). */
@@ -41,7 +48,7 @@ const TYPE_BADGES: Record<string, { label: string; color: string }> = {
  * O(S) where S = number of steps.
  */
 export function PipelineCanvas(props: PipelineCanvasProps): VNode {
-  const { steps, selectedStepId, onSelectStep, onReorder } = props;
+  const { steps, selectedStepId, onSelectStep, onReorder, debugStates } = props;
 
   const { dragHandlers, dragOverIndex } = useDragList<PipelineStep>({
     items: steps,
@@ -66,6 +73,12 @@ export function PipelineCanvas(props: PipelineCanvasProps): VNode {
         const isSelected = step.id === selectedStepId;
         const isDragOver = dragOverIndex === index;
         const handlers = dragHandlers(index);
+        const dbg = debugStates?.get(index);
+
+        let debugAttr: string | undefined;
+        if (dbg?.status === 'done') debugAttr = 'done';
+        else if (dbg?.status === 'error') debugAttr = 'error';
+        else if (dbg?.status === 'current') debugAttr = 'current';
 
         return (
           <div key={step.id}>
@@ -83,6 +96,7 @@ export function PipelineCanvas(props: PipelineCanvasProps): VNode {
             <div
               class="wl-pipelineStep"
               data-active={isSelected ? 'true' : undefined}
+              data-debug={debugAttr}
               onClick={() => onSelectStep(step.id)}
               {...handlers}
             >
@@ -104,6 +118,13 @@ export function PipelineCanvas(props: PipelineCanvasProps): VNode {
                 <span style="font-weight:700;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
                   {step.label || `${step.type} step`}
                 </span>
+
+                {/* Debug record count */}
+                {dbg && dbg.recordsOut !== undefined && !dbg.status.includes('error') && (
+                  <span class="wl-muted" style="font-size:10px;flex-shrink:0">
+                    {dbg.recordsOut} rec
+                  </span>
+                )}
 
                 {/* Step number */}
                 <span class="wl-muted" style="font-size:10px;flex-shrink:0">

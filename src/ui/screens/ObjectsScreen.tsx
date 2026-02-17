@@ -48,14 +48,17 @@ export function ObjectsScreen(props: {
   const [selected, setSelected] = useState<string>('');
   const [describe, setDescribe] = useState<SObjectDescribe | null>(null);
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
+  function loadObjects(): void {
     sf.describeGlobal(tabId)
       .then(res => {
         setObjects(res.sobjects.map(s => ({ name: s.name, label: s.label, queryable: s.queryable })));
       })
       .catch(e => setToast({ title: 'Describe Failed', body: e instanceof Error ? e.message : 'Unknown error' }));
-  }, [sf, tabId]);
+  }
+
+  useEffect(() => { loadObjects(); }, [sf, tabId]);
 
   useEffect(() => {
     if (!selected) {
@@ -78,7 +81,29 @@ export function ObjectsScreen(props: {
       <div class="wl-card">
         <div class="wl-cardHeader">
           <h2>Objects</h2>
-          <div class="wl-muted">{objects.length}</div>
+          <div class="wl-actions">
+            <div class="wl-muted">{objects.length}</div>
+            <button
+              class="wl-btn"
+              disabled={refreshing}
+              onClick={async () => {
+                setRefreshing(true);
+                try {
+                  await sf.clearSchemaCache();
+                  loadObjects();
+                  setSelected('');
+                  setDescribe(null);
+                  setToast({ title: 'Schema Refreshed', body: 'Cache cleared. Object metadata will be re-fetched.' });
+                } catch (e) {
+                  setToast({ title: 'Refresh Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+                } finally {
+                  setRefreshing(false);
+                }
+              }}
+            >
+              {refreshing ? 'Refreshing...' : 'Refresh Schema'}
+            </button>
+          </div>
         </div>
         <div class="wl-row">
           <input

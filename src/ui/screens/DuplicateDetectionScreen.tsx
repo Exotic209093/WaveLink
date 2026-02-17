@@ -169,6 +169,63 @@ export function DuplicateDetectionScreen(props: DuplicateDetectionScreenProps): 
     setToast({ title: 'Merge Complete', body: `${merged.length} records after merge.` });
   }
 
+  /** Push merge to Salesforce: update masters + delete duplicates. */
+  async function pushMergeToSalesforce(): Promise<void> {
+    if (!mergedRecords || groups.length === 0) return;
+    setBusy(true);
+    try {
+      const updateRecords: Record<string, unknown>[] = [];
+      const deleteIds: string[] = [];
+
+      for (const group of groups) {
+        const master = records[group.masterIndex];
+        const masterId = master?.Id;
+        if (!masterId || typeof masterId !== 'string') continue;
+
+        const merged = mergedRecords.find(r => r.Id === masterId);
+        if (merged) {
+          updateRecords.push(merged);
+        }
+
+        for (const dupIdx of group.duplicateIndexes) {
+          const dup = records[dupIdx];
+          const dupId = dup?.Id;
+          if (dupId && typeof dupId === 'string') {
+            deleteIds.push(dupId);
+          }
+        }
+      }
+
+      if (updateRecords.length > 0) {
+        await sf.startDataPush({
+          tabId,
+          objectName: selectedObject,
+          operation: 'update',
+          records: updateRecords,
+        });
+      }
+
+      if (deleteIds.length > 0) {
+        const deleteRecords = deleteIds.map(id => ({ Id: id }));
+        await sf.startDataPush({
+          tabId,
+          objectName: selectedObject,
+          operation: 'delete',
+          records: deleteRecords,
+        });
+      }
+
+      setToast({
+        title: 'Merge Pushed',
+        body: `Updated ${updateRecords.length} master(s) and queued ${deleteIds.length} duplicate(s) for deletion.`,
+      });
+    } catch (e) {
+      setToast({ title: 'Push Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const comparisonFields = Array.from(selectedFields);
 
   return (
@@ -303,10 +360,19 @@ export function DuplicateDetectionScreen(props: DuplicateDetectionScreenProps): 
               )}
             </div>
 
-            {/* Send to Push option for merged results */}
-            {mergedRecords && mergedRecords.length > 0 && (
-              <div class="wl-muted" style="padding-top:6px">
-                Merged dataset ready with {mergedRecords.length} records. Use "Send to Push" from the navigation to push these records.
+            {/* Push merge to Salesforce */}
+            {mergedRecords && mergedRecords.length > 0 && groups.length > 0 && (
+              <div style="display:flex;gap:8px;align-items:center;padding-top:6px;flex-wrap:wrap">
+                <button
+                  class="wl-btn wl-btnPrimary"
+                  disabled={busy}
+                  onClick={pushMergeToSalesforce}
+                >
+                  {busy ? 'Pushing...' : 'Push Merge to Salesforce'}
+                </button>
+                <div class="wl-muted">
+                  Updates {groups.length} master record(s) and deletes {groups.reduce((sum, g) => sum + g.duplicateIndexes.length, 0)} duplicate(s).
+                </div>
               </div>
             )}
           </div>

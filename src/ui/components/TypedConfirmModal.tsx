@@ -5,6 +5,7 @@
  * - Shows a modal requiring user to type a specific confirmation phrase
  * - Disables confirm button until the phrase matches exactly
  * - Auto-focuses the input field
+ * - Traps focus within the modal and closes on Escape
  *
  * Complexity: O(1) for rendering and validation.
  */
@@ -26,6 +27,7 @@ export function TypedConfirmModal(props: TypedConfirmModalProps): VNode | null {
   const { open, title, confirmationPhrase, onConfirm, onCancel, busy, children } = props;
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -33,6 +35,35 @@ export function TypedConfirmModal(props: TypedConfirmModalProps): VNode | null {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
+
+  // Focus trapping and Escape key
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape' && !busy) {
+        e.preventDefault();
+        onCancel();
+        return;
+      }
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+          'input:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, busy, onCancel]);
 
   if (!open) return null;
 
@@ -46,8 +77,8 @@ export function TypedConfirmModal(props: TypedConfirmModalProps): VNode | null {
   };
 
   return (
-    <div class="wl-modalOverlay" onClick={onCancel}>
-      <div class="wl-modal wl-card" onClick={(e) => e.stopPropagation()}>
+    <div class="wl-modalOverlay" onClick={onCancel} role="dialog" aria-modal="true" aria-label={title}>
+      <div class="wl-modal wl-card" ref={modalRef} onClick={(e) => e.stopPropagation()}>
         <div class="wl-cardHeader">
           <h2>{title}</h2>
         </div>
@@ -74,6 +105,7 @@ export function TypedConfirmModal(props: TypedConfirmModalProps): VNode | null {
                 disabled={busy}
                 autocomplete="off"
                 spellcheck={false}
+                aria-label={`Type ${confirmationPhrase} to confirm`}
                 style="font-family:var(--wl-font-mono);width:100%"
               />
             </form>

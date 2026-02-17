@@ -126,6 +126,21 @@ export class NetworkError extends WaveLinkError {
   }
 }
 
+/** Circuit breaker is open - API calls temporarily blocked */
+export class CircuitBreakerError extends WaveLinkError {
+  public readonly resetMs: number;
+
+  constructor(resetMs: number) {
+    super(
+      `API circuit breaker is open. Requests blocked for ${Math.ceil(resetMs / 1000)}s due to repeated failures.`,
+      'CIRCUIT_BREAKER_OPEN',
+      { resetMs },
+    );
+    this.name = 'CircuitBreakerError';
+    this.resetMs = resetMs;
+  }
+}
+
 /** Check if an error is retryable */
 export function isRetryableError(error: unknown): boolean {
   if (error instanceof RateLimitError) return true;

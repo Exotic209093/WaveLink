@@ -26,7 +26,7 @@ import { PushHistoryScreen } from '../screens/PushHistoryScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { Toast } from '../components/Toast';
 import type { Theme } from '../utils/theme';
-import { resolveTheme, applyTheme, watchSystemTheme } from '../utils/theme';
+import { resolveTheme, applyTheme, watchSystemTheme, applyAccentColor } from '../utils/theme';
 import { isSalesforceUrl, extractTabIdFromUrl } from '../../core/utils';
 import { MessageBus } from '../../services/messaging';
 
@@ -73,11 +73,12 @@ export function PopupRoot(): VNode {
   useEffect(() => {
     refreshContext();
 
-    // Load theme
+    // Load theme and accent color
     sf.getUiSettings().then(settings => {
       const savedTheme = settings.theme ?? 'light';
       setTheme(savedTheme);
       applyTheme(resolveTheme(savedTheme));
+      applyAccentColor(settings.accentColor);
     }).catch(() => {
       applyTheme('light');
     });

@@ -79,6 +79,20 @@ export interface UiSettings {
   lastTabId?: number;
   theme?: 'light' | 'dark' | 'auto';
   shortcuts?: Record<string, string>;
+  /** Default batch size for data pushes (1-200) */
+  defaultBatchSize?: number;
+  /** Default parallel threads for REST pushes (1-4) */
+  defaultThreads?: number;
+  /** API request timeout in milliseconds (5000-120000) */
+  apiTimeoutMs?: number;
+  /** Max retry attempts for transient errors (0-5) */
+  maxRetries?: number;
+  /** Max push history entries to retain (10-500) */
+  pushHistoryLimit?: number;
+  /** Schema cache TTL in minutes (5-120) */
+  schemaCacheTtlMinutes?: number;
+  /** Accent color hex string */
+  accentColor?: string;
 }
 
 /** Saved data template for reusable data pushes */
@@ -130,6 +144,8 @@ export interface PushHistoryEntry {
   startedAt: number;
   completedAt: number;
   errors?: Array<{ recordIndex: number; message: string }>;
+  /** If this push was a retry of a previous push */
+  retryOfPushId?: string;
 }
 
 /** Stored successful record IDs for a completed push (session scoped) */
@@ -140,6 +156,8 @@ export interface PushResult {
   operation: 'insert' | 'update' | 'upsert' | 'delete';
   ids: string[];
   capturedAt: number;
+  /** Failed records stored for retry */
+  failedRecords?: Array<{ index: number; record: Record<string, unknown>; error: string }>;
 }
 
 /** Captured push transaction for undo/rollback */

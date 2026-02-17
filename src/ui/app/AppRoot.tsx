@@ -31,7 +31,7 @@ import { DataCleanserScreen } from '../screens/DataCleanserScreen';
 import { DataPushScreen } from '../screens/DataPushScreen';
 import { parseTabIdFromSearch } from '../../core/utils';
 import type { Theme } from '../utils/theme';
-import { resolveTheme, applyTheme, watchSystemTheme } from '../utils/theme';
+import { resolveTheme, applyTheme, watchSystemTheme, applyAccentColor } from '../utils/theme';
 import { TestDataGeneratorScreen } from '../screens/TestDataGeneratorScreen';
 import { TemplatesScreen } from '../screens/TemplatesScreen';
 import { SchemaComparisonScreen } from '../screens/SchemaComparisonScreen';
@@ -112,12 +112,13 @@ export function AppRoot(): VNode {
     // Initial load: populate the tab selector.
     refreshTabs();
 
-    // Load theme from storage
+    // Load theme and accent color from storage
     sf.getUiSettings().then(settings => {
       const savedTheme = settings.theme ?? 'light';
       setTheme(savedTheme);
       const resolved = resolveTheme(savedTheme);
       applyTheme(resolved);
+      applyAccentColor(settings.accentColor);
     }).catch(e => {
       console.error('Failed to load theme:', e);
       applyTheme('light');

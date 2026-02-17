@@ -17,7 +17,7 @@
 
 import { StorageError } from '../../core/errors';
 import { STORAGE_KEYS, MAX_PUSH_HISTORY, MAX_UNDO_ENTRIES } from '../../core/constants';
-import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry, PushResult, SavedQuery, QueryFolder, UiSettings, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
+import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry, PushResult, ActivePush, SavedQuery, QueryFolder, UiSettings, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
 import type { SalesforceOrg } from '../../core/types/salesforce';
 
 /**
@@ -83,13 +83,15 @@ export class StorageService {
     return (await this.getLocal<PushHistoryEntry[]>(STORAGE_KEYS.PUSH_HISTORY)) ?? [];
   }
 
-  /** Add a push history entry (maintains max size) */
+  /** Add a push history entry (maintains max size, respects user-configured limit) */
   async addPushHistory(entry: PushHistoryEntry): Promise<void> {
-    // Time: O(H) worst-case due to `unshift` + truncation; H is capped by MAX_PUSH_HISTORY.
+    // Time: O(H) worst-case due to `unshift` + truncation; H is capped by limit.
     const history = await this.getPushHistory();
+    const settings = await this.getUiSettings();
+    const limit = settings.pushHistoryLimit ?? MAX_PUSH_HISTORY;
     history.unshift(entry);
-    if (history.length > MAX_PUSH_HISTORY) {
-      history.length = MAX_PUSH_HISTORY;
+    if (history.length > limit) {
+      history.length = limit;
     }
     await this.setLocal(STORAGE_KEYS.PUSH_HISTORY, history);
   }
@@ -371,6 +373,101 @@ export class StorageService {
     return entry.data;
   }
 
+  /** Clear cached schema. If orgId is provided, clears only that org's cache. */
+  async clearSchemaCache(orgId?: string): Promise<number> {
+    const cache = await this.getLocal<LocalStorageSchema['schemaCache']>(STORAGE_KEYS.SCHEMA_CACHE) ?? {};
+    let cleared = 0;
+    if (orgId) {
+      for (const key of Object.keys(cache)) {
+        if (key.startsWith(`${orgId}:`)) {
+          delete cache[key];
+          cleared++;
+        }
+      }
+      await this.setLocal(STORAGE_KEYS.SCHEMA_CACHE, cache);
+    } else {
+      cleared = Object.keys(cache).length;
+      await this.setLocal(STORAGE_KEYS.SCHEMA_CACHE, {});
+    }
+    return cleared;
+  }
+
+  /** Get storage usage in bytes */
+  async getStorageUsage(): Promise<{ bytesInUse: number; quota: number }> {
+    const bytesInUse = await chrome.storage.local.getBytesInUse(null);
+    return { bytesInUse, quota: 10 * 1024 * 1024 };
+  }
+
+  /** Purge push history older than given age in ms and expired undo transactions */
+  async purgeOldData(maxAgeMs: number = 30 * 24 * 60 * 60 * 1000): Promise<{ historyPurged: number; transactionsPurged: number }> {
+    const cutoff = Date.now() - maxAgeMs;
+
+    const history = await this.getPushHistory();
+    const freshHistory = history.filter(h => h.completedAt > cutoff);
+    const historyPurged = history.length - freshHistory.length;
+    await this.setLocal(STORAGE_KEYS.PUSH_HISTORY, freshHistory);
+
+    const transactions = await this.getPushTransactions();
+    const now = Date.now();
+    const liveTransactions = transactions.filter(t => t.expiresAt > now);
+    const transactionsPurged = transactions.length - liveTransactions.length;
+    await this.setLocal(STORAGE_KEYS.PUSH_TRANSACTIONS, liveTransactions);
+
+    return { historyPurged, transactionsPurged };
+  }
+
+  /** Export user data as a JSON-serializable backup object */
+  async exportUserData(): Promise<Record<string, unknown>> {
+    const [savedQueries, queryFolders, dataTemplates, uiSettings, pipelines, qualityRuleSets] = await Promise.all([
+      this.getSavedQueries(),
+      this.getQueryFolders(),
+      this.getDataTemplates(),
+      this.getUiSettings(),
+      this.getPipelines(),
+      this.getQualityRuleSets(),
+    ]);
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      savedQueries,
+      queryFolders,
+      dataTemplates,
+      uiSettings,
+      pipelines,
+      qualityRuleSets,
+    };
+  }
+
+  /** Import user data from a backup object. Replaces all matching storage keys. */
+  async importUserData(data: Record<string, unknown>): Promise<{ imported: string[] }> {
+    const imported: string[] = [];
+    if (Array.isArray(data.savedQueries)) {
+      await this.setLocal(STORAGE_KEYS.SAVED_QUERIES, data.savedQueries);
+      imported.push('savedQueries');
+    }
+    if (Array.isArray(data.queryFolders)) {
+      await this.setLocal(STORAGE_KEYS.QUERY_FOLDERS, data.queryFolders);
+      imported.push('queryFolders');
+    }
+    if (Array.isArray(data.dataTemplates)) {
+      await this.setLocal(STORAGE_KEYS.DATA_TEMPLATES, data.dataTemplates);
+      imported.push('dataTemplates');
+    }
+    if (data.uiSettings && typeof data.uiSettings === 'object') {
+      await this.setLocal(STORAGE_KEYS.UI_SETTINGS, data.uiSettings);
+      imported.push('uiSettings');
+    }
+    if (Array.isArray(data.pipelines)) {
+      await this.setLocal(STORAGE_KEYS.PIPELINES, data.pipelines);
+      imported.push('pipelines');
+    }
+    if (Array.isArray(data.qualityRuleSets)) {
+      await this.setLocal(STORAGE_KEYS.QUALITY_RULE_SETS, data.qualityRuleSets);
+      imported.push('qualityRuleSets');
+    }
+    return { imported };
+  }
+
   /** Cache schema data */
   async setCachedSchema(orgId: string, objectName: string, data: unknown, ttl: number): Promise<void> {
     const cache = await this.getLocal<LocalStorageSchema['schemaCache']>(STORAGE_KEYS.SCHEMA_CACHE) ?? {};
@@ -396,6 +493,46 @@ export class StorageService {
   /** Clear session data */
   async clearSession(): Promise<void> {
     await chrome.storage.session.clear();
+  }
+
+  // -- Active Pushes (Session) ------------------------------------------------
+
+  /** Store an active push entry in session storage */
+  async setActivePush(push: ActivePush): Promise<void> {
+    const all = (await this.getSession<Record<string, ActivePush>>(STORAGE_KEYS.ACTIVE_PUSHES)) ?? {};
+    all[push.id] = push;
+    await this.setSession(STORAGE_KEYS.ACTIVE_PUSHES, all);
+  }
+
+  /** Update the status of an active push in session storage */
+  async updateActivePushStatus(pushId: string, status: ActivePush['status']): Promise<void> {
+    const all = (await this.getSession<Record<string, ActivePush>>(STORAGE_KEYS.ACTIVE_PUSHES)) ?? {};
+    if (all[pushId]) {
+      all[pushId].status = status;
+      await this.setSession(STORAGE_KEYS.ACTIVE_PUSHES, all);
+    }
+  }
+
+  /** Get all active pushes from session storage */
+  async getActivePushes(): Promise<ActivePush[]> {
+    const all = (await this.getSession<Record<string, ActivePush>>(STORAGE_KEYS.ACTIVE_PUSHES)) ?? {};
+    return Object.values(all);
+  }
+
+  /** Mark any "processing" pushes as interrupted (called on service worker startup) */
+  async markInterruptedPushes(): Promise<number> {
+    const all = (await this.getSession<Record<string, ActivePush>>(STORAGE_KEYS.ACTIVE_PUSHES)) ?? {};
+    let count = 0;
+    for (const push of Object.values(all)) {
+      if (push.status === 'processing' || push.status === 'queued') {
+        push.status = 'error';
+        count++;
+      }
+    }
+    if (count > 0) {
+      await this.setSession(STORAGE_KEYS.ACTIVE_PUSHES, all);
+    }
+    return count;
   }
 
   // -- Push Results (Session) -------------------------------------------------

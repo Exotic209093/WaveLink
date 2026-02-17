@@ -18,10 +18,12 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { SfApi, SfContext } from '../api/sf';
 import { scoreDataset, getDefaultRulesForField } from '../utils/dataQuality';
 import type { ScorecardResult } from '../utils/dataQuality';
+import { Skeleton } from '../components/Skeleton';
 import type { QualityRule, QualityRuleSet } from '../../core/types/storage';
 import { QualityRuleEditor } from '../components/QualityRuleEditor';
 import { QualityScorecard } from '../components/QualityScorecard';
 import { Toast } from '../components/Toast';
+import { TypedConfirmModal } from '../components/TypedConfirmModal';
 import { downloadTextFile } from '../utils/download';
 import type { SObjectField } from '../../core/types/salesforce';
 
@@ -55,6 +57,7 @@ export function DataQualityScorecardScreen(props: { sf: SfApi; tabId: number }):
   // UI
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Load sObjects on mount
   useEffect(() => {
@@ -317,7 +320,7 @@ export function DataQualityScorecardScreen(props: { sf: SfApi; tabId: number }):
           </div>
 
           {loadingFields ? (
-            <div class="wl-muted">Loading fields...</div>
+            <Skeleton variant="text" rows={4} />
           ) : fieldNames.length > 0 ? (
             <div class="wl-muted">{fieldNames.length} fields available on {selectedObject}</div>
           ) : null}
@@ -368,7 +371,7 @@ export function DataQualityScorecardScreen(props: { sf: SfApi; tabId: number }):
             {selectedRuleSetId ? (
               <button
                 class="wl-btn"
-                onClick={() => deleteRuleSet(selectedRuleSetId)}
+                onClick={() => setDeleteConfirmOpen(true)}
                 disabled={busy}
                 style="color:var(--wl-danger)"
               >
@@ -419,6 +422,24 @@ export function DataQualityScorecardScreen(props: { sf: SfApi; tabId: number }):
 
       {/* Results */}
       {result ? <QualityScorecard result={result} /> : null}
+
+      <TypedConfirmModal
+        open={deleteConfirmOpen}
+        title="Delete Rule Set"
+        confirmationPhrase="DELETE RULE SET"
+        busy={busy}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        onConfirm={async () => {
+          if (selectedRuleSetId) {
+            await deleteRuleSet(selectedRuleSetId);
+          }
+          setDeleteConfirmOpen(false);
+        }}
+      >
+        <div class="wl-muted">
+          This will permanently delete the saved rule set. This action cannot be undone.
+        </div>
+      </TypedConfirmModal>
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </div>

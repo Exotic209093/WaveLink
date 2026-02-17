@@ -69,6 +69,15 @@ export const MAX_UNDO_ENTRIES = 10;
 /** Undo transaction TTL: 1 hour */
 export const UNDO_TTL_MS = 60 * 60 * 1000;
 
+/** Circuit breaker: consecutive failures before opening */
+export const CIRCUIT_BREAKER_THRESHOLD = 3;
+
+/** Circuit breaker: time window for counting failures (ms) */
+export const CIRCUIT_BREAKER_WINDOW_MS = 60_000;
+
+/** Circuit breaker: time to stay open before allowing a probe (ms) */
+export const CIRCUIT_BREAKER_RESET_MS = 30_000;
+
 /** Salesforce domain patterns for org detection */
 export const SALESFORCE_DOMAIN_PATTERNS = [
   /^https:\/\/([a-zA-Z0-9-]+)\.lightning\.force\.com/,

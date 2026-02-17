@@ -23,7 +23,7 @@ import { ObjectsScreen } from '../screens/ObjectsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { Toast } from '../components/Toast';
 import type { Theme } from '../utils/theme';
-import { resolveTheme, applyTheme, watchSystemTheme } from '../utils/theme';
+import { resolveTheme, applyTheme, watchSystemTheme, applyAccentColor } from '../utils/theme';
 
 export function PanelRoot(props: { shadowRoot: ShadowRoot }): VNode {
   const sf = useMemo(() => new SfApi('content'), []);
@@ -39,7 +39,7 @@ export function PanelRoot(props: { shadowRoot: ShadowRoot }): VNode {
       .then(setContext)
       .catch(e => setToast({ title: 'Not Connected', body: e instanceof Error ? e.message : 'Open a logged-in Salesforce tab.' }));
 
-    // Load theme from storage
+    // Load theme and accent color from storage
     sf.getUiSettings().then(settings => {
       const savedTheme = settings.theme ?? 'light';
       setTheme(savedTheme);
@@ -48,6 +48,7 @@ export function PanelRoot(props: { shadowRoot: ShadowRoot }): VNode {
       if (props.shadowRoot.host) {
         (props.shadowRoot.host as HTMLElement).setAttribute('data-theme', resolved);
       }
+      applyAccentColor(settings.accentColor);
     }).catch(e => {
       console.error('Failed to load theme:', e);
     });

@@ -16,6 +16,7 @@ import type { SfApi } from '../api/sf';
 import type { PushHistoryEntry } from '../../core/types/storage';
 import { Toast } from '../components/Toast';
 import { PushHistoryDetail } from '../components/PushHistoryDetail';
+import { Skeleton } from '../components/Skeleton';
 
 type SortField = 'completedAt' | 'objectName' | 'operation' | 'totalRecords' | 'failureCount';
 type SortDirection = 'asc' | 'desc';
@@ -116,7 +117,7 @@ export function PushHistoryScreen(props: { sf: SfApi }): VNode {
         </div>
 
         {loading ? (
-          <div class="wl-muted">Loading history...</div>
+          <Skeleton variant="table" rows={4} columns={5} />
         ) : sortedHistory.length === 0 ? (
           <div class="wl-muted">
             {history.length === 0 ? 'No push history yet.' : 'No entries match your filters.'}
@@ -206,6 +207,18 @@ export function PushHistoryScreen(props: { sf: SfApi }): VNode {
         <PushHistoryDetail
           entry={selectedEntry}
           onClose={() => setSelectedEntry(null)}
+          onRetryFailed={async (pushId) => {
+            try {
+              const result = await sf.retryFailedRecords(pushId);
+              setToast({
+                title: 'Retry Started',
+                body: `Retrying ${result.recordCount} failed records via ${result.strategy.toUpperCase()}. Push ID: ${result.pushId}`,
+              });
+              setSelectedEntry(null);
+            } catch (e) {
+              setToast({ title: 'Retry Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+            }
+          }}
         />
       ) : null}
 

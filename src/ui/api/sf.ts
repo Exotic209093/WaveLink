@@ -169,6 +169,15 @@ export class SfApi {
     return (res.data ?? null) as DataPushResultGetResponse | null;
   }
 
+  async retryFailedRecords(pushId: string, tabId?: number): Promise<{ pushId: string; strategy: string; recordCount: number }> {
+    const res = await this.bus.send<{ pushId: string; tabId?: number }, { pushId: string; strategy: string; recordCount: number }>(
+      'DATA_PUSH_RETRY_FAILED',
+      { pushId, tabId },
+    );
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to retry failed records');
+    return res.data;
+  }
+
   async getPushHistory(): Promise<PushHistoryEntry[]> {
     const res = await this.bus.send<object, PushHistoryGetResponse>('PUSH_HISTORY_GET', {});
     if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to fetch push history');
@@ -262,6 +271,42 @@ export class SfApi {
   async deleteQualityRuleSet(id: string): Promise<void> {
     const res = await this.bus.send<{ id: string }, object>('QUALITY_RULES_DELETE', { id });
     if (!res.success) throw new Error(res.error?.message ?? 'Failed to delete rule set');
+  }
+
+  // ── Schema Cache Management ──────────────────────────────────────
+
+  async clearSchemaCache(orgId?: string): Promise<{ cleared: number }> {
+    const res = await this.bus.send<{ orgId?: string }, { cleared: number }>('SCHEMA_CACHE_CLEAR', { orgId });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to clear schema cache');
+    return res.data;
+  }
+
+  // ── Storage Management ─────────────────────────────────────────
+
+  async getStorageUsage(): Promise<{ bytesInUse: number; quota: number }> {
+    const res = await this.bus.send<object, { bytesInUse: number; quota: number }>('STORAGE_USAGE_GET', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to get storage usage');
+    return res.data;
+  }
+
+  async purgeOldData(): Promise<{ historyPurged: number; transactionsPurged: number }> {
+    const res = await this.bus.send<object, { historyPurged: number; transactionsPurged: number }>('STORAGE_PURGE_OLD', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to purge old data');
+    return res.data;
+  }
+
+  // ── Data Backup/Restore ─────────────────────────────────────────
+
+  async exportUserData(): Promise<Record<string, unknown>> {
+    const res = await this.bus.send<object, Record<string, unknown>>('DATA_EXPORT', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to export data');
+    return res.data;
+  }
+
+  async importUserData(data: Record<string, unknown>): Promise<{ imported: string[] }> {
+    const res = await this.bus.send<Record<string, unknown>, { imported: string[] }>('DATA_IMPORT', data);
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to import data');
+    return res.data;
   }
 
   // ── Onboarding ─────────────────────────────────────────────────

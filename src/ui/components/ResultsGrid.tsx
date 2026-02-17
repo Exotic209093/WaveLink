@@ -1,22 +1,32 @@
 /**
- * Generic results table for displaying query results / record lists.
+ * Virtualized results table for displaying query results / record lists.
  *
  * What this file does:
  * - Derives columns from provided rows.
- * - Renders a simple table with some Salesforce-ID affordances.
+ * - Renders a virtual-scrolling table for smooth 10,000+ row performance.
+ * - Column sorting: click header to cycle asc/desc/none.
+ * - Column filtering: small input below each header for as-you-type filtering.
+ * - Frozen "Id" column (position: sticky) when present.
  *
  * Complexity:
- * - Rendering is roughly O(R*C) where R is rows and C is columns (typical for tables).
+ * - Sorting: O(R log R) on sort change.
+ * - Filtering: O(R * C_filtered) on filter change.
+ * - Rendering: O(visible) rows, constant regardless of total rows.
  */
 
 import type { VNode } from 'preact';
 import { h } from 'preact';
-import { useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { FlatRecord } from '../utils/records';
+
+const ROW_HEIGHT = 32;
+const BUFFER_ROWS = 5;
 
 function looksLikeSfId(value: unknown): value is string {
   return typeof value === 'string' && /^[a-zA-Z0-9]{15,18}$/.test(value);
 }
+
+type SortDir = 'asc' | 'desc' | null;
 
 export function ResultsGrid(props: {
   instanceUrl?: string;
@@ -28,10 +38,60 @@ export function ResultsGrid(props: {
   const { instanceUrl, records, columns, selectedColumns, onSelectedColumnsChange } = props;
   const [showCols, setShowCols] = useState(false);
 
+  // Sort state
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>(null);
+
+  // Filter state
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Virtual scroll state
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(400);
+
   const visibleCols = useMemo(() => {
     const set = new Set(selectedColumns);
     return columns.filter(c => set.has(c));
   }, [columns, selectedColumns]);
+
+  // Apply filters
+  const filteredRecords = useMemo(() => {
+    const activeFilters = Object.entries(filters).filter(([, v]) => v.trim() !== '');
+    if (activeFilters.length === 0) return records;
+    return records.filter(r =>
+      activeFilters.every(([col, query]) => {
+        const val = r[col];
+        const str = val === null || val === undefined ? '' : String(val);
+        return str.toLowerCase().includes(query.toLowerCase());
+      }),
+    );
+  }, [records, filters]);
+
+  // Apply sorting
+  const sortedRecords = useMemo(() => {
+    if (!sortCol || !sortDir) return filteredRecords;
+    const sorted = [...filteredRecords];
+    sorted.sort((a, b) => {
+      const va = a[sortCol];
+      const vb = b[sortCol];
+      if (va === vb) return 0;
+      if (va === null || va === undefined) return 1;
+      if (vb === null || vb === undefined) return -1;
+      const sa = String(va);
+      const sb = String(vb);
+      // Try numeric comparison
+      const na = Number(sa);
+      const nb = Number(sb);
+      if (!isNaN(na) && !isNaN(nb)) {
+        return sortDir === 'asc' ? na - nb : nb - na;
+      }
+      const cmp = sa.localeCompare(sb);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [filteredRecords, sortCol, sortDir]);
 
   function toggleCol(col: string): void {
     const set = new Set(selectedColumns);
@@ -40,14 +100,64 @@ export function ResultsGrid(props: {
     onSelectedColumnsChange(Array.from(set));
   }
 
+  function handleSort(col: string): void {
+    if (sortCol === col) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else if (sortDir === 'desc') { setSortCol(null); setSortDir(null); }
+      else setSortDir('asc');
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  }
+
+  function handleFilterChange(col: string, value: string): void {
+    setFilters(prev => ({ ...prev, [col]: value }));
+    setScrollTop(0);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }
+
+  // Virtual scroll calculations
+  const totalRows = sortedRecords.length;
+  const totalHeight = totalRows * ROW_HEIGHT;
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_ROWS);
+  const endIdx = Math.min(totalRows, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + BUFFER_ROWS);
+  const visibleRows = sortedRecords.slice(startIdx, endIdx);
+
+  const handleScroll = useCallback((e: Event) => {
+    const target = e.currentTarget as HTMLDivElement;
+    setScrollTop(target.scrollTop);
+  }, []);
+
+  // Measure viewport on mount and resize
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = (): void => setViewportHeight(el.clientHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const idColIdx = visibleCols.indexOf('Id');
+
   return (
     <div class="wl-card">
       <div class="wl-cardHeader">
         <h2>Results</h2>
         <div class="wl-actions">
+          <button class="wl-btn" onClick={() => setShowFilters(v => !v)}>
+            {showFilters ? 'Hide Filters' : 'Filters'}
+          </button>
           <button class="wl-btn" onClick={() => setShowCols(v => !v)}>
             Columns ({selectedColumns.length}/{columns.length})
           </button>
+          <span class="wl-muted" style="font-size:12px">
+            {totalRows === records.length
+              ? `${records.length} rows`
+              : `${totalRows} / ${records.length} rows`}
+          </span>
         </div>
       </div>
 
@@ -69,22 +179,71 @@ export function ResultsGrid(props: {
         </div>
       ) : null}
 
-      <div class="wl-tableWrap">
-        <table class="wl-table">
+      <div
+        ref={scrollRef}
+        class="wl-tableWrap"
+        style="max-height:480px;overflow:auto"
+        onScroll={handleScroll}
+      >
+        <table class="wl-table" style="table-layout:fixed">
           <thead>
             <tr>
-              {visibleCols.map(c => <th key={c}>{c}</th>)}
+              {visibleCols.map((c, ci) => (
+                <th
+                  key={c}
+                  style={`cursor:pointer;user-select:none;min-width:100px;max-width:240px${
+                    ci === idColIdx ? ';position:sticky;left:0;z-index:2;background:inherit' : ''
+                  }`}
+                  onClick={() => handleSort(c)}
+                >
+                  {c}
+                  {sortCol === c ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
+                </th>
+              ))}
             </tr>
+            {showFilters ? (
+              <tr>
+                {visibleCols.map((c, ci) => (
+                  <th
+                    key={`filter-${c}`}
+                    style={`padding:2px 4px${
+                      ci === idColIdx ? ';position:sticky;left:0;z-index:2;background:inherit' : ''
+                    }`}
+                  >
+                    <input
+                      class="wl-input"
+                      type="text"
+                      style="font-size:11px;padding:2px 6px;width:100%"
+                      placeholder="Filter..."
+                      value={filters[c] ?? ''}
+                      onInput={(e) => handleFilterChange(c, (e.currentTarget as HTMLInputElement).value)}
+                    />
+                  </th>
+                ))}
+              </tr>
+            ) : null}
           </thead>
           <tbody>
-            {records.map((r, idx) => (
-              <tr key={idx}>
-                {visibleCols.map(c => {
+            {/* Spacer row for virtual scroll offset */}
+            {startIdx > 0 ? (
+              <tr style={`height:${startIdx * ROW_HEIGHT}px`}>
+                <td colSpan={visibleCols.length} />
+              </tr>
+            ) : null}
+            {visibleRows.map((r, vi) => (
+              <tr key={startIdx + vi} style={`height:${ROW_HEIGHT}px`}>
+                {visibleCols.map((c, ci) => {
                   const v = r[c];
                   const display = v === null ? '' : String(v ?? '');
                   const isId = c === 'Id' && looksLikeSfId(v) && instanceUrl;
                   return (
-                    <td key={c} title={display}>
+                    <td
+                      key={c}
+                      title={display}
+                      style={`max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap${
+                        ci === idColIdx ? ';position:sticky;left:0;z-index:1;background:inherit' : ''
+                      }`}
+                    >
                       {isId ? (
                         <a class="wl-link" href={`${instanceUrl}/${v}`} target="_blank" rel="noreferrer">
                           {display}
@@ -95,6 +254,12 @@ export function ResultsGrid(props: {
                 })}
               </tr>
             ))}
+            {/* Spacer row for remaining virtual scroll space */}
+            {endIdx < totalRows ? (
+              <tr style={`height:${(totalRows - endIdx) * ROW_HEIGHT}px`}>
+                <td colSpan={visibleCols.length} />
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

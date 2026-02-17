@@ -364,7 +364,9 @@ messageBus.on('SF_DESCRIBE_SOBJECT', async (message, sender): Promise<MessageRes
       apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
     });
     const result = await client.describeSObject(objectName);
-    await storage.setCachedSchema(org.orgId, objectName, result, SCHEMA_CACHE_TTL);
+    const uiSettingsForTtl = await storage.getUiSettings();
+    const ttl = uiSettingsForTtl.schemaCacheTtlMinutes ? uiSettingsForTtl.schemaCacheTtlMinutes * 60 * 1000 : SCHEMA_CACHE_TTL;
+    await storage.setCachedSchema(org.orgId, objectName, result, ttl);
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
     return {
@@ -693,6 +695,77 @@ messageBus.on('ONBOARDING_SET', async (message): Promise<MessageResponse> => {
   }
 });
 
+// ── Schema Cache Management ──────────────────────────────────────────
+
+messageBus.on('SCHEMA_CACHE_CLEAR', async (message): Promise<MessageResponse> => {
+  try {
+    const payload = message.payload as { orgId?: string };
+    const cleared = await storage.clearSchemaCache(payload.orgId);
+    return { success: true, data: { cleared }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'SCHEMA_CACHE_CLEAR_ERROR', message: error instanceof Error ? error.message : 'Failed to clear schema cache' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+// ── Storage Management ───────────────────────────────────────────────
+
+messageBus.on('STORAGE_USAGE_GET', async (message): Promise<MessageResponse> => {
+  try {
+    const usage = await storage.getStorageUsage();
+    return { success: true, data: usage, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'STORAGE_USAGE_ERROR', message: error instanceof Error ? error.message : 'Failed to get storage usage' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('STORAGE_PURGE_OLD', async (message): Promise<MessageResponse> => {
+  try {
+    const result = await storage.purgeOldData();
+    return { success: true, data: result, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'STORAGE_PURGE_ERROR', message: error instanceof Error ? error.message : 'Failed to purge old data' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('DATA_EXPORT', async (message): Promise<MessageResponse> => {
+  try {
+    const data = await storage.exportUserData();
+    return { success: true, data, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'DATA_EXPORT_ERROR', message: error instanceof Error ? error.message : 'Failed to export data' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('DATA_IMPORT', async (message): Promise<MessageResponse> => {
+  try {
+    const payload = message.payload as Record<string, unknown>;
+    const result = await storage.importUserData(payload);
+    return { success: true, data: result, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'DATA_IMPORT_ERROR', message: error instanceof Error ? error.message : 'Failed to import data' },
+      requestId: message.requestId,
+    };
+  }
+});
+
 async function togglePanelOnActiveTab(): Promise<void> {
   /**
    * Ask the active Salesforce tab's content script to toggle the in-page panel.
@@ -793,8 +866,10 @@ messageBus.on('SCHEMA_DESCRIBE_SOBJECT', async (message): Promise<MessageRespons
     const client = createApiClient(org);
     const result = await client.describeSObject(objectName);
 
-    // Cache the result
-    await storage.setCachedSchema(orgId, objectName, result, SCHEMA_CACHE_TTL);
+    // Cache the result with user-configured TTL
+    const uiSettingsForTtl2 = await storage.getUiSettings();
+    const ttl2 = uiSettingsForTtl2.schemaCacheTtlMinutes ? uiSettingsForTtl2.schemaCacheTtlMinutes * 60 * 1000 : SCHEMA_CACHE_TTL;
+    await storage.setCachedSchema(orgId, objectName, result, ttl2);
 
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
@@ -838,10 +913,33 @@ messageBus.on('DATA_PUSH_START', async (message): Promise<MessageResponse> => {
       useBulkApi?: boolean;
     };
 
+    // Read user's advanced settings to apply defaults
+    const uiSettings = await storage.getUiSettings();
+    if (payload.batchSize === undefined && uiSettings.defaultBatchSize) {
+      payload.batchSize = uiSettings.defaultBatchSize;
+    }
+    if (payload.threads === undefined && uiSettings.defaultThreads) {
+      payload.threads = uiSettings.defaultThreads;
+    }
+
     const pushId = generateId();
     const startedAt = Date.now();
     const abortController = new AbortController();
     activePushes.set(pushId, { abortController });
+
+    // Persist push state to session storage for resilience across service worker restarts
+    storage.setActivePush({
+      id: pushId,
+      orgId: payload.orgId ?? '',
+      objectName: payload.objectName,
+      operation: payload.operation,
+      totalRecords: payload.records.length,
+      processedRecords: 0,
+      failedRecords: 0,
+      startedAt,
+      status: 'processing',
+    }).catch(() => undefined);
+
     if (!payload.tabId && !payload.orgId) {
       throw new Error('DATA_PUSH_START requires either tabId (full app) or orgId (popup).');
     }
@@ -857,10 +955,14 @@ messageBus.on('DATA_PUSH_START', async (message): Promise<MessageResponse> => {
     if (useBulk) {
       // Bulk API 2.0 path
       executeBulkPush(pushId, org, payload, { startedAt, abortSignal: abortController.signal, strategy })
+        .then(() => storage.updateActivePushStatus(pushId, 'complete').catch(() => undefined))
+        .catch(() => storage.updateActivePushStatus(pushId, 'error').catch(() => undefined))
         .finally(() => activePushes.delete(pushId));
     } else {
       // REST API (SObject Collections + Composite) path
       executeRestPush(pushId, org, payload, { startedAt, abortSignal: abortController.signal, strategy })
+        .then(() => storage.updateActivePushStatus(pushId, 'complete').catch(() => undefined))
+        .catch(() => storage.updateActivePushStatus(pushId, 'error').catch(() => undefined))
         .finally(() => activePushes.delete(pushId));
     }
 
@@ -1145,7 +1247,17 @@ async function executeRestPush(
 
   await storage.addPushHistory(historyEntry);
 
-  // Store successful IDs (session scoped) for rollback/audit.
+  // Store successful IDs and failed records (session scoped) for rollback/audit/retry.
+  const failedRecordData: Array<{ index: number; record: Record<string, unknown>; error: string }> = [];
+  for (const err of errors) {
+    if (err.recordIndex >= 0 && err.recordIndex < payload.records.length) {
+      failedRecordData.push({
+        index: err.recordIndex,
+        record: payload.records[err.recordIndex],
+        error: err.message,
+      });
+    }
+  }
   const pushResult: PushResult = {
     pushId,
     orgId: org.orgId,
@@ -1153,6 +1265,7 @@ async function executeRestPush(
     operation: payload.operation,
     ids: successfulIds,
     capturedAt: completedAt,
+    failedRecords: failedRecordData.length > 0 ? failedRecordData : undefined,
   };
   await storage.setPushResult(pushResult);
 
@@ -1397,6 +1510,9 @@ chrome.runtime.onInstalled.addListener((details) => {
   console.log(`WaveLink installed: ${details.reason}`);
 });
 
+// On service worker startup: mark any in-progress pushes as interrupted
+storage.markInterruptedPushes().catch(() => undefined);
+
 chrome.commands.onCommand.addListener((command) => {
   if (command === 'toggle-panel') {
     togglePanelOnActiveTab().catch(() => {
@@ -1413,6 +1529,7 @@ messageBus.on('DATA_PUSH_CANCEL', async (message): Promise<MessageResponse> => {
       return { success: true, data: { cancelled: false }, requestId: message.requestId };
     }
     active.abortController.abort();
+    storage.updateActivePushStatus(pushId, 'cancelled').catch(() => undefined);
     return { success: true, data: { cancelled: true }, requestId: message.requestId };
   } catch (error) {
     return {
@@ -1441,6 +1558,7 @@ messageBus.on('DATA_PUSH_RESULT_GET', async (message): Promise<MessageResponse> 
         operation: result.operation,
         ids: result.ids,
         capturedAt: result.capturedAt,
+        failedRecords: result.failedRecords,
       },
       requestId: message.requestId,
     };
@@ -1451,6 +1569,81 @@ messageBus.on('DATA_PUSH_RESULT_GET', async (message): Promise<MessageResponse> 
         code: 'DATA_PUSH_RESULT_GET_ERROR',
         message: error instanceof Error ? error.message : 'Failed to fetch data push result',
       },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('DATA_PUSH_RETRY_FAILED', async (message): Promise<MessageResponse> => {
+  try {
+    const { pushId, tabId } = message.payload as { pushId: string; tabId?: number };
+    const result = await storage.getPushResult(pushId);
+    if (!result || !result.failedRecords || result.failedRecords.length === 0) {
+      return {
+        success: false,
+        error: { code: 'NO_FAILED_RECORDS', message: 'No failed records found for this push.' },
+        requestId: message.requestId,
+      };
+    }
+
+    // Get the original history entry to look up the org
+    const history = await storage.getPushHistory();
+    const originalEntry = history.find(h => h.id === pushId);
+
+    const records = result.failedRecords.map(fr => fr.record);
+    // Re-dispatch as a new push with retryOfPushId tracking
+    const retryPushId = generateId();
+    const startedAt = Date.now();
+    const abortController = new AbortController();
+    activePushes.set(retryPushId, { abortController });
+
+    storage.setActivePush({
+      id: retryPushId,
+      orgId: result.orgId,
+      objectName: result.objectName,
+      operation: result.operation,
+      totalRecords: records.length,
+      processedRecords: 0,
+      failedRecords: 0,
+      startedAt,
+      status: 'processing',
+    }).catch(() => undefined);
+
+    let org: SalesforceOrg;
+    if (tabId) {
+      org = await auth.ensureValidToken(await auth.loginForTab(tabId));
+    } else {
+      org = await getValidOrg(result.orgId);
+    }
+
+    const useBulk = records.length >= BULK_API_THRESHOLD;
+
+    if (useBulk) {
+      executeBulkPush(retryPushId, org, { objectName: result.objectName, records, operation: result.operation }, { startedAt, abortSignal: abortController.signal, strategy: 'bulk' })
+        .then(() => storage.updateActivePushStatus(retryPushId, 'complete').catch(() => undefined))
+        .catch(() => storage.updateActivePushStatus(retryPushId, 'error').catch(() => undefined))
+        .finally(() => activePushes.delete(retryPushId));
+    } else {
+      executeRestPush(retryPushId, org, {
+        objectName: result.objectName,
+        records,
+        operation: result.operation,
+        externalIdField: originalEntry?.externalIdField,
+      }, { startedAt, abortSignal: abortController.signal, strategy: 'rest' })
+        .then(() => storage.updateActivePushStatus(retryPushId, 'complete').catch(() => undefined))
+        .catch(() => storage.updateActivePushStatus(retryPushId, 'error').catch(() => undefined))
+        .finally(() => activePushes.delete(retryPushId));
+    }
+
+    return {
+      success: true,
+      data: { pushId: retryPushId, strategy: useBulk ? 'bulk' : 'rest', recordCount: records.length },
+      requestId: message.requestId,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'RETRY_FAILED', message: error instanceof Error ? error.message : 'Failed to retry' },
       requestId: message.requestId,
     };
   }

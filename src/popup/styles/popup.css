@@ -14,20 +14,20 @@
   --wl-font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
 
   --wl-ink: #072033;
-  --wl-ink-dim: rgba(7, 32, 51, 0.72);
-  --wl-paper: #f5fbff;
-  --wl-paper-2: #eaf4ff;
-  --wl-line: rgba(7, 32, 51, 0.18);
-  --wl-line-2: rgba(7, 32, 51, 0.10);
+  --wl-ink-dim: rgba(7, 32, 51, 0.68);
+  --wl-paper: #f0f7ff;
+  --wl-paper-2: #e3f0fc;
+  --wl-line: rgba(7, 32, 51, 0.12);
+  --wl-line-2: rgba(7, 32, 51, 0.06);
 
-  --wl-accent: #00a6c8;
-  --wl-accent-2: #2de2c5;
-  --wl-danger: #ff3b5c;
-  --wl-glow: rgba(0, 166, 200, 0.22);
+  --wl-accent: #0284a8;
+  --wl-accent-2: #48cae4;
+  --wl-danger: #ef4460;
+  --wl-glow: rgba(2, 132, 168, 0.18);
 
   --wl-radius: 16px;
   --wl-radius-sm: 12px;
-  --wl-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+  --wl-shadow: 0 12px 36px rgba(0, 0, 0, 0.10);
 
   --wl-transition: 160ms ease;
 
@@ -36,14 +36,14 @@
     Keeping aliases avoids having to refactor the popup DOM right now.
   */
   --color-primary: var(--wl-accent);
-  --color-primary-hover: #067c95;
-  --color-secondary: #2b4a5c;
+  --color-primary-hover: #026e8e;
+  --color-secondary: #1e3d50;
   --color-success: #1f9f7a;
   --color-danger: var(--wl-danger);
-  --color-warning: #fe9339;
+  --color-warning: #f0913a;
   --color-bg: var(--wl-paper);
   --color-bg-secondary: var(--wl-paper-2);
-  --color-border: rgba(7, 32, 51, 0.16);
+  --color-border: rgba(7, 32, 51, 0.10);
   --color-text: var(--wl-ink);
   --color-text-secondary: var(--wl-ink-dim);
   --color-text-inverse: #ffffff;
@@ -65,11 +65,9 @@ body {
   font-size: 13px;
   color: var(--color-text);
   background:
-    radial-gradient(900px 520px at 10% 6%, rgba(0, 166, 200, 0.20), transparent 62%),
-    radial-gradient(780px 520px at 86% 14%, rgba(45, 226, 197, 0.16), transparent 62%),
-    radial-gradient(920px 620px at 60% 110%, rgba(4, 60, 82, 0.18), transparent 58%),
-    linear-gradient(180deg, var(--wl-paper), #ffffff 62%),
-    repeating-linear-gradient(135deg, rgba(0, 110, 140, 0.028) 0 2px, transparent 2px 10px);
+    radial-gradient(800px 480px at 10% 6%, rgba(2, 132, 168, 0.14), transparent 60%),
+    radial-gradient(700px 480px at 86% 14%, rgba(72, 202, 228, 0.10), transparent 60%),
+    linear-gradient(180deg, var(--wl-paper), #ffffff 70%);
   animation: wl-popupIn 520ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 
@@ -83,8 +81,8 @@ body {
   justify-content: space-between;
   padding: 12px 16px;
   background:
-    radial-gradient(380px 180px at 20% 20%, rgba(255, 255, 255, 0.16), transparent 60%),
-    linear-gradient(135deg, #043c52, var(--color-primary));
+    radial-gradient(380px 180px at 20% 20%, rgba(255, 255, 255, 0.10), transparent 60%),
+    linear-gradient(135deg, #052e40, var(--color-primary));
   color: var(--color-text-inverse);
 }
 
@@ -105,15 +103,16 @@ body {
   padding: 3px 8px;
   border-radius: 10px;
   font-weight: 600;
+  backdrop-filter: blur(6px);
 }
 
 .status-badge.connected {
-  background: rgba(31, 159, 122, 0.92);
+  background: rgba(31, 159, 122, 0.85);
   color: var(--color-text-inverse);
 }
 
 .status-badge.disconnected {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
   color: var(--color-text-inverse);
 }
 
@@ -145,6 +144,7 @@ body {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  backdrop-filter: blur(6px);
   transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition);
 }
 
@@ -161,7 +161,7 @@ body {
 .btn-primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 10px 18px rgba(4, 60, 82, 0.18);
+  box-shadow: 0 6px 16px rgba(2, 90, 120, 0.12);
 }
 
 .btn-secondary {
@@ -171,8 +171,8 @@ body {
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: rgba(0, 166, 200, 0.10);
-  border-color: rgba(0, 166, 200, 0.35);
+  background: rgba(2, 132, 168, 0.08);
+  border-color: rgba(2, 132, 168, 0.28);
 }
 
 .btn-danger {
@@ -307,7 +307,7 @@ body {
 .file-drop:hover,
 .file-drop.dragover {
   border-color: var(--color-primary);
-  background: rgba(0, 166, 200, 0.06);
+  background: rgba(2, 132, 168, 0.04);
 }
 
 /* ── Data Preview ─────────────────────────────────────────────────── */
@@ -370,7 +370,8 @@ body {
 .progress-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(7, 32, 51, 0.30);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -378,7 +379,9 @@ body {
 }
 
 .progress-card {
-  background: var(--color-bg);
+  background: rgba(240, 247, 255, 0.85);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: 20px;
   width: 300px;

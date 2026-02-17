@@ -23,6 +23,7 @@ export type MessageType =
   | 'DATA_PUSH_ERROR'
   | 'DATA_PUSH_CANCEL'
   | 'DATA_PUSH_RESULT_GET'
+  | 'DATA_PUSH_RETRY_FAILED'
   | 'PUSH_HISTORY_GET'
   // Schema messages
   | 'SCHEMA_DESCRIBE'
@@ -67,6 +68,14 @@ export type MessageType =
   | 'QUALITY_RULES_LIST'
   | 'QUALITY_RULES_UPSERT'
   | 'QUALITY_RULES_DELETE'
+  // Schema cache management
+  | 'SCHEMA_CACHE_CLEAR'
+  // Storage management
+  | 'STORAGE_USAGE_GET'
+  | 'STORAGE_PURGE_OLD'
+  // Data backup/restore
+  | 'DATA_EXPORT'
+  | 'DATA_IMPORT'
   // Onboarding
   | 'ONBOARDING_GET'
   | 'ONBOARDING_SET';

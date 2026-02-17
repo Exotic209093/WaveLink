@@ -27,10 +27,11 @@ function groupErrors(errors: Array<{ recordIndex: number; message: string }>): M
 export interface PushHistoryDetailProps {
   entry: PushHistoryEntry;
   onClose: () => void;
+  onRetryFailed?: (pushId: string) => Promise<void>;
 }
 
 export function PushHistoryDetail(props: PushHistoryDetailProps): VNode {
-  const { entry, onClose } = props;
+  const { entry, onClose, onRetryFailed } = props;
   const [busy, setBusy] = useState(false);
 
   const errorGroups = entry.errors ? groupErrors(entry.errors) : new Map();
@@ -120,6 +121,22 @@ export function PushHistoryDetail(props: PushHistoryDetailProps): VNode {
                   Error Summary ({entry.failureCount} failures, {sortedGroups.length} unique messages)
                 </h3>
                 <div style="display:flex;gap:8px">
+                  {onRetryFailed && entry.failureCount > 0 ? (
+                    <button
+                      class="wl-btn wl-btnPrimary"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        try {
+                          await onRetryFailed(entry.id);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Retry {entry.failureCount} Failed
+                    </button>
+                  ) : null}
                   <button class="wl-btn" onClick={() => exportErrors('csv')} disabled={busy}>
                     Export CSV
                   </button>

@@ -14,11 +14,12 @@
  * - Batch helpers (collectionCreate/update/delete) are O(N) in the batch size due to payload construction.
  */
 
-import { API_BASE_PATH, MAX_API_RETRIES, RETRY_BASE_DELAY_MS } from '../../core/constants';
+import { API_BASE_PATH, MAX_API_RETRIES, RETRY_BASE_DELAY_MS, CIRCUIT_BREAKER_THRESHOLD, CIRCUIT_BREAKER_WINDOW_MS, CIRCUIT_BREAKER_RESET_MS } from '../../core/constants';
 import {
   SalesforceApiError,
   RateLimitError,
   NetworkError,
+  CircuitBreakerError,
   isRetryableError,
 } from '../../core/errors';
 import { retryWithBackoff } from '../../core/utils';
@@ -29,6 +30,60 @@ import type {
   CompositeSubRequest,
   CompositeResponse,
 } from '../../core/types/salesforce';
+
+/**
+ * Simple circuit breaker state machine.
+ * Tracks consecutive failures and blocks requests when the circuit is open.
+ */
+type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+
+class CircuitBreaker {
+  private state: CircuitState = 'CLOSED';
+  private failureTimestamps: number[] = [];
+  private openedAt = 0;
+
+  /** Check if a request should be allowed through. Throws if circuit is OPEN. */
+  allowRequest(): void {
+    if (this.state === 'CLOSED') return;
+    if (this.state === 'HALF_OPEN') return; // allow one probe
+
+    // OPEN: check if enough time has passed to transition to HALF_OPEN
+    const elapsed = Date.now() - this.openedAt;
+    if (elapsed >= CIRCUIT_BREAKER_RESET_MS) {
+      this.state = 'HALF_OPEN';
+      return;
+    }
+    throw new CircuitBreakerError(CIRCUIT_BREAKER_RESET_MS - elapsed);
+  }
+
+  /** Record a successful request. Resets the circuit to CLOSED. */
+  recordSuccess(): void {
+    this.state = 'CLOSED';
+    this.failureTimestamps = [];
+  }
+
+  /** Record a failed request. May trip the circuit to OPEN. */
+  recordFailure(): void {
+    const now = Date.now();
+    this.failureTimestamps.push(now);
+
+    // Only count failures within the window
+    const windowStart = now - CIRCUIT_BREAKER_WINDOW_MS;
+    this.failureTimestamps = this.failureTimestamps.filter(t => t >= windowStart);
+
+    if (this.state === 'HALF_OPEN') {
+      // Probe failed — re-open
+      this.state = 'OPEN';
+      this.openedAt = now;
+      return;
+    }
+
+    if (this.failureTimestamps.length >= CIRCUIT_BREAKER_THRESHOLD) {
+      this.state = 'OPEN';
+      this.openedAt = now;
+    }
+  }
+}
 
 export interface ApiClientConfig {
   instanceUrl: string;
@@ -41,6 +96,7 @@ export interface ApiClientConfig {
  */
 export class SalesforceApiClient {
   private config: ApiClientConfig;
+  private circuitBreaker = new CircuitBreaker();
 
   constructor(config: ApiClientConfig) {
     this.config = config;
@@ -229,8 +285,14 @@ export class SalesforceApiClient {
       headers['Content-Type'] = 'application/json';
     }
 
+    // Circuit breaker gate: block requests if the circuit is open
+    this.circuitBreaker.allowRequest();
+
     return retryWithBackoff(
       async () => {
+        // Re-check on each retry attempt (circuit may have opened during backoff)
+        this.circuitBreaker.allowRequest();
+
         let response: Response;
         try {
           response = await fetch(url, {
@@ -240,6 +302,7 @@ export class SalesforceApiClient {
             signal,
           });
         } catch (error) {
+          this.circuitBreaker.recordFailure();
           throw new NetworkError(
             `Network request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
             { url, method },
@@ -247,11 +310,13 @@ export class SalesforceApiClient {
         }
 
         if (response.status === 429) {
+          this.circuitBreaker.recordFailure();
           const retryAfter = response.headers.get('Retry-After');
           throw new RateLimitError(retryAfter ? parseInt(retryAfter, 10) : undefined);
         }
 
         if (response.status === 204) {
+          this.circuitBreaker.recordSuccess();
           return undefined as T;
         }
 
@@ -261,14 +326,20 @@ export class SalesforceApiClient {
           const sfErrors = Array.isArray(responseBody) ? responseBody : [responseBody];
           const errorMessage = sfErrors.map((e: { message?: string }) => e.message).join('; ');
           const errorCode = sfErrors[0]?.errorCode as string | undefined;
-          throw new SalesforceApiError(
+          const apiError = new SalesforceApiError(
             errorMessage || `API request failed: ${response.status}`,
             response.status,
             errorCode,
             { url, method, errors: sfErrors },
           );
+          // Record 5xx errors as circuit breaker failures
+          if (response.status >= 500) {
+            this.circuitBreaker.recordFailure();
+          }
+          throw apiError;
         }
 
+        this.circuitBreaker.recordSuccess();
         return responseBody as T;
       },
       MAX_API_RETRIES,

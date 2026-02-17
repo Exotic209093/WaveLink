@@ -25,8 +25,12 @@ import { executePipeline } from '../utils/pipelineExecutor';
 import type { Pipeline } from '../../core/types/storage';
 import { StepLibrary } from '../components/StepLibrary';
 import { PipelineCanvas } from '../components/PipelineCanvas';
+import type { DebugStepState } from '../components/PipelineCanvas';
 import { StepConfigPanel } from '../components/StepConfigPanel';
+import { PipelineDebugger } from '../components/PipelineDebugger';
+import type { StepDebugResult } from '../components/PipelineDebugger';
 import { Toast } from '../components/Toast';
+import { TypedConfirmModal } from '../components/TypedConfirmModal';
 
 export interface PipelineBuilderScreenProps {
   sf: SfApi;
@@ -79,6 +83,11 @@ export function PipelineBuilderScreen(props: PipelineBuilderScreenProps): VNode 
   const [savedPipelines, setSavedPipelines] = useState<Pipeline[]>([]);
   const [pipelineName, setPipelineName] = useState('');
   const [loadedPipelineId, setLoadedPipelineId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  // Debug mode
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugResults, setDebugResults] = useState<StepDebugResult[]>([]);
 
   // UI
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
@@ -113,6 +122,24 @@ export function PipelineBuilderScreen(props: PipelineBuilderScreenProps): VNode 
     () => (previewResult ?? []).slice(0, 10),
     [previewResult],
   );
+
+  /** Build debug states map for canvas highlighting. O(S). */
+  const canvasDebugStates = useMemo(() => {
+    if (!debugMode || debugResults.length === 0) return undefined;
+    const map = new Map<number, DebugStepState>();
+    for (const r of debugResults) {
+      map.set(r.stepIndex, {
+        status: r.error ? 'error' : 'done',
+        recordsOut: r.recordsOut,
+      });
+    }
+    // Mark next unexecuted step as current if no error
+    const lastResult = debugResults[debugResults.length - 1];
+    if (!lastResult.error && debugResults.length < steps.length) {
+      map.set(debugResults.length, { status: 'current' });
+    }
+    return map;
+  }, [debugMode, debugResults, steps.length]);
 
   /** Add a step from the library. O(1). */
   function handleAddStep(type: StepType): void {
@@ -223,8 +250,15 @@ export function PipelineBuilderScreen(props: PipelineBuilderScreenProps): VNode 
         <div class="wl-cardHeader">
           <h2>Pipeline Builder</h2>
           <div class="wl-actions">
-            <button class="wl-btn wl-btnPrimary" onClick={runPreview}>
+            <button class="wl-btn wl-btnPrimary" onClick={runPreview} disabled={debugMode}>
               Run Preview
+            </button>
+            <button
+              class={`wl-btn${debugMode ? ' wl-btnPrimary' : ''}`}
+              onClick={() => { setDebugMode((v) => !v); setDebugResults([]); }}
+              disabled={steps.length === 0}
+            >
+              {debugMode ? 'Exit Debug' : 'Debug'}
             </button>
             <button class="wl-btn" onClick={savePipeline}>
               Save
@@ -264,7 +298,7 @@ export function PipelineBuilderScreen(props: PipelineBuilderScreenProps): VNode 
                   <button
                     class="wl-btn wl-btnDanger"
                     style="flex-shrink:0"
-                    onClick={() => deletePipeline(loadedPipelineId)}
+                    onClick={() => setDeleteConfirmOpen(true)}
                   >
                     Delete
                   </button>
@@ -302,6 +336,7 @@ export function PipelineBuilderScreen(props: PipelineBuilderScreenProps): VNode 
           selectedStepId={selectedStepId}
           onSelectStep={setSelectedStepId}
           onReorder={handleReorder}
+          debugStates={canvasDebugStates}
         />
 
         {/* Right: Config Panel */}
@@ -320,8 +355,26 @@ export function PipelineBuilderScreen(props: PipelineBuilderScreenProps): VNode 
         )}
       </div>
 
+      {/* Debug panel */}
+      {debugMode && dataset && dataset.records.length > 0 && (
+        <PipelineDebugger
+          steps={steps}
+          inputRecords={dataset.records}
+          onClose={() => { setDebugMode(false); setDebugResults([]); }}
+          onStepResultsChange={setDebugResults}
+        />
+      )}
+
+      {debugMode && (!dataset || dataset.records.length === 0) && (
+        <div class="wl-card">
+          <div class="wl-row">
+            <div class="wl-muted">Load a dataset before using the debugger.</div>
+          </div>
+        </div>
+      )}
+
       {/* Preview table */}
-      {previewRows.length > 0 && (
+      {!debugMode && previewRows.length > 0 && (
         <div class="wl-card">
           <div class="wl-cardHeader">
             <h2>Preview (first 10 rows)</h2>
@@ -353,7 +406,7 @@ export function PipelineBuilderScreen(props: PipelineBuilderScreenProps): VNode 
       )}
 
       {/* Send to Push hint */}
-      {previewResult && previewResult.length > 0 && (
+      {!debugMode && previewResult && previewResult.length > 0 && (
         <div class="wl-card">
           <div class="wl-row">
             <div class="wl-muted">
@@ -362,6 +415,24 @@ export function PipelineBuilderScreen(props: PipelineBuilderScreenProps): VNode 
           </div>
         </div>
       )}
+
+      <TypedConfirmModal
+        open={deleteConfirmOpen}
+        title="Delete Pipeline"
+        confirmationPhrase="DELETE PIPELINE"
+        busy={false}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        onConfirm={async () => {
+          if (loadedPipelineId) {
+            await deletePipeline(loadedPipelineId);
+          }
+          setDeleteConfirmOpen(false);
+        }}
+      >
+        <div class="wl-muted">
+          This will permanently delete the saved pipeline. This action cannot be undone.
+        </div>
+      </TypedConfirmModal>
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </div>

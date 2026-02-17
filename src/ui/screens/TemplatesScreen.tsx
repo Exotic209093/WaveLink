@@ -15,7 +15,7 @@ import type { SfApi } from '../api/sf';
 import type { DataTemplate } from '../../core/types/storage';
 import { TemplateCard } from '../components/TemplateCard';
 import { TemplateEditor } from '../components/TemplateEditor';
-import { ConfirmModal } from '../components/ConfirmModal';
+import { TypedConfirmModal } from '../components/TypedConfirmModal';
 import { Toast } from '../components/Toast';
 
 export function TemplatesScreen(props: { sf: SfApi }): VNode {
@@ -179,18 +179,20 @@ export function TemplatesScreen(props: { sf: SfApi }): VNode {
         </div>
       )}
 
-      <ConfirmModal
+      <TypedConfirmModal
         open={deleteTarget !== null}
         title="Delete Template"
-        confirmText="Delete"
+        confirmationPhrase="DELETE TEMPLATE"
         busy={busy}
         onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={async () => {
+          await handleDelete();
+        }}
       >
-        <div>
-          Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+        <div class="wl-muted">
+          This will permanently delete <strong>{deleteTarget?.name}</strong>. This action cannot be undone.
         </div>
-      </ConfirmModal>
+      </TypedConfirmModal>
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </div>
