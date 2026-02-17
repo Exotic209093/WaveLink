@@ -63,6 +63,12 @@ export const RETRY_BASE_DELAY_MS = 1000;
 /** Push history retention: keep last 100 entries */
 export const MAX_PUSH_HISTORY = 100;
 
+/** Max undo/rollback transaction entries */
+export const MAX_UNDO_ENTRIES = 10;
+
+/** Undo transaction TTL: 1 hour */
+export const UNDO_TTL_MS = 60 * 60 * 1000;
+
 /** Salesforce domain patterns for org detection */
 export const SALESFORCE_DOMAIN_PATTERNS = [
   /^https:\/\/([a-zA-Z0-9-]+)\.lightning\.force\.com/,
@@ -83,4 +89,8 @@ export const STORAGE_KEYS = {
   SAVED_QUERIES: 'savedQueries',
   QUERY_FOLDERS: 'queryFolders',
   UI_SETTINGS: 'uiSettings',
+  PUSH_TRANSACTIONS: 'pushTransactions',
+  PIPELINES: 'pipelines',
+  QUALITY_RULE_SETS: 'qualityRuleSets',
+  ONBOARDING: 'onboarding',
 } as const;

@@ -14,7 +14,7 @@
 
 import { MessageBus } from '../../services/messaging';
 import type { SObjectDescribe } from '../../core/types/salesforce';
-import type { UiSettings, SavedQuery, PushHistoryEntry } from '../../core/types/storage';
+import type { UiSettings, SavedQuery, PushHistoryEntry, QueryFolder, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
 import type { DescribeGlobalResult, QueryResult } from '../../services/salesforce/api-client';
 import type { DataPushCancelResponse, DataPushResultGetResponse, PushHistoryGetResponse } from '../../core/types/messaging';
 
@@ -173,5 +173,107 @@ export class SfApi {
     const res = await this.bus.send<object, PushHistoryGetResponse>('PUSH_HISTORY_GET', {});
     if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to fetch push history');
     return res.data.history;
+  }
+
+  // ── Query Folders ────────────────────────────────────────────────
+
+  async listQueryFolders(): Promise<QueryFolder[]> {
+    const res = await this.bus.send<object, { folders: QueryFolder[] }>('QUERY_FOLDERS_GET', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to list query folders');
+    return res.data.folders;
+  }
+
+  async upsertQueryFolder(folder: { id: string; name: string; parentId?: string }): Promise<QueryFolder> {
+    const res = await this.bus.send<typeof folder, QueryFolder>('QUERY_FOLDERS_UPSERT', folder);
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to save query folder');
+    return res.data;
+  }
+
+  async deleteQueryFolder(id: string): Promise<void> {
+    const res = await this.bus.send<{ id: string }, object>('QUERY_FOLDERS_DELETE', { id });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to delete query folder');
+  }
+
+  // ── Data Templates ───────────────────────────────────────────────
+
+  async listTemplates(): Promise<DataTemplate[]> {
+    const res = await this.bus.send<object, { templates: DataTemplate[] }>('TEMPLATES_LIST', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to list templates');
+    return res.data.templates;
+  }
+
+  async upsertTemplate(t: Partial<DataTemplate> & { id: string; name: string; objectName: string }): Promise<DataTemplate> {
+    const res = await this.bus.send<typeof t, DataTemplate>('TEMPLATES_UPSERT', t);
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to save template');
+    return res.data;
+  }
+
+  async deleteTemplate(id: string): Promise<void> {
+    const res = await this.bus.send<{ id: string }, object>('TEMPLATES_DELETE', { id });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to delete template');
+  }
+
+  // ── Push Transactions (Undo) ─────────────────────────────────────
+
+  async getPushTransactions(): Promise<PushTransaction[]> {
+    const res = await this.bus.send<object, { transactions: PushTransaction[] }>('TRANSACTIONS_GET', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to get transactions');
+    return res.data.transactions;
+  }
+
+  async removePushTransaction(id: string): Promise<void> {
+    const res = await this.bus.send<{ id: string }, object>('TRANSACTIONS_CLEAR', { id });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to remove transaction');
+  }
+
+  // ── Pipelines ────────────────────────────────────────────────────
+
+  async listPipelines(): Promise<Pipeline[]> {
+    const res = await this.bus.send<object, { pipelines: Pipeline[] }>('PIPELINES_LIST', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to list pipelines');
+    return res.data.pipelines;
+  }
+
+  async upsertPipeline(p: Partial<Pipeline> & { id: string; name: string; steps: Pipeline['steps'] }): Promise<Pipeline> {
+    const res = await this.bus.send<typeof p, Pipeline>('PIPELINES_UPSERT', p);
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to save pipeline');
+    return res.data;
+  }
+
+  async deletePipeline(id: string): Promise<void> {
+    const res = await this.bus.send<{ id: string }, object>('PIPELINES_DELETE', { id });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to delete pipeline');
+  }
+
+  // ── Quality Rule Sets ──────────────────────────────────────────
+
+  async listQualityRuleSets(): Promise<QualityRuleSet[]> {
+    const res = await this.bus.send<object, { ruleSets: QualityRuleSet[] }>('QUALITY_RULES_LIST', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to list rule sets');
+    return res.data.ruleSets;
+  }
+
+  async upsertQualityRuleSet(rs: Partial<QualityRuleSet> & { id: string; name: string; objectName: string; rules: QualityRuleSet['rules'] }): Promise<QualityRuleSet> {
+    const res = await this.bus.send<typeof rs, QualityRuleSet>('QUALITY_RULES_UPSERT', rs);
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to save rule set');
+    return res.data;
+  }
+
+  async deleteQualityRuleSet(id: string): Promise<void> {
+    const res = await this.bus.send<{ id: string }, object>('QUALITY_RULES_DELETE', { id });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to delete rule set');
+  }
+
+  // ── Onboarding ─────────────────────────────────────────────────
+
+  async getOnboarding(): Promise<OnboardingProgress> {
+    const res = await this.bus.send<object, OnboardingProgress>('ONBOARDING_GET', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to get onboarding');
+    return res.data;
+  }
+
+  async setOnboarding(progress: Partial<OnboardingProgress>): Promise<void> {
+    const res = await this.bus.send<Partial<OnboardingProgress>, object>('ONBOARDING_SET', progress);
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to save onboarding');
   }
 }

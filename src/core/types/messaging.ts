@@ -47,7 +47,29 @@ export type MessageType =
   | 'UI_SETTINGS_SET'
   | 'SAVED_QUERIES_LIST'
   | 'SAVED_QUERIES_UPSERT'
-  | 'SAVED_QUERIES_DELETE';
+  | 'SAVED_QUERIES_DELETE'
+  // Query folders
+  | 'QUERY_FOLDERS_GET'
+  | 'QUERY_FOLDERS_UPSERT'
+  | 'QUERY_FOLDERS_DELETE'
+  // Data templates
+  | 'TEMPLATES_LIST'
+  | 'TEMPLATES_UPSERT'
+  | 'TEMPLATES_DELETE'
+  // Push transactions (undo)
+  | 'TRANSACTIONS_GET'
+  | 'TRANSACTIONS_CLEAR'
+  // Pipelines
+  | 'PIPELINES_LIST'
+  | 'PIPELINES_UPSERT'
+  | 'PIPELINES_DELETE'
+  // Quality rule sets
+  | 'QUALITY_RULES_LIST'
+  | 'QUALITY_RULES_UPSERT'
+  | 'QUALITY_RULES_DELETE'
+  // Onboarding
+  | 'ONBOARDING_GET'
+  | 'ONBOARDING_SET';
 
 /** Base message shape */
 export interface ExtensionMessage<T extends MessageType = MessageType, P = unknown> {

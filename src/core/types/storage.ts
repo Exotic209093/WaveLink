@@ -23,6 +23,14 @@ export interface LocalStorageSchema {
   queryFolders: QueryFolder[];
   /** UI settings for panel/app */
   uiSettings: UiSettings;
+  /** Push transactions for undo/rollback */
+  pushTransactions: PushTransaction[];
+  /** Data transformation pipelines */
+  pipelines: Pipeline[];
+  /** Data quality rule sets */
+  qualityRuleSets: QualityRuleSet[];
+  /** User onboarding progress */
+  onboarding: OnboardingProgress;
 }
 
 /** Data stored in chrome.storage.session (ephemeral, cleared on browser close) */
@@ -70,6 +78,7 @@ export interface UiSettings {
   panelPinned: boolean;
   lastTabId?: number;
   theme?: 'light' | 'dark' | 'auto';
+  shortcuts?: Record<string, string>;
 }
 
 /** Saved data template for reusable data pushes */
@@ -82,6 +91,9 @@ export interface DataTemplate {
   sampleData: Record<string, unknown>[];
   createdAt: number;
   updatedAt: number;
+  category?: string;
+  usageCount?: number;
+  lastUsedAt?: number;
 }
 
 /** Maps source fields to Salesforce fields */
@@ -128,6 +140,66 @@ export interface PushResult {
   operation: 'insert' | 'update' | 'upsert' | 'delete';
   ids: string[];
   capturedAt: number;
+}
+
+/** Captured push transaction for undo/rollback */
+export interface PushTransaction {
+  id: string;
+  pushId: string;
+  orgId: string;
+  objectName: string;
+  operation: 'insert' | 'update' | 'upsert' | 'delete';
+  capturedAt: number;
+  expiresAt: number;
+  rollbackIds: string[];
+  rollbackOperation: 'delete' | 'insert' | 'update';
+}
+
+/** Step types for transformation pipelines */
+export type PipelineStepType = 'filter' | 'transform' | 'lookup' | 'aggregate' | 'join';
+
+/** Single step in a transformation pipeline */
+export interface PipelineStep {
+  id: string;
+  type: PipelineStepType;
+  label: string;
+  config: Record<string, unknown>;
+}
+
+/** Saved data transformation pipeline */
+export interface Pipeline {
+  id: string;
+  name: string;
+  steps: PipelineStep[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Data quality rule for validating records before push */
+export interface QualityRule {
+  id: string;
+  field: string;
+  type: 'required' | 'format' | 'range' | 'picklist' | 'unique' | 'custom';
+  config: Record<string, unknown>;
+  severity: 'error' | 'warning' | 'info';
+  message: string;
+}
+
+/** Saved quality rule set for reuse */
+export interface QualityRuleSet {
+  id: string;
+  name: string;
+  objectName: string;
+  rules: QualityRule[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Onboarding progress tracking */
+export interface OnboardingProgress {
+  completedSteps: string[];
+  dismissedAt?: number;
+  lastSeenVersion?: string;
 }
 
 /** In-progress push operation */

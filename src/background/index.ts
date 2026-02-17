@@ -26,12 +26,12 @@ import { BulkApiService } from '../services/salesforce/bulk-api';
 import { buildUpsertSubrequests, parseUpsertCompositeResponse } from '../services/salesforce/composite-upsert';
 import { DataMapper } from '../data/mappers';
 import { DataValidator } from '../data/validators';
-import { API_BASE_PATH, DEFAULT_API_VERSION, DEFAULT_BATCH_SIZE, BULK_API_THRESHOLD, MAX_COMPOSITE_BATCH_SIZE, SCHEMA_CACHE_TTL } from '../core/constants';
+import { API_BASE_PATH, DEFAULT_API_VERSION, DEFAULT_BATCH_SIZE, BULK_API_THRESHOLD, MAX_COMPOSITE_BATCH_SIZE, SCHEMA_CACHE_TTL, UNDO_TTL_MS } from '../core/constants';
 import { generateId } from '../core/utils';
 import { isSalesforceUrl } from '../core/utils';
 import type { MessageResponse } from '../core/types/messaging';
 import type { SalesforceOrg, SObjectDescribe } from '../core/types/salesforce';
-import type { PushHistoryEntry, PushResult } from '../core/types/storage';
+import type { PushHistoryEntry, PushResult, PushTransaction } from '../core/types/storage';
 
 // ── Service Instances ────────────────────────────────────────────────
 
@@ -457,6 +457,237 @@ messageBus.on('SAVED_QUERIES_DELETE', async (message): Promise<MessageResponse> 
     return {
       success: false,
       error: { code: 'SAVED_QUERIES_DELETE_ERROR', message: error instanceof Error ? error.message : 'Failed to delete query' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+// ── Query Folders Handlers ──────────────────────────────────────────
+
+messageBus.on('QUERY_FOLDERS_GET', async (message): Promise<MessageResponse> => {
+  try {
+    const folders = await storage.getQueryFolders();
+    return { success: true, data: { folders }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'QUERY_FOLDERS_GET_ERROR', message: error instanceof Error ? error.message : 'Failed to list query folders' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('QUERY_FOLDERS_UPSERT', async (message): Promise<MessageResponse> => {
+  try {
+    const payload = message.payload as { id: string; name: string; parentId?: string };
+    const folder = await storage.upsertQueryFolder(payload);
+    return { success: true, data: folder, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'QUERY_FOLDERS_UPSERT_ERROR', message: error instanceof Error ? error.message : 'Failed to save query folder' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('QUERY_FOLDERS_DELETE', async (message): Promise<MessageResponse> => {
+  try {
+    const { id } = message.payload as { id: string };
+    await storage.deleteQueryFolder(id);
+    return { success: true, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'QUERY_FOLDERS_DELETE_ERROR', message: error instanceof Error ? error.message : 'Failed to delete query folder' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+// ── Templates Handlers ──────────────────────────────────────────────
+
+messageBus.on('TEMPLATES_LIST', async (message): Promise<MessageResponse> => {
+  try {
+    const templates = await storage.getDataTemplates();
+    return { success: true, data: { templates }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'TEMPLATES_LIST_ERROR', message: error instanceof Error ? error.message : 'Failed to list templates' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('TEMPLATES_UPSERT', async (message): Promise<MessageResponse> => {
+  try {
+    const payload = message.payload as Parameters<typeof storage.upsertDataTemplate>[0];
+    const template = await storage.upsertDataTemplate(payload);
+    return { success: true, data: template, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'TEMPLATES_UPSERT_ERROR', message: error instanceof Error ? error.message : 'Failed to save template' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('TEMPLATES_DELETE', async (message): Promise<MessageResponse> => {
+  try {
+    const { id } = message.payload as { id: string };
+    await storage.deleteDataTemplate(id);
+    return { success: true, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'TEMPLATES_DELETE_ERROR', message: error instanceof Error ? error.message : 'Failed to delete template' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+// ── Push Transactions (Undo) Handlers ───────────────────────────────
+
+messageBus.on('TRANSACTIONS_GET', async (message): Promise<MessageResponse> => {
+  try {
+    const transactions = await storage.getPushTransactions();
+    return { success: true, data: { transactions }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'TRANSACTIONS_GET_ERROR', message: error instanceof Error ? error.message : 'Failed to get transactions' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('TRANSACTIONS_CLEAR', async (message): Promise<MessageResponse> => {
+  try {
+    const { id } = message.payload as { id: string };
+    await storage.removePushTransaction(id);
+    return { success: true, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'TRANSACTIONS_CLEAR_ERROR', message: error instanceof Error ? error.message : 'Failed to remove transaction' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+// ── Pipeline Handlers ───────────────────────────────────────────────
+
+messageBus.on('PIPELINES_LIST', async (message): Promise<MessageResponse> => {
+  try {
+    const pipelines = await storage.getPipelines();
+    return { success: true, data: { pipelines }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'PIPELINES_LIST_ERROR', message: error instanceof Error ? error.message : 'Failed to list pipelines' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('PIPELINES_UPSERT', async (message): Promise<MessageResponse> => {
+  try {
+    const payload = message.payload as Parameters<typeof storage.upsertPipeline>[0];
+    const pipeline = await storage.upsertPipeline(payload);
+    return { success: true, data: pipeline, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'PIPELINES_UPSERT_ERROR', message: error instanceof Error ? error.message : 'Failed to save pipeline' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('PIPELINES_DELETE', async (message): Promise<MessageResponse> => {
+  try {
+    const { id } = message.payload as { id: string };
+    await storage.deletePipeline(id);
+    return { success: true, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'PIPELINES_DELETE_ERROR', message: error instanceof Error ? error.message : 'Failed to delete pipeline' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+// ── Quality Rule Sets ────────────────────────────────────────────
+
+messageBus.on('QUALITY_RULES_LIST', async (message): Promise<MessageResponse> => {
+  try {
+    const ruleSets = await storage.getQualityRuleSets();
+    return { success: true, data: { ruleSets }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'QUALITY_RULES_LIST_ERROR', message: error instanceof Error ? error.message : 'Failed to list rule sets' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('QUALITY_RULES_UPSERT', async (message): Promise<MessageResponse> => {
+  try {
+    const payload = message.payload as Parameters<typeof storage.upsertQualityRuleSet>[0];
+    const ruleSet = await storage.upsertQualityRuleSet(payload);
+    return { success: true, data: ruleSet, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'QUALITY_RULES_UPSERT_ERROR', message: error instanceof Error ? error.message : 'Failed to save rule set' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('QUALITY_RULES_DELETE', async (message): Promise<MessageResponse> => {
+  try {
+    const { id } = message.payload as { id: string };
+    await storage.deleteQualityRuleSet(id);
+    return { success: true, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'QUALITY_RULES_DELETE_ERROR', message: error instanceof Error ? error.message : 'Failed to delete rule set' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+// ── Onboarding ───────────────────────────────────────────────────
+
+messageBus.on('ONBOARDING_GET', async (message): Promise<MessageResponse> => {
+  try {
+    const progress = await storage.getOnboarding();
+    return { success: true, data: progress, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'ONBOARDING_GET_ERROR', message: error instanceof Error ? error.message : 'Failed to get onboarding' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('ONBOARDING_SET', async (message): Promise<MessageResponse> => {
+  try {
+    const payload = message.payload as { completedSteps?: string[]; dismissedAt?: number; lastSeenVersion?: string };
+    const current = await storage.getOnboarding();
+    await storage.setOnboarding({ ...current, ...payload });
+    return { success: true, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'ONBOARDING_SET_ERROR', message: error instanceof Error ? error.message : 'Failed to save onboarding' },
       requestId: message.requestId,
     };
   }
@@ -924,6 +1155,22 @@ async function executeRestPush(
     capturedAt: completedAt,
   };
   await storage.setPushResult(pushResult);
+
+  // Capture undo transaction for insert operations
+  if (payload.operation === 'insert' && successfulIds.length > 0 && !cancelled) {
+    const tx: PushTransaction = {
+      id: generateId(),
+      pushId,
+      orgId: org.orgId,
+      objectName: payload.objectName,
+      operation: payload.operation,
+      capturedAt: completedAt,
+      expiresAt: completedAt + UNDO_TTL_MS,
+      rollbackIds: successfulIds,
+      rollbackOperation: 'delete',
+    };
+    await storage.addPushTransaction(tx);
+  }
 
   messageBus.broadcast('DATA_PUSH_COMPLETE', {
     pushId,

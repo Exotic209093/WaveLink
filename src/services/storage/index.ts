@@ -16,8 +16,8 @@
  */
 
 import { StorageError } from '../../core/errors';
-import { STORAGE_KEYS, MAX_PUSH_HISTORY } from '../../core/constants';
-import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry, PushResult, SavedQuery, QueryFolder, UiSettings } from '../../core/types/storage';
+import { STORAGE_KEYS, MAX_PUSH_HISTORY, MAX_UNDO_ENTRIES } from '../../core/constants';
+import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry, PushResult, SavedQuery, QueryFolder, UiSettings, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
 import type { SalesforceOrg } from '../../core/types/salesforce';
 
 /**
@@ -226,6 +226,129 @@ export class StorageService {
     const templates = await this.getDataTemplates();
     const filtered = templates.filter(t => t.id !== templateId);
     await this.setLocal(STORAGE_KEYS.DATA_TEMPLATES, filtered);
+  }
+
+  /** Upsert a data template with timestamps */
+  async upsertDataTemplate(template: Omit<DataTemplate, 'createdAt' | 'updatedAt'> & Partial<Pick<DataTemplate, 'createdAt' | 'updatedAt'>>): Promise<DataTemplate> {
+    const now = Date.now();
+    const templates = await this.getDataTemplates();
+    const idx = templates.findIndex(t => t.id === template.id);
+    const existing = idx >= 0 ? templates[idx] : null;
+    const next: DataTemplate = {
+      ...template,
+      createdAt: template.createdAt ?? existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    if (idx >= 0) {
+      templates[idx] = next;
+    } else {
+      templates.push(next);
+    }
+    await this.setLocal(STORAGE_KEYS.DATA_TEMPLATES, templates);
+    return next;
+  }
+
+  /** Increment template usage count */
+  async incrementTemplateUsage(id: string): Promise<void> {
+    const templates = await this.getDataTemplates();
+    const idx = templates.findIndex(t => t.id === id);
+    if (idx >= 0) {
+      templates[idx].usageCount = (templates[idx].usageCount ?? 0) + 1;
+      templates[idx].lastUsedAt = Date.now();
+      await this.setLocal(STORAGE_KEYS.DATA_TEMPLATES, templates);
+    }
+  }
+
+  // ── Push Transactions (Undo) ──────────────────────────────────────
+
+  async getPushTransactions(): Promise<PushTransaction[]> {
+    return (await this.getLocal<PushTransaction[]>(STORAGE_KEYS.PUSH_TRANSACTIONS)) ?? [];
+  }
+
+  async addPushTransaction(t: PushTransaction): Promise<void> {
+    const now = Date.now();
+    const list = (await this.getPushTransactions())
+      .filter(tx => tx.expiresAt > now);
+    list.unshift(t);
+    if (list.length > MAX_UNDO_ENTRIES) {
+      list.length = MAX_UNDO_ENTRIES;
+    }
+    await this.setLocal(STORAGE_KEYS.PUSH_TRANSACTIONS, list);
+  }
+
+  async removePushTransaction(id: string): Promise<void> {
+    const list = await this.getPushTransactions();
+    await this.setLocal(STORAGE_KEYS.PUSH_TRANSACTIONS, list.filter(t => t.id !== id));
+  }
+
+  // ── Pipelines ─────────────────────────────────────────────────────
+
+  async getPipelines(): Promise<Pipeline[]> {
+    return (await this.getLocal<Pipeline[]>(STORAGE_KEYS.PIPELINES)) ?? [];
+  }
+
+  async upsertPipeline(pipeline: Omit<Pipeline, 'createdAt' | 'updatedAt'> & Partial<Pick<Pipeline, 'createdAt' | 'updatedAt'>>): Promise<Pipeline> {
+    const now = Date.now();
+    const list = await this.getPipelines();
+    const idx = list.findIndex(p => p.id === pipeline.id);
+    const existing = idx >= 0 ? list[idx] : null;
+    const next: Pipeline = {
+      ...pipeline,
+      createdAt: pipeline.createdAt ?? existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    if (idx >= 0) {
+      list[idx] = next;
+    } else {
+      list.push(next);
+    }
+    await this.setLocal(STORAGE_KEYS.PIPELINES, list);
+    return next;
+  }
+
+  async deletePipeline(id: string): Promise<void> {
+    const list = await this.getPipelines();
+    await this.setLocal(STORAGE_KEYS.PIPELINES, list.filter(p => p.id !== id));
+  }
+
+  // ── Quality Rule Sets ──────────────────────────────────────────
+
+  async getQualityRuleSets(): Promise<QualityRuleSet[]> {
+    return (await this.getLocal<QualityRuleSet[]>(STORAGE_KEYS.QUALITY_RULE_SETS)) ?? [];
+  }
+
+  async upsertQualityRuleSet(ruleSet: Omit<QualityRuleSet, 'createdAt' | 'updatedAt'> & Partial<Pick<QualityRuleSet, 'createdAt' | 'updatedAt'>>): Promise<QualityRuleSet> {
+    const now = Date.now();
+    const list = await this.getQualityRuleSets();
+    const idx = list.findIndex(r => r.id === ruleSet.id);
+    const existing = idx >= 0 ? list[idx] : null;
+    const next: QualityRuleSet = {
+      ...ruleSet,
+      createdAt: ruleSet.createdAt ?? existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    if (idx >= 0) {
+      list[idx] = next;
+    } else {
+      list.push(next);
+    }
+    await this.setLocal(STORAGE_KEYS.QUALITY_RULE_SETS, list);
+    return next;
+  }
+
+  async deleteQualityRuleSet(id: string): Promise<void> {
+    const list = await this.getQualityRuleSets();
+    await this.setLocal(STORAGE_KEYS.QUALITY_RULE_SETS, list.filter(r => r.id !== id));
+  }
+
+  // ── Onboarding ─────────────────────────────────────────────────
+
+  async getOnboarding(): Promise<OnboardingProgress> {
+    return (await this.getLocal<OnboardingProgress>(STORAGE_KEYS.ONBOARDING)) ?? { completedSteps: [] };
+  }
+
+  async setOnboarding(progress: OnboardingProgress): Promise<void> {
+    await this.setLocal(STORAGE_KEYS.ONBOARDING, progress);
   }
 
   // ── Schema Cache ────────────────────────────────────────────────
