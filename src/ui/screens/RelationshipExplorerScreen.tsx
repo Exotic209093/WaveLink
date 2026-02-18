@@ -18,12 +18,13 @@
 
 import { h } from 'preact';
 import type { VNode } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { SchemaGraph, SchemaNode } from '../utils/schemaGraph';
 import {
   buildSchemaGraph,
   computeLayout,
+  computeTreeLayout,
   getRelatedObjects,
   getFieldRelationships,
   findPath,
@@ -33,10 +34,20 @@ import { Toast } from '../components/Toast';
 import { downloadTextFile } from '../utils/download';
 
 type FieldFilter = 'all' | 'reference' | 'text' | 'number' | 'date' | 'other';
+type ViewMode = 'orbital' | 'tree' | 'list';
 
 const TEXT_TYPES = new Set(['string', 'textarea', 'email', 'phone', 'url', 'picklist', 'multipicklist', 'combobox', 'encryptedstring']);
 const NUMBER_TYPES = new Set(['int', 'double', 'currency', 'percent']);
 const DATE_TYPES = new Set(['date', 'datetime', 'time']);
+
+const FILTER_TABS: Array<{ key: FieldFilter; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'reference', label: 'Reference' },
+  { key: 'text', label: 'Text' },
+  { key: 'number', label: 'Number' },
+  { key: 'date', label: 'Date' },
+  { key: 'other', label: 'Other' },
+];
 
 function matchesFilter(fieldType: string, filter: FieldFilter): boolean {
   if (filter === 'all') return true;
@@ -57,6 +68,14 @@ export function RelationshipExplorerScreen(props: {
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /** Ref to cancel any in-flight exploration when a new one starts or component unmounts. */
+  const exploreAbortRef = useRef<AbortController | null>(null);
+
+  /** Abort in-flight exploration on unmount to prevent stale state updates. */
+  useEffect(() => {
+    return () => { exploreAbortRef.current?.abort(); };
+  }, []);
+
   const [objects, setObjects] = useState<Array<{ name: string; label: string }>>([]);
   const [objSearch, setObjSearch] = useState('');
 
@@ -67,6 +86,8 @@ export function RelationshipExplorerScreen(props: {
   const [layout, setLayout] = useState<Map<string, { x: number; y: number; level: number }> | null>(null);
   const [selectedObject, setSelectedObject] = useState<string | null>(null);
   const [fieldFilter, setFieldFilter] = useState<FieldFilter>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('orbital');
+  const [edgeSearch, setEdgeSearch] = useState('');
 
   /** Load global object list on mount. */
   useEffect(() => {
@@ -95,12 +116,21 @@ export function RelationshipExplorerScreen(props: {
   /**
    * Explore relationships bidirectionally: traverse outgoing reference fields
    * AND incoming childRelationships at each depth level.
+   *
+   * Cancels any in-flight exploration before starting, so switching root objects
+   * mid-flight does not produce stale state updates.
    */
-  async function explore(): Promise<void> {
+  const explore = useCallback(async (): Promise<void> => {
     if (!rootObject) {
       setToast({ title: 'Select an Object', body: 'Choose a root object to explore.' });
       return;
     }
+
+    // Abort any previous exploration, create a new controller for this run.
+    exploreAbortRef.current?.abort();
+    const controller = new AbortController();
+    exploreAbortRef.current = controller;
+    const { signal } = controller;
 
     setBusy(true);
     setGraph(null);
@@ -109,6 +139,7 @@ export function RelationshipExplorerScreen(props: {
 
     try {
       const rootDescribe = await sf.describeSObject(rootObject, tabId);
+      if (signal.aborted) return;
 
       const describes = new Map<string, SchemaNode>();
       describes.set(rootObject, {
@@ -133,6 +164,7 @@ export function RelationshipExplorerScreen(props: {
       let currentFrontier = new Set<string>([rootObject]);
 
       for (let d = 0; d < depth; d++) {
+        if (signal.aborted) return;
         const nextFrontier = new Set<string>();
 
         for (const objName of currentFrontier) {
@@ -154,8 +186,10 @@ export function RelationshipExplorerScreen(props: {
         }
 
         const fetches = Array.from(nextFrontier).map(async (name) => {
+          if (signal.aborted) return;
           try {
             const desc = await sf.describeSObject(name, tabId);
+            if (signal.aborted) return;
             describes.set(name, {
               objectName: name,
               label: desc.label,
@@ -180,6 +214,7 @@ export function RelationshipExplorerScreen(props: {
         });
 
         await Promise.all(fetches);
+        if (signal.aborted) return;
         currentFrontier = nextFrontier;
         if (nextFrontier.size === 0) break;
       }
@@ -195,11 +230,12 @@ export function RelationshipExplorerScreen(props: {
         body: `${builtGraph.nodes.size} objects, ${builtGraph.edges.length} relationships`,
       });
     } catch (e) {
+      if (signal.aborted) return;
       setToast({ title: 'Exploration Failed', body: e instanceof Error ? e.message : 'Unknown error' });
     } finally {
-      setBusy(false);
+      if (!signal.aborted) setBusy(false);
     }
-  }
+  }, [rootObject, depth, sf, tabId]);
 
   const selectedNode: SchemaNode | null =
     graph && selectedObject ? graph.nodes.get(selectedObject) ?? null : null;
@@ -224,15 +260,15 @@ export function RelationshipExplorerScreen(props: {
       .join('.');
   }, [graph, rootObject, selectedObject]);
 
-  function copyToClipboard(text: string, label: string): void {
+  const copyToClipboard = useCallback((text: string, label: string): void => {
     navigator.clipboard.writeText(text).then(() => {
       setToast({ title: `Copied`, body: `${label} copied to clipboard.` });
     }).catch(() => {
       setToast({ title: 'Copy Failed', body: 'Could not access clipboard.' });
     });
-  }
+  }, []);
 
-  function exportGraph(): void {
+  const exportGraph = useCallback((): void => {
     if (!graph) return;
     const exportData = {
       rootObject,
@@ -256,7 +292,26 @@ export function RelationshipExplorerScreen(props: {
       'application/json',
     );
     setToast({ title: 'Exported', body: 'Relationship data saved as JSON.' });
-  }
+  }, [graph, rootObject, depth]);
+
+  const treeLayout = useMemo(() => {
+    if (!graph) return null;
+    return computeTreeLayout(graph, rootObject);
+  }, [graph, rootObject]);
+
+  const activeLayout = viewMode === 'tree' ? treeLayout : layout;
+
+  const filteredEdges = useMemo(() => {
+    if (!graph) return [];
+    const q = edgeSearch.trim().toLowerCase();
+    if (!q) return graph.edges;
+    return graph.edges.filter(e =>
+      e.from.toLowerCase().includes(q) ||
+      e.to.toLowerCase().includes(q) ||
+      e.field.toLowerCase().includes(q) ||
+      (e.relationshipName ?? '').toLowerCase().includes(q),
+    );
+  }, [graph, edgeSearch]);
 
   const filteredFields = useMemo(() => {
     if (!selectedNode) return [];
@@ -275,15 +330,6 @@ export function RelationshipExplorerScreen(props: {
     }
     return counts;
   }, [selectedNode]);
-
-  const FILTER_TABS: Array<{ key: FieldFilter; label: string }> = [
-    { key: 'all', label: 'All' },
-    { key: 'reference', label: 'Reference' },
-    { key: 'text', label: 'Text' },
-    { key: 'number', label: 'Number' },
-    { key: 'date', label: 'Date' },
-    { key: 'other', label: 'Other' },
-  ];
 
   return (
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -372,17 +418,100 @@ export function RelationshipExplorerScreen(props: {
           <div class="wl-card">
             <div class="wl-cardHeader">
               <h2>Relationship Graph</h2>
-              <div class="wl-muted">{graph.nodes.size} objects · {graph.edges.length} edges</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                {/* View mode switcher */}
+                <div style="display:flex;border:1px solid var(--wl-line-2);border-radius:var(--wl-radius-sm);overflow:hidden">
+                  {([
+                    { key: 'orbital', label: '⊙ Orbital' },
+                    { key: 'tree',    label: '⊟ Tree' },
+                    { key: 'list',    label: '≡ List' },
+                  ] as Array<{ key: ViewMode; label: string }>).map(m => (
+                    <button
+                      key={m.key}
+                      class="wl-btn"
+                      style={`padding:3px 10px;font-size:11px;border:none;border-radius:0;transition:background 120ms;${viewMode === m.key ? 'background:var(--wl-accent);color:#fff;font-weight:700;' : ''}`}
+                      onClick={() => setViewMode(m.key)}
+                    >{m.label}</button>
+                  ))}
+                </div>
+                <div class="wl-muted" style="font-size:12px">{graph.nodes.size} objects · {graph.edges.length} edges</div>
+              </div>
             </div>
-            <div class="wl-row" style="padding:0">
-              <SchemaGraphView
-                graph={graph}
-                rootObject={rootObject}
-                layout={layout}
-                selectedObject={selectedObject}
-                onSelectObject={setSelectedObject}
-              />
-            </div>
+
+            {/* Orbital / Tree views share SchemaGraphView */}
+            {viewMode !== 'list' && activeLayout ? (
+              <div class="wl-row" style="padding:0">
+                <SchemaGraphView
+                  graph={graph}
+                  rootObject={rootObject}
+                  layout={activeLayout}
+                  selectedObject={selectedObject}
+                  onSelectObject={setSelectedObject}
+                  showRings={viewMode === 'orbital'}
+                />
+              </div>
+            ) : null}
+
+            {/* List view */}
+            {viewMode === 'list' ? (
+              <div style="display:flex;flex-direction:column;gap:0">
+                <div style="padding:10px 14px;border-bottom:1px solid var(--wl-line-2)">
+                  <input
+                    class="wl-input"
+                    type="text"
+                    placeholder="Search by object, field, or relationship name…"
+                    value={edgeSearch}
+                    onInput={(e) => setEdgeSearch((e.currentTarget as HTMLInputElement).value)}
+                    style="width:100%"
+                  />
+                </div>
+                <div class="wl-tableWrap" style="max-height:620px">
+                  <table class="wl-table">
+                    <thead>
+                      <tr>
+                        <th>From Object</th>
+                        <th>Field</th>
+                        <th>Rel. Name</th>
+                        <th>To Object</th>
+                        <th>Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredEdges.map((edge) => (
+                        <tr
+                          key={`${edge.from}-${edge.to}-${edge.field}`}
+                          style="cursor:pointer"
+                          onClick={() => setSelectedObject(edge.from)}
+                        >
+                          <td class="wl-mono" style={`font-size:11px;color:${edge.from === selectedObject ? 'var(--wl-accent)' : ''}`}>{edge.from}</td>
+                          <td class="wl-mono" style="font-size:11px">{edge.field}</td>
+                          <td class="wl-mono" style="font-size:11px;color:var(--wl-ink-dim)">{edge.relationshipName ?? '—'}</td>
+                          <td class="wl-mono" style={`font-size:11px;color:${edge.to === selectedObject ? 'var(--wl-accent)' : ''}`}>{edge.to}</td>
+                          <td>
+                            <span
+                              class="wl-badge"
+                              style={`font-size:10px;padding:2px 5px${edge.type === 'masterDetail' ? ';border-color:rgba(239,68,96,0.4);color:var(--wl-danger)' : ''}`}
+                            >
+                              {edge.type === 'masterDetail' ? 'M-D' : 'lookup'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredEdges.length === 0 ? (
+                        <tr>
+                          <td colspan={5} class="wl-muted" style="text-align:center;padding:20px">No matching relationships</td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
+                {edgeSearch ? (
+                  <div style="padding:6px 14px;font-size:11px;color:var(--wl-ink-dim);border-top:1px solid var(--wl-line-2)">
+                    {filteredEdges.length} of {graph.edges.length} relationships
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           {/* Detail pane */}
