@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "WaveLink - Salesforce Data Seeding",
   "version": "0.1.0",
-  "description": "Push and seed data into Salesforce orgs directly from your browser",
+  "description": "Push CSV/JSON data into Salesforce orgs, run SOQL queries, compare schemas, and seed test data — all from your browser.",
+  "homepage_url": "https://github.com/jc-wave/wave-link",
   "permissions": [
     "storage",
     "cookies",
@@ -24,6 +25,7 @@
     "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     }
@@ -51,6 +53,7 @@
   },
   "icons": {
     "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },

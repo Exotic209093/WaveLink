@@ -59,7 +59,7 @@ const config: Configuration = {
   optimization: {
     splitChunks: false,
   },
-  devtool: 'cheap-module-source-map',
+  devtool: process.env.NODE_ENV === 'production' ? false : 'cheap-module-source-map',
 };
 
 export default config;

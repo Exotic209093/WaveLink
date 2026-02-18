@@ -184,13 +184,13 @@ export class SalesforceAuth {
 
   private getCandidateInstanceUrls(baseUrl: URL): string[] {
     const urls = new Set<string>([baseUrl.origin]);
-    const lightningMatch = baseUrl.hostname.match(/^([a-zA-Z0-9-]+)\.lightning\.force\.com$/);
+    const lightningMatch = baseUrl.hostname.match(/^(.+)\.lightning\.force\.com$/);
     if (lightningMatch) {
       urls.add(`https://${lightningMatch[1]}.my.salesforce.com`);
       urls.add(`https://${lightningMatch[1]}.lightning.force.com`);
     }
 
-    const myDomainMatch = baseUrl.hostname.match(/^([a-zA-Z0-9-]+)\.my\.salesforce\.com$/);
+    const myDomainMatch = baseUrl.hostname.match(/^(.+)\.my\.salesforce\.com$/);
     if (myDomainMatch) {
       urls.add(`https://${myDomainMatch[1]}.my.salesforce.com`);
       urls.add(`https://${myDomainMatch[1]}.lightning.force.com`);

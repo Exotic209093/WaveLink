@@ -1605,8 +1605,8 @@ function createApiClient(org: SalesforceOrg): SalesforceApiClient {
 
 // ── Service Worker Lifecycle ─────────────────────────────────────────
 
-chrome.runtime.onInstalled.addListener((details) => {
-  console.log(`WaveLink installed: ${details.reason}`);
+chrome.runtime.onInstalled.addListener((_details) => {
+  // Extension installed/updated
 });
 
 // On service worker startup: mark any in-progress pushes as interrupted
@@ -1768,4 +1768,4 @@ messageBus.on('PUSH_HISTORY_GET', async (message): Promise<MessageResponse> => {
   }
 });
 
-console.log('WaveLink background service worker initialized');
+// Background service worker initialized

@@ -14,7 +14,7 @@
 import type { ApiVersion } from '../types/salesforce';
 
 /** Default Salesforce API version */
-export const DEFAULT_API_VERSION: ApiVersion = 'v59.0';
+export const DEFAULT_API_VERSION: ApiVersion = 'v63.0';
 
 /** Salesforce login URLs */
 export const SALESFORCE_LOGIN_URLS = {

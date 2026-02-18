@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WaveLink Privacy Policy</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 24px;
+      color: #1a1a1a;
+      line-height: 1.7;
+    }
+    h1 { font-size: 2rem; margin-bottom: 4px; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: #333; }
+    .meta { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
+    ul { padding-left: 1.5rem; }
+    a { color: #0070f3; }
+    hr { border: none; border-top: 1px solid #eee; margin: 2rem 0; }
+  </style>
+</head>
+<body>
+  <h1>WaveLink Privacy Policy</h1>
+  <p class="meta">Effective date: February 2026 &nbsp;|&nbsp; Last updated: February 2026</p>
+
+  <p>
+    WaveLink ("the Extension") is a Chrome browser extension that helps Salesforce developers
+    and administrators push, seed, and manage data directly from their browser. This Privacy
+    Policy explains what data the Extension collects, how it is used, and how it is protected.
+  </p>
+
+  <h2>1. Data We Collect</h2>
+  <p>WaveLink collects and stores the following data <strong>locally on your device</strong>:</p>
+  <ul>
+    <li><strong>Salesforce org metadata</strong> – org IDs, instance URLs, usernames, and display names of orgs you connect.</li>
+    <li><strong>Authentication tokens</strong> – OAuth 2.0 access tokens and session identifiers required to communicate with Salesforce APIs. These are stored in Chrome's local storage and are never transmitted to any server outside of Salesforce.</li>
+    <li><strong>Schema cache</strong> – Salesforce object and field metadata fetched from your org, cached locally to improve performance.</li>
+    <li><strong>Saved SOQL queries</strong> – Any SOQL queries you save within the Extension.</li>
+    <li><strong>Push history</strong> – A record of data push operations you have performed, including file names, record counts, and outcomes.</li>
+    <li><strong>User interface settings</strong> – Preferences such as theme and panel layout.</li>
+  </ul>
+
+  <h2>2. Data We Do NOT Collect</h2>
+  <ul>
+    <li>We do <strong>not</strong> collect, transmit, or store any data on our own servers.</li>
+    <li>We do <strong>not</strong> collect analytics, crash reports, or telemetry.</li>
+    <li>We do <strong>not</strong> access, read, or transmit the contents of files you upload beyond sending them directly to Salesforce on your behalf.</li>
+    <li>We do <strong>not</strong> share any data with third parties.</li>
+  </ul>
+
+  <h2>3. How Data Is Used</h2>
+  <p>All data collected by WaveLink is used solely to operate the Extension's features:</p>
+  <ul>
+    <li>Authentication tokens are used exclusively to make authenticated API calls to Salesforce on your behalf.</li>
+    <li>Org metadata is displayed within the Extension UI so you can select and switch between orgs.</li>
+    <li>Schema cache data is used to populate field-mapping UIs and speed up data pushes.</li>
+    <li>Saved queries and push history are stored for your convenience so you can reuse and review past operations.</li>
+  </ul>
+
+  <h2>4. Data Storage and Security</h2>
+  <p>
+    All data is stored using Chrome's built-in <code>chrome.storage.local</code> API, which means
+    it is stored on your local device and is accessible only to this Extension. It is not synced
+    to Chrome Sync or any external service.
+  </p>
+  <p>
+    Authentication tokens are scoped to Salesforce's OAuth flow and can be revoked at any time
+    from within your Salesforce org's Connected Apps settings.
+  </p>
+
+  <h2>5. Third-Party Services</h2>
+  <p>
+    WaveLink communicates exclusively with Salesforce APIs (*.salesforce.com, *.force.com,
+    *.lightning.force.com, *.my.salesforce.com, login.salesforce.com, test.salesforce.com).
+    No data is sent to any other external service. The Salesforce platform's own
+    <a href="https://www.salesforce.com/company/privacy/" target="_blank" rel="noopener">Privacy Policy</a>
+    governs how Salesforce handles data on their platform.
+  </p>
+
+  <h2>6. Permissions Justification</h2>
+  <ul>
+    <li><strong>storage</strong> – Required to save org connections, tokens, preferences, and push history locally.</li>
+    <li><strong>cookies</strong> – Required to detect an active Salesforce session on pages you visit, so the Extension can authenticate without requiring you to log in again.</li>
+    <li><strong>activeTab</strong> – Required to detect which Salesforce org you are currently viewing.</li>
+    <li><strong>tabs</strong> – Required to open the WaveLink panel and communicate between the Extension and active Salesforce tabs.</li>
+    <li><strong>host permissions (*.salesforce.com etc.)</strong> – Required to inject the content script that detects your Salesforce org and to make authenticated API requests.</li>
+  </ul>
+
+  <h2>7. Data Deletion</h2>
+  <p>
+    You can delete all data stored by WaveLink at any time by:
+  </p>
+  <ul>
+    <li>Removing an individual org connection from within the Extension.</li>
+    <li>Using your browser's "Clear site data" or extension storage controls.</li>
+    <li>Uninstalling the Extension, which removes all locally stored data.</li>
+  </ul>
+
+  <h2>8. Children's Privacy</h2>
+  <p>
+    WaveLink is a developer tool intended for professional use. It is not directed at children
+    under 13 and does not knowingly collect data from children.
+  </p>
+
+  <h2>9. Changes to This Policy</h2>
+  <p>
+    If we make material changes to this Privacy Policy, we will update the "Last updated" date
+    above and post the new policy at the same URL. Continued use of the Extension after changes
+    constitutes acceptance of the updated policy.
+  </p>
+
+  <h2>10. Contact</h2>
+  <p>
+    If you have questions about this Privacy Policy, please open an issue on
+    <a href="https://github.com/jc-wave/wave-link/issues" target="_blank" rel="noopener">GitHub</a>
+    or contact us via the Chrome Web Store listing.
+  </p>
+
+  <hr />
+  <p style="font-size:0.85rem;color:#888;">WaveLink is not affiliated with or endorsed by Salesforce, Inc.</p>
+</body>
+</html>

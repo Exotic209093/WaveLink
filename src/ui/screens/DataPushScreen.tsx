@@ -48,8 +48,8 @@ function makeEmptyMappings(headers: string[]): FieldMapping[] {
 }
 
 function estimateTooLarge(fileSizeBytes: number, recordCount: number): string | null {
-  if (recordCount > 25_000) return 'Dataset too large for MVP push pipeline (over 25,000 rows). Split the file or reduce rows.';
-  if (fileSizeBytes > 10 * 1024 * 1024) return 'Dataset too large for MVP push pipeline (over ~10MB). Split the file or reduce columns.';
+  if (recordCount > 25_000) return 'Dataset too large (over 25,000 rows). Please split the file or reduce the number of rows.';
+  if (fileSizeBytes > 10 * 1024 * 1024) return 'Dataset too large (over ~10MB). Please split the file or reduce the number of columns.';
   return null;
 }
 

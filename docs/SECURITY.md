@@ -244,7 +244,7 @@ SheetJS `xlsx` version 0.18.x is distributed under the Apache 2.0 license. Versi
 If you discover a security vulnerability in WaveLink, please report it by:
 
 1. Opening a **private** security advisory on GitHub: [Security Advisories](https://github.com/jc-wave/wave-link/security/advisories)
-2. Or email: [TODO: security contact email]
+2. Or open an issue tagged **security** on the GitHub repository
 
 Please include:
 - Description of the vulnerability

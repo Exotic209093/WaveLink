@@ -140,7 +140,7 @@ async function reportOrgDetection(): Promise<void> {
     await messageBus.send('ORG_DETECT', orgInfo);
   } catch (error) {
     // Background may not be ready yet, fail silently
-    console.debug('WaveLink: Could not report org detection', error);
+    // Background may not be ready yet; ignore silently
   }
 }
 
@@ -171,7 +171,7 @@ const urlObserver = new MutationObserver(() => {
 
 urlObserver.observe(document.body, { childList: true, subtree: true });
 
-console.debug('WaveLink content script initialized');
+// Content script initialized
 
 // ── In-Page Panel UI (Inspector-Style) ───────────────────────────────
 
