@@ -9,7 +9,8 @@
 export interface SchemaNode {
   objectName: string;
   label: string;
-  fields: Array<{ name: string; type: string; referenceTo?: string[] }>;
+  fields: Array<{ name: string; type: string; referenceTo?: string[]; nillable?: boolean }>;
+  childRelationships: Array<{ childSObject: string; field: string; relationshipName: string | null; restrictedDelete: boolean }>;
 }
 
 /** A directed edge representing a reference (lookup/master-detail) between objects. */
@@ -31,8 +32,8 @@ export interface SchemaGraph {
  * Build a schema graph from a map of SObject describes. O(N*F).
  *
  * Iterates over all fields in every describe, extracting reference-type fields
- * as directed edges. A field is classified as `masterDetail` if its name ends
- * with "Id" and its reference targets a known object; otherwise it is `lookup`.
+ * as directed edges. Uses `nillable: false` as a heuristic for master-detail,
+ * and cross-checks against childRelationships.restrictedDelete when available.
  *
  * @param describes - Map of objectName to SchemaNode.
  * @returns A SchemaGraph with all nodes and extracted edges.
@@ -41,31 +42,39 @@ export function buildSchemaGraph(describes: Map<string, SchemaNode>): SchemaGrap
   const nodes = new Map(describes);
   const edges: SchemaEdge[] = [];
 
+  // Build a lookup of restrictedDelete by (parentObject, field) for master-detail detection
+  const restrictedDeleteKeys = new Set<string>();
+  for (const node of Array.from(describes.values())) {
+    for (const cr of node.childRelationships) {
+      if (cr.restrictedDelete) {
+        restrictedDeleteKeys.add(`${cr.childSObject}:${cr.field}`);
+      }
+    }
+  }
+
   for (const [objectName, node] of Array.from(describes.entries())) {
     for (const field of node.fields) {
       if (!field.referenceTo || field.referenceTo.length === 0) continue;
 
-      // A field type of "reference" indicates a lookup or master-detail relationship
       const isReference = field.type.toLowerCase() === 'reference';
       if (!isReference) continue;
 
       for (const target of field.referenceTo) {
-        // Derive the relationship name by stripping the trailing "Id" (Salesforce convention)
         const relationshipName = field.name.endsWith('Id')
           ? field.name.slice(0, -2)
           : field.name.replace(/__c$/, '__r');
 
-        // Heuristic: fields ending with "Id" on a known target are likely master-detail
-        // if the target is a standard object or the field is required.
-        // For safety, default to lookup since we lack the `nillable` flag here.
-        const edgeType: 'lookup' | 'masterDetail' = 'lookup';
+        // Master-detail: restrictedDelete on the parent OR nillable:false on the field
+        const isMasterDetail =
+          restrictedDeleteKeys.has(`${objectName}:${field.name}`) ||
+          field.nillable === false;
 
         edges.push({
           from: objectName,
           to: target,
           field: field.name,
           relationshipName,
-          type: edgeType,
+          type: isMasterDetail ? 'masterDetail' : 'lookup',
         });
       }
     }
@@ -76,9 +85,6 @@ export function buildSchemaGraph(describes: Map<string, SchemaNode>): SchemaGrap
 
 /**
  * Get all objects related to a given object within `depth` hops via BFS. O(N+E).
- *
- * Traverses edges in both directions (from and to) to capture the full
- * neighborhood of an object in the schema graph.
  *
  * @param graph - The schema graph to traverse.
  * @param objectName - The starting object name.
@@ -94,7 +100,6 @@ export function getRelatedObjects(
   const queue: Array<{ name: string; level: number }> = [{ name: objectName, level: 0 }];
   visited.add(objectName);
 
-  // Build adjacency list for bidirectional traversal
   const adjacency = new Map<string, string[]>();
   for (const edge of graph.edges) {
     if (!adjacency.has(edge.from)) adjacency.set(edge.from, []);
@@ -116,7 +121,6 @@ export function getRelatedObjects(
     }
   }
 
-  // Remove the starting object from the result
   visited.delete(objectName);
   return visited;
 }
@@ -136,13 +140,68 @@ export function getFieldRelationships(
 }
 
 /**
- * Compute a basic hierarchical layout for visualization via BFS from a root. O(N+E).
+ * Find the shortest edge-path between two objects via BFS. O(N+E).
  *
- * Assigns each node an (x, y) coordinate based on its BFS level from the root.
- * Nodes at the same level are distributed horizontally with even spacing.
+ * @param graph - The schema graph to search.
+ * @param fromObject - Starting object name.
+ * @param toObject - Target object name.
+ * @returns Ordered array of edges forming the path, or null if no path exists.
+ */
+export function findPath(
+  graph: SchemaGraph,
+  fromObject: string,
+  toObject: string,
+): SchemaEdge[] | null {
+  if (fromObject === toObject) return [];
+
+  // BFS tracking the edge used to reach each node
+  const cameFrom = new Map<string, { via: SchemaEdge; from: string } | null>();
+  cameFrom.set(fromObject, null);
+  const queue: string[] = [fromObject];
+
+  outer: while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const edge of graph.edges) {
+      let neighbor: string | null = null;
+      if (edge.from === current && !cameFrom.has(edge.to)) {
+        neighbor = edge.to;
+        cameFrom.set(neighbor, { via: edge, from: current });
+      } else if (edge.to === current && !cameFrom.has(edge.from)) {
+        neighbor = edge.from;
+        cameFrom.set(neighbor, { via: edge, from: current });
+      }
+      if (neighbor) {
+        if (neighbor === toObject) break outer;
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  if (!cameFrom.has(toObject)) return null;
+
+  // Reconstruct path
+  const path: SchemaEdge[] = [];
+  let current: string | null = toObject;
+  while (current && current !== fromObject) {
+    const entry = cameFrom.get(current);
+    if (!entry) break;
+    path.unshift(entry.via);
+    current = entry.from;
+  }
+  return path;
+}
+
+/**
+ * Compute a radial (solar-system) layout for visualization via BFS from a root. O(N+E).
+ *
+ * The root object sits at the origin (0, 0). Each subsequent depth level is
+ * placed on a concentric orbit ring, spaced evenly around the circumference.
+ * The orbit radius grows to ensure nodes never overlap regardless of count.
+ *
+ * Positions represent the CENTER of each node.
  *
  * @param graph - The schema graph to lay out.
- * @param rootObject - The root object to start BFS from.
+ * @param rootObject - The root object to place at center.
  * @returns A map of objectName to position `{ x, y, level }`.
  */
 export function computeLayout(
@@ -153,7 +212,6 @@ export function computeLayout(
   const visited = new Set<string>();
   const levelBuckets = new Map<number, string[]>();
 
-  // Build bidirectional adjacency list
   const adjacency = new Map<string, string[]>();
   for (const edge of graph.edges) {
     if (!adjacency.has(edge.from)) adjacency.set(edge.from, []);
@@ -162,15 +220,12 @@ export function computeLayout(
     adjacency.get(edge.to)!.push(edge.from);
   }
 
-  // BFS to assign levels
   const queue: Array<{ name: string; level: number }> = [{ name: rootObject, level: 0 }];
   visited.add(rootObject);
 
   while (queue.length > 0) {
     const current = queue.shift()!;
-    if (!levelBuckets.has(current.level)) {
-      levelBuckets.set(current.level, []);
-    }
+    if (!levelBuckets.has(current.level)) levelBuckets.set(current.level, []);
     levelBuckets.get(current.level)!.push(current.name);
 
     const neighbors = adjacency.get(current.name) ?? [];
@@ -182,19 +237,32 @@ export function computeLayout(
     }
   }
 
-  // Horizontal and vertical spacing constants
-  const HORIZONTAL_SPACING = 200;
-  const VERTICAL_SPACING = 150;
+  // Root at the center
+  layout.set(rootObject, { x: 0, y: 0, level: 0 });
 
-  // Assign coordinates based on level and position within level
+  // Base orbit radii per depth level (px between centers)
+  const BASE_RADII = [0, 260, 500, 760, 1020];
+  // Minimum arc distance between adjacent node centers at each ring
+  const MIN_ARC_SPACING = 180;
+
   for (const [level, objects] of Array.from(levelBuckets.entries())) {
-    const totalWidth = (objects.length - 1) * HORIZONTAL_SPACING;
-    const startX = -totalWidth / 2;
+    if (level === 0) continue;
 
-    for (let i = 0; i < objects.length; i++) {
+    const count = objects.length;
+    const baseR = BASE_RADII[Math.min(level, BASE_RADII.length - 1)];
+    // Increase radius if there are too many objects to fit without overlap
+    const minRForCount = (count * MIN_ARC_SPACING) / (2 * Math.PI);
+    const radius = Math.max(baseR, minRForCount);
+
+    for (let i = 0; i < count; i++) {
+      // Offset starting angle so first node is at top (-π/2)
+      // Rotate each level slightly so rings don't stack vertically
+      const angleOffset = (level % 2 === 0) ? 0 : Math.PI / count;
+      const angle = (i / count) * 2 * Math.PI - Math.PI / 2 + angleOffset;
+
       layout.set(objects[i], {
-        x: startX + i * HORIZONTAL_SPACING,
-        y: level * VERTICAL_SPACING,
+        x: Math.round(Math.cos(angle) * radius),
+        y: Math.round(Math.sin(angle) * radius),
         level,
       });
     }

@@ -65,14 +65,34 @@ export const uiCss = `
   backdrop-filter: blur(16px);
 }
 
-:root[data-theme="dark"] .wl-topNav {
+:root[data-theme="dark"] .wl-navBar {
   background: rgba(17, 41, 62, 0.60);
   backdrop-filter: blur(14px);
+}
+
+:root[data-theme="dark"] .wl-topNav {
+  background: transparent;
 }
 
 :root[data-theme="dark"] .wl-topNavBtn {
   background: rgba(17, 41, 62, 0.70);
 }
+
+:root[data-theme="dark"] .wl-navGroupBtn {
+  background: rgba(17, 41, 62, 0.70);
+}
+
+:root[data-theme="dark"] .wl-subNav {
+  background: rgba(11, 28, 46, 0.72);
+  backdrop-filter: blur(12px);
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+:root[data-theme="dark"] .wl-subNavBtn {
+  color: rgba(255, 255, 255, 0.55);
+}
+:root[data-theme="dark"] .wl-subNavBtn:hover { background: rgba(2, 132, 168, 0.14); color: #fff; }
+:root[data-theme="dark"] .wl-subNavBtn[data-active="true"] { color: #fff; border-bottom-color: var(--wl-accent-2); }
 
 :root[data-theme="dark"] .wl-chip {
   background: rgba(17, 41, 62, 0.70);
@@ -142,6 +162,26 @@ export const uiCss = `
 
 * { box-sizing: border-box; }
 
+/* ── Scrollbars ── */
+.wl-app * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(2, 132, 168, 0.25) transparent;
+}
+.wl-app *::-webkit-scrollbar { width: 4px; height: 4px; }
+.wl-app *::-webkit-scrollbar-track { background: transparent; }
+.wl-app *::-webkit-scrollbar-thumb {
+  background: rgba(2, 132, 168, 0.28);
+  border-radius: 999px;
+}
+.wl-app *::-webkit-scrollbar-thumb:hover { background: rgba(2, 132, 168, 0.55); }
+.wl-app *::-webkit-scrollbar-corner { background: transparent; }
+
+:root[data-theme="dark"] .wl-app * {
+  scrollbar-color: rgba(72, 202, 228, 0.22) transparent;
+}
+:root[data-theme="dark"] .wl-app *::-webkit-scrollbar-thumb { background: rgba(72, 202, 228, 0.22); }
+:root[data-theme="dark"] .wl-app *::-webkit-scrollbar-thumb:hover { background: rgba(72, 202, 228, 0.45); }
+
 .wl-app {
   font-family: var(--wl-font-sans);
   color: var(--wl-ink);
@@ -202,11 +242,23 @@ export const uiCss = `
   grid-template-columns: 1fr;
 }
 
-.wl-topNav {
+/* Sticky wrapper when using grouped two-tier nav */
+.wl-navBar {
   position: sticky;
   top: 56px;
   z-index: 4;
+}
+
+/* Standalone sticky (flat nav, no groups) */
+.wl-topNav--sticky {
+  position: sticky;
+  top: 56px;
+  z-index: 4;
+}
+
+.wl-topNav {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 10px 18px;
   border-bottom: 1px solid var(--wl-line-2);
@@ -229,6 +281,58 @@ export const uiCss = `
 }
 .wl-topNavBtn:hover { background: rgba(2, 132, 168, 0.08); color: var(--wl-ink); transform: translateY(-1px); border-color: rgba(2, 132, 168, 0.28); }
 .wl-topNavBtn[data-active="true"] { background: rgba(2, 132, 168, 0.12); color: var(--wl-ink); border-color: rgba(2, 132, 168, 0.28); }
+
+/* ── Pinned items (Help, Settings) pushed to right ── */
+.wl-navPinned {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Two-tier grouped nav (app mode) ── */
+.wl-navGroupBtn {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--wl-ink-dim);
+  cursor: pointer;
+  transition: background var(--wl-transition), color var(--wl-transition), border-color var(--wl-transition);
+  white-space: nowrap;
+}
+.wl-navGroupBtn:hover { background: rgba(2, 132, 168, 0.08); color: var(--wl-ink); }
+.wl-navGroupBtn[data-active="true"] { background: rgba(2, 132, 168, 0.12); color: var(--wl-ink); border-color: rgba(2, 132, 168, 0.30); }
+
+/* Sub-screen row */
+.wl-subNav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--wl-line-2);
+  background: rgba(255, 255, 255, 0.38);
+  backdrop-filter: blur(10px);
+  overflow: auto;
+}
+
+.wl-subNavBtn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wl-ink-dim);
+  cursor: pointer;
+  transition: color var(--wl-transition), border-color var(--wl-transition), background var(--wl-transition);
+  white-space: nowrap;
+  margin-bottom: -1px;
+}
+.wl-subNavBtn:hover { background: rgba(2, 132, 168, 0.06); color: var(--wl-ink); }
+.wl-subNavBtn[data-active="true"] { color: var(--wl-accent); border-bottom-color: var(--wl-accent); }
 
 .wl-nav {
   padding: 14px;
@@ -637,7 +741,7 @@ export const uiCss = `
 
 @media (prefers-reduced-motion: reduce) {
   .wl-app, .wl-card, .wl-toast { animation: none !important; }
-  .wl-btn, .wl-navBtn, .wl-topNavBtn, .wl-panelRoot { transition: none !important; }
+  .wl-btn, .wl-navBtn, .wl-topNavBtn, .wl-navGroupBtn, .wl-subNavBtn, .wl-panelRoot { transition: none !important; animation: none !important; }
 }
 
 /* ── Query Builder ── */

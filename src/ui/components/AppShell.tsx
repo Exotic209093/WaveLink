@@ -4,6 +4,7 @@
  * What this file does:
  * - Provides consistent topbar, nav, and content layout.
  * - Displays current Salesforce context (hostname, sandbox flag, username).
+ * - In app mode, renders a two-tier grouped nav: group row + sub-screen row.
  *
  * Why:
  * - Keeps screens focused on content/behavior rather than repeated chrome/layout code.
@@ -24,6 +25,12 @@ export interface NavItem {
   label: string;
 }
 
+export interface NavGroup {
+  key: string;
+  label: string;
+  items: NavItem[];
+}
+
 export interface AppShellContext {
   orgId?: string;
   username?: string;
@@ -38,17 +45,22 @@ export function AppShell(props: {
   onOrgSwitch?: (orgId: string) => void;
   titleRight?: ComponentChildren;
   navItems: NavItem[];
+  navGroups?: NavGroup[];
+  pinnedItems?: NavItem[];
   route: string;
   onRouteChange: (route: string) => void;
   children: ComponentChildren;
   theme?: Theme;
   onThemeChange?: (theme: Theme) => void;
 }): VNode {
-  const { mode, context, sf, onOrgSwitch, titleRight, navItems, route, onRouteChange, children, theme, onThemeChange } = props;
+  const { mode, context, sf, onOrgSwitch, titleRight, navItems, navGroups, pinnedItems, route, onRouteChange, children, theme, onThemeChange } = props;
 
   const chipText = context?.instanceUrl
     ? `${new URL(context.instanceUrl).hostname}${context.environment === 'sandbox' ? ' (Sandbox)' : ''}`
     : 'No org selected';
+
+  // Derive which group contains the current route
+  const activeGroup = navGroups?.find(g => g.items.some(item => item.key === route)) ?? null;
 
   return (
     <div class="wl-app" data-mode={mode}>
@@ -83,8 +95,55 @@ export function AppShell(props: {
             </button>
           ))}
         </div>
+      ) : mode === 'app' && navGroups ? (
+        /* Single sticky wrapper so both rows stick together */
+        <div class="wl-navBar">
+          {/* Tier 1: group buttons */}
+          <div class="wl-topNav">
+            {navGroups.map(group => (
+              <button
+                key={group.key}
+                class="wl-navGroupBtn"
+                data-active={activeGroup?.key === group.key}
+                onClick={() => onRouteChange(group.items[0].key)}
+              >
+                {group.label}
+              </button>
+            ))}
+            {pinnedItems && pinnedItems.length > 0 ? (
+              <div class="wl-navPinned">
+                {pinnedItems.map(item => (
+                  <button
+                    key={item.key}
+                    class="wl-topNavBtn"
+                    data-active={route === item.key}
+                    onClick={() => onRouteChange(item.key)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          {/* Tier 2: sub-screen tabs for the active group */}
+          {activeGroup ? (
+            <div class="wl-subNav">
+              {activeGroup.items.map(item => (
+                <button
+                  key={item.key}
+                  class="wl-subNavBtn"
+                  data-active={route === item.key}
+                  onClick={() => onRouteChange(item.key)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
       ) : mode === 'app' ? (
-        <div class="wl-topNav">
+        <div class="wl-topNav wl-topNav--sticky">
           {navItems.map(item => (
             <button
               key={item.key}

@@ -27,6 +27,15 @@ export interface SalesforceOrg {
   nickname?: string;
 }
 
+/** Child relationship entry returned by SObject describe */
+export interface ChildRelationship {
+  relationshipName: string | null;
+  childSObject: string;
+  deprecatedAndHidden: boolean;
+  field: string;
+  restrictedDelete: boolean;
+}
+
 /** Salesforce SObject metadata */
 export interface SObjectDescribe {
   name: string;
@@ -38,6 +47,7 @@ export interface SObjectDescribe {
   updateable: boolean;
   deletable: boolean;
   fields: SObjectField[];
+  childRelationships?: ChildRelationship[];
 }
 
 /** Salesforce field metadata */

@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { SfApi } from '../api/sf';
 import type { SfContext } from '../api/sf';
 import { AppShell } from '../components/AppShell';
-import type { NavItem } from '../components/AppShell';
+import type { NavItem, NavGroup } from '../components/AppShell';
 import { QueryScreen } from '../screens/QueryScreen';
 import { ObjectsScreen } from '../screens/ObjectsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
@@ -248,26 +248,43 @@ export function AppRoot(): VNode {
     </>
   );
 
-  const navItems: NavItem[] = [
-    { key: 'query', label: 'Query' },
-    { key: 'objects', label: 'Objects' },
-    { key: 'push', label: 'Data Push' },
-    { key: 'history', label: 'Push History' },
-    { key: 'cleanse', label: 'Cleanser' },
-    { key: 'templates', label: 'Templates' },
-    { key: 'testData', label: 'Test Data' },
-    { key: 'schemaCompare', label: 'Schema' },
-    { key: 'fieldAnalytics', label: 'Analytics' },
-    { key: 'duplicates', label: 'Duplicates' },
-    { key: 'pipeline', label: 'Pipeline' },
-    { key: 'clone', label: 'Clone' },
-    { key: 'quality', label: 'Quality' },
-    { key: 'apiUsage', label: 'API Usage' },
-    { key: 'bulkOps', label: 'Bulk Ops' },
-    { key: 'relationships', label: 'Explorer' },
-    { key: 'compare', label: 'Compare' },
+  const navGroups: NavGroup[] = [
+    { key: 'query-explore', label: 'Query & Explore', items: [
+      { key: 'query', label: 'Query' },
+      { key: 'objects', label: 'Objects' },
+      { key: 'relationships', label: 'Explorer' },
+      { key: 'schemaCompare', label: 'Schema' },
+    ]},
+    { key: 'data-ops', label: 'Data Ops', items: [
+      { key: 'push', label: 'Data Push' },
+      { key: 'history', label: 'Push History' },
+      { key: 'clone', label: 'Clone' },
+      { key: 'bulkOps', label: 'Bulk Ops' },
+      { key: 'templates', label: 'Templates' },
+      { key: 'testData', label: 'Test Data' },
+    ]},
+    { key: 'quality', label: 'Quality', items: [
+      { key: 'cleanse', label: 'Cleanser' },
+      { key: 'duplicates', label: 'Duplicates' },
+      { key: 'quality', label: 'Quality' },
+      { key: 'fieldAnalytics', label: 'Analytics' },
+    ]},
+    { key: 'insights', label: 'Insights', items: [
+      { key: 'pipeline', label: 'Pipeline' },
+      { key: 'apiUsage', label: 'API Usage' },
+      { key: 'compare', label: 'Compare' },
+    ]},
+  ];
+
+  const pinnedItems: NavItem[] = [
     { key: 'help', label: 'Help' },
     { key: 'settings', label: 'Settings' },
+  ];
+
+  // Flat list kept for CommandPalette
+  const navItems: NavItem[] = [
+    ...navGroups.flatMap(g => g.items),
+    ...pinnedItems,
   ];
 
   return (
@@ -282,6 +299,8 @@ export function AppRoot(): VNode {
         }}
         titleRight={titleRight}
         navItems={navItems}
+        navGroups={navGroups}
+        pinnedItems={pinnedItems}
         route={route}
         onRouteChange={setRoute}
         theme={theme}
