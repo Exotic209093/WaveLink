@@ -46,7 +46,7 @@ export function DataDiffView(props: {
   };
 
   return (
-    <div>
+    <div style="min-width:0;overflow:hidden">
       <div class="wl-row" style="gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
         <div class="wl-chipRow">
           {(['all', 'added', 'removed', 'changed'] as FilterTab[]).map(tab => (

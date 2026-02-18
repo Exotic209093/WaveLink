@@ -302,7 +302,7 @@ export function DataComparisonScreen(props: { sf: SfApi }): VNode {
       </div>
 
       {diff ? (
-        <div class="wl-card">
+        <div class="wl-card" style="overflow:hidden">
           <div class="wl-cardHeader">
             <h2>Results: {objectName}</h2>
             <div class="wl-actions">
