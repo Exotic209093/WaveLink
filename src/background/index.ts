@@ -826,6 +826,105 @@ messageBus.on('ORG_SWITCH', async (message): Promise<MessageResponse> => {
   return { success: true, data: { orgId }, requestId: message.requestId };
 });
 
+messageBus.on('ORG_CONNECT_TAB', async (message): Promise<MessageResponse> => {
+  try {
+    const { tabId } = message.payload as { tabId: number };
+    const org = await auth.loginForTab(tabId);
+    await storage.saveOrg(org);
+    await storage.setSessionToken(org.orgId, org.accessToken);
+    return {
+      success: true,
+      data: { orgId: org.orgId, username: org.username, instanceUrl: org.instanceUrl },
+      requestId: message.requestId,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'ORG_CONNECT_TAB_ERROR', message: error instanceof Error ? error.message : 'Failed to connect org from tab' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('ORG_REFRESH', async (message): Promise<MessageResponse> => {
+  try {
+    const { orgId } = message.payload as { orgId: string };
+    const org = await storage.getOrg(orgId);
+    if (!org) {
+      return { success: false, error: { code: 'ORG_NOT_FOUND', message: 'Org not found' }, requestId: message.requestId };
+    }
+    const refreshed = await auth.ensureValidToken(org);
+    if (refreshed !== org) await storage.saveOrg(refreshed);
+    return { success: true, data: { valid: true, orgId }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'ORG_REFRESH_ERROR', message: error instanceof Error ? error.message : 'Failed to refresh org token' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('ORG_UPDATE', async (message): Promise<MessageResponse> => {
+  try {
+    const { orgId, nickname } = message.payload as { orgId: string; nickname?: string };
+    const org = await storage.getOrg(orgId);
+    if (!org) {
+      return { success: false, error: { code: 'ORG_NOT_FOUND', message: 'Org not found' }, requestId: message.requestId };
+    }
+    if (nickname !== undefined) org.nickname = nickname;
+    await storage.saveOrg(org);
+    return { success: true, data: { orgId }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'ORG_UPDATE_ERROR', message: error instanceof Error ? error.message : 'Failed to update org' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('CROSS_ORG_QUERY', async (message): Promise<MessageResponse> => {
+  try {
+    const { orgId, soql } = message.payload as { orgId: string; soql: string };
+    const org = await getValidOrg(orgId);
+    const client = createApiClient(org);
+    const result = await client.query(soql);
+    return { success: true, data: result, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'CROSS_ORG_QUERY_ERROR', message: error instanceof Error ? error.message : 'Cross-org query failed' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('CROSS_ORG_DESCRIBE', async (message): Promise<MessageResponse> => {
+  try {
+    const { orgId, objectName } = message.payload as { orgId: string; objectName?: string };
+    const org = await getValidOrg(orgId);
+    const client = createApiClient(org);
+    if (objectName) {
+      const cached = await storage.getCachedSchema(orgId, objectName);
+      if (cached) return { success: true, data: cached, requestId: message.requestId };
+      const result = await client.describeSObject(objectName);
+      const uiSettingsForTtl = await storage.getUiSettings();
+      const ttl = uiSettingsForTtl.schemaCacheTtlMinutes ? uiSettingsForTtl.schemaCacheTtlMinutes * 60 * 1000 : SCHEMA_CACHE_TTL;
+      await storage.setCachedSchema(orgId, objectName, result, ttl);
+      return { success: true, data: result, requestId: message.requestId };
+    }
+    const result = await client.describeGlobal();
+    return { success: true, data: result, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'CROSS_ORG_DESCRIBE_ERROR', message: error instanceof Error ? error.message : 'Cross-org describe failed' },
+      requestId: message.requestId,
+    };
+  }
+});
+
 // ── Schema Handlers ──────────────────────────────────────────────────
 
 messageBus.on('SCHEMA_DESCRIBE', async (message): Promise<MessageResponse> => {

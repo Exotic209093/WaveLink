@@ -47,6 +47,7 @@ import { ApiUsageDashboardScreen } from '../screens/ApiUsageDashboardScreen';
 import { BulkObjectOpsScreen } from '../screens/BulkObjectOpsScreen';
 import { RelationshipExplorerScreen } from '../screens/RelationshipExplorerScreen';
 import { HelpScreen } from '../screens/HelpScreen';
+import { DataComparisonScreen } from '../screens/DataComparisonScreen';
 import { OnboardingWizard } from '../components/OnboardingWizard';
 
 export function AppRoot(): VNode {
@@ -264,6 +265,7 @@ export function AppRoot(): VNode {
     { key: 'apiUsage', label: 'API Usage' },
     { key: 'bulkOps', label: 'Bulk Ops' },
     { key: 'relationships', label: 'Explorer' },
+    { key: 'compare', label: 'Compare' },
     { key: 'help', label: 'Help' },
     { key: 'settings', label: 'Settings' },
   ];
@@ -273,6 +275,11 @@ export function AppRoot(): VNode {
       <AppShell
         mode="app"
         context={context ?? undefined}
+        sf={sf}
+        onOrgSwitch={(orgId) => {
+          // Re-resolve context after org switch
+          refreshTabs();
+        }}
         titleRight={titleRight}
         navItems={navItems}
         route={route}
@@ -346,6 +353,8 @@ export function AppRoot(): VNode {
           <BulkObjectOpsScreen sf={sf} tabId={selectedTabId} />
         ) : route === 'relationships' ? (
           <RelationshipExplorerScreen sf={sf} tabId={selectedTabId} />
+        ) : route === 'compare' ? (
+          <DataComparisonScreen sf={sf} />
         ) : route === 'help' ? (
           <HelpScreen sf={sf} onNavigate={setRoute} />
         ) : (

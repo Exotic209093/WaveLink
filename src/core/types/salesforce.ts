@@ -23,6 +23,8 @@ export interface SalesforceOrg {
   apiVersion: ApiVersion;
   connectedAt: number;
   lastUsedAt: number;
+  /** User-assigned nickname for this org */
+  nickname?: string;
 }
 
 /** Salesforce SObject metadata */

@@ -16,6 +16,12 @@ export type MessageType =
   | 'ORG_INFO'
   | 'ORG_LIST'
   | 'ORG_SWITCH'
+  | 'ORG_CONNECT_TAB'
+  | 'ORG_REFRESH'
+  | 'ORG_UPDATE'
+  // Cross-org messages
+  | 'CROSS_ORG_QUERY'
+  | 'CROSS_ORG_DESCRIBE'
   // Data operation messages
   | 'DATA_PUSH_START'
   | 'DATA_PUSH_PROGRESS'

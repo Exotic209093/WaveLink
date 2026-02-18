@@ -1,75 +1,210 @@
 # WaveLink
 
-A Chrome extension for seeding, transforming, and managing data in Salesforce orgs — directly from your browser.
+**Your Salesforce data workbench — right in the browser.**
 
-WaveLink reuses your active Salesforce session (no OAuth setup) and gives you a full data workbench: push records via REST or Bulk API, run SOQL queries, clean and transform datasets, generate test data, compare schemas, detect duplicates, and more.
+WaveLink is a free, open-source Chrome extension that gives Salesforce admins, developers, and consultants a complete toolkit for pushing, querying, comparing, cleaning, and managing data across orgs. It piggybacks on your existing Salesforce session — no OAuth apps, no connected apps, no setup. Just install and go.
 
-## Install
+> **Why open source?** Salesforce tooling shouldn't be locked behind paywalls. WaveLink was built because every team deserves powerful data tools without per-seat pricing or enterprise gates. Fork it, improve it, make it yours. Contributions, bug reports, and feature ideas are all welcome.
+
+---
+
+## Quick Start
 
 ```bash
+git clone https://github.com/jc-wave/wave-link.git
+cd wave-link
 npm install
-npm run build        # production build → dist/
-npm run dev          # watch mode for development
+npm run build
 ```
 
-Load the `dist/` folder as an unpacked extension in `chrome://extensions`.
+1. Open `chrome://extensions` in Chrome
+2. Enable **Developer mode** (top right)
+3. Click **Load unpacked** and select the `dist/` folder
+4. Open any Salesforce org in a tab — WaveLink is ready
 
-## Key Features
+No API keys. No OAuth. No configuration files. If you're logged into Salesforce, WaveLink works.
+
+---
+
+## Features
 
 ### Data Push
-- **Insert, Update, Upsert, Delete** operations on any SObject
-- Auto-selects REST API (< 2,000 records) or Bulk API 2.0 (2,000+)
-- REST batching: SObject Collections (200/req) for insert/update/delete, Composite API (25/req) for upsert
-- Retry transient failures up to 3 times with exponential backoff
-- Type-to-confirm safety modal for destructive delete operations
-- Retry failed rows — generates a new dataset from only the records that failed
-- Push history with sortable/filterable table, error grouping, and CSV/JSON export
+
+Push records into any Salesforce object with full control over the operation.
+
+- **Insert, Update, Upsert, Delete** — all four DML operations
+- **Smart API selection** — automatically uses REST API for small datasets (< 2,000 records) and Bulk API 2.0 for large ones
+- **REST batching** — SObject Collections (200/req) for insert/update/delete, Composite API (25/req) for upsert
+- **Retry logic** — transient failures retry up to 3 times with exponential backoff
+- **Safety first** — type-to-confirm modal for destructive delete operations
+- **Retry failed rows** — generates a new dataset from only the records that failed so you can fix and re-push
+- **Push history** — sortable, filterable table of every push with error grouping and CSV/JSON export
 
 ### Data Import & Export
-- **Import:** Drag-and-drop CSV, JSON, or Excel files
-- **Export:** CSV, JSON, Excel (auto-sized columns), and Salesforce-compatible XML
-- Column selector and format-specific options in the export modal
+
+Get data in and out of WaveLink with drag-and-drop simplicity.
+
+- **Import** — drag-and-drop CSV, JSON, or Excel files directly into the app
+- **Export** — CSV, JSON, Excel (auto-sized columns), and Salesforce-compatible XML
+- **Column selector** — choose exactly which fields to include in exports
+- **Format options** — configure delimiters, encodings, and format-specific settings
+
+### SOQL Query Editor
+
+A full-featured query editor with autocomplete and history.
+
+- **SOQL builder** — structured SELECT / FROM / WHERE / ORDER BY / LIMIT interface
+- **Smart autocomplete** — context-aware parser that detects which clause you're editing and suggests fields, objects, and operators
+- **Query history** — organized with folders, favorites, tags, and fuzzy search; drag queries between folders
+- **Performance metrics** — execution time, record count, and API cost estimates for every query
+- **Import/export** — save and share queries as JSON bundles
 
 ### Data Cleanser
-- Column renaming, dropping, and reordering (drag-and-drop or Alt+Up/Down)
-- Bulk field updates with formula interpolation (`{FirstName} {LastName}`) or conditional rules (IF/THEN/ELSE)
-- Transformation pipeline: filter, transform, lookup, aggregate, and join steps in a visual builder
 
-### SOQL Query
-- SOQL builder with structured SELECT/FROM/WHERE/ORDER BY/LIMIT
-- Autocomplete-aware SOQL parser (detects clause context and partial tokens)
-- Query history with folders, favorites, tags, fuzzy search, and drag-to-folder
-- Query performance metrics (execution time, record count, API cost estimate)
-- Import/export queries as JSON
+Clean and transform datasets before pushing them to Salesforce.
 
-### Schema & Analytics
-- **Schema Comparison** — diff two objects side by side, export to CSV/JSON/HTML
-- **Field Usage Analytics** — population rates, uniqueness, and optimization recommendations
-- **Visual Relationship Explorer** — interactive graph of object relationships with depth control
-- **API Usage Dashboard** — color-coded org limit bars with search and filtering
+- **Column operations** — rename, drop, and reorder columns (drag-and-drop or Alt+Up/Down keyboard shortcuts)
+- **Bulk field updates** — formula interpolation (`{FirstName} {LastName}`) and conditional rules (IF / THEN / ELSE)
+- **Pipeline builder** — chain filter, transform, lookup, aggregate, and join steps in a visual flow
 
-### Data Generation & Templates
-- **Test Data Generator** — maps Salesforce field types to faker.js generators; configurable null rates, static values, formulas, and relationship ID injection
-- **Data Templates Library** — save and reuse field mapping configurations; search, filter by category, usage tracking
+### Multi-Org Workspace
 
-### Advanced Operations
-- **Duplicate Detection & Merging** — exact, Levenshtein, or Soundex matching; 3-step merge wizard
-- **Cross-Object Data Cloning** — dependency graph with topological sort, ID remapping, circular reference detection, cross-org support
-- **Bulk Object Operations** — count records, delete all with safety confirmation, production org warnings
-- **Data Quality Scorecards** — define rules (required, format, range, picklist, unique), score datasets before pushing
-- **Undo/Redo** — auto-captures rollback data for insert operations (10 entries, 1-hour TTL)
+Work across multiple Salesforce orgs without juggling browser profiles.
 
-### UX
-- Dark mode with light/dark/auto toggle (respects system preference)
-- Command palette (`Ctrl+K`) with fuzzy search
-- Customizable keyboard shortcuts with conflict detection
-- Onboarding wizard with step-by-step tutorial and contextual help tooltips
-- Popup UI (Preact) with compact nav: Data Push, Templates, History, Settings
-- Full-page app with 18+ screens
+- **Org switcher** — click the org indicator in the topbar to switch between connected orgs instantly
+- **Connect from tab** — open a Salesforce org in any browser tab and connect it to WaveLink with one click
+- **Nicknames & colors** — assign custom names and color dots to each org for quick visual identification
+- **Environment badges** — production orgs show a red PROD badge, sandboxes show amber SBX
+- **Per-org isolation** — each org maintains its own schema cache and session
+
+### Data Comparison Between Orgs
+
+Diff records between two orgs and selectively sync differences.
+
+- **Side-by-side org selection** — pick any two connected orgs as source and target
+- **Object intersection** — automatically shows only objects that exist in both orgs
+- **Field-level diff** — compare records field by field, matched by Name, External ID, or any field you choose
+- **Color-coded results** — added (green), removed (red), changed (blue), unchanged (gray)
+- **Changed cell highlights** — see old value (strikethrough) and new value side by side in each cell
+- **Selective sync** — checkbox individual records and push them from source to target
+- **Export diff** — download comparison results as CSV
+- **Filters & pagination** — filter by status (All / Added / Removed / Changed) with 100-record pages
+
+### Schema Comparison
+
+Compare the structure of two objects side by side.
+
+- **Field-level diff** — see which fields exist in one object but not the other, and which have different types or configurations
+- **Export** — download schema diffs as CSV, JSON, or HTML
+
+### Field Usage Analytics
+
+Understand how your data is actually being used.
+
+- **Population rates** — see what percentage of records have values for each field
+- **Uniqueness analysis** — identify fields with high or low cardinality
+- **Optimization recommendations** — get suggestions for fields that could be removed, indexed, or required
+
+### Visual Relationship Explorer
+
+Navigate your data model as an interactive graph.
+
+- **Object graph** — see how objects relate through lookups and master-detail relationships
+- **Depth control** — expand or collapse relationship depth to focus on what matters
+- **Interactive** — click nodes to explore, zoom and pan to navigate
+
+### API Usage Dashboard
+
+Monitor your org's API consumption at a glance.
+
+- **Org limits** — color-coded bars showing consumption vs. limits for all Salesforce governor limits
+- **Search & filter** — find specific limits quickly across the full list
+
+### Test Data Generator
+
+Generate realistic test data for any Salesforce object.
+
+- **Smart field mapping** — maps Salesforce field types to appropriate faker.js generators automatically
+- **Configurable** — set null rates, static values, formula-based values, and relationship ID injection per field
+- **Bulk generation** — generate hundreds or thousands of records in seconds
+
+### Data Templates
+
+Save and reuse field mapping configurations.
+
+- **Template library** — save any field mapping as a reusable template
+- **Categories & search** — organize templates by category, search by name
+- **Usage tracking** — see which templates are used most and when they were last applied
+
+### Duplicate Detection & Merging
+
+Find and merge duplicate records with precision.
+
+- **Multiple algorithms** — exact match, Levenshtein (fuzzy), or Soundex (phonetic) matching
+- **3-step merge wizard** — identify duplicates, review matches, merge with field-level control
+- **Configurable thresholds** — tune matching sensitivity to reduce false positives
+
+### Cross-Object Data Cloning
+
+Clone records and their related children across objects or orgs.
+
+- **Dependency graph** — automatically detects lookup and master-detail relationships
+- **Topological sort** — inserts records in the right order so parents exist before children
+- **ID remapping** — updates relationship fields to point to newly created records
+- **Circular reference detection** — identifies and handles circular dependencies gracefully
+
+### Bulk Object Operations
+
+Perform object-level operations across your org.
+
+- **Record counts** — quickly count records in any object
+- **Bulk delete** — delete all records from an object with safety confirmation and production org warnings
+
+### Data Quality Scorecards
+
+Score your data against defined rules before pushing.
+
+- **Rule types** — required fields, format validation (regex), range checks, picklist enforcement, uniqueness constraints
+- **Dataset scoring** — run rules against your dataset and get a quality score with per-record detail
+- **Pre-push validation** — catch data issues before they become Salesforce errors
+
+### Undo / Redo
+
+Recover from mistakes with automatic rollback capture.
+
+- **Auto-capture** — rollback data is saved automatically for insert operations
+- **Quick undo** — revert a push with one click from the undo panel (`Ctrl+Z`)
+- **History** — browse and restore from the last 10 operations (1-hour TTL)
+
+---
+
+## User Interface
+
+WaveLink runs in three modes to fit your workflow:
+
+| Mode | Access | Best for |
+|------|--------|----------|
+| **Popup** | Click the WaveLink icon in Chrome's toolbar | Quick pushes, checking templates, viewing history |
+| **Side Panel** | `Ctrl+Shift+L` on any Salesforce page | Working alongside Salesforce without switching tabs |
+| **Full App** | Click "Full App" in the popup or panel | Complex workflows — queries, comparisons, pipelines, analytics |
+
+- **Dark mode** — light, dark, or auto (follows system preference)
+- **Command palette** — `Ctrl+K` to fuzzy-search and jump to any screen
+- **Keyboard shortcuts** — fully customizable in Settings with conflict detection
+- **Onboarding wizard** — step-by-step tutorial for first-time users
+
+---
 
 ## Authentication
 
-WaveLink reads your active Salesforce session cookie (`sid`) from the browser — no OAuth configuration needed. It works with both production and sandbox orgs, and auto-detects the org from the instance URL. Tokens refresh automatically with a 5-minute buffer before expiry.
+WaveLink reads your active Salesforce session cookie (`sid`) from the browser. There is nothing to configure:
+
+- Works with **production** and **sandbox** orgs
+- Auto-detects the org from the instance URL
+- Tokens refresh automatically with a 5-minute buffer before expiry
+- Multiple orgs can be connected simultaneously — just open each org in a tab and connect via the org switcher
+
+---
 
 ## Architecture
 
@@ -89,19 +224,21 @@ src/
 │   └── templates/       Data template definitions
 ├── core/
 │   ├── types/           TypeScript type definitions
-│   ├── errors/          Error hierarchy (Auth, API, Validation, Push, etc.)
+│   ├── errors/          Error hierarchy (Auth, API, Validation, Push)
 │   ├── constants/       Configuration constants
 │   └── utils/           Shared utilities
 └── ui/
-    ├── screens/         18+ screen components
-    ├── components/      Reusable UI components
-    ├── utils/           SOQL builder, export, theme, analytics, etc.
+    ├── screens/         19 screen components
+    ├── components/      Reusable UI components (OrgSwitcher, DataDiffView, etc.)
+    ├── utils/           SOQL builder, export, theme, data diff, analytics
     ├── hooks/           Custom Preact hooks
     ├── api/             UI-specific API wrappers
-    └── styles/          CSS-in-JS styles with dark mode support
+    └── styles/          CSS-in-JS with dark mode and design tokens
 ```
 
-## Current Limits
+---
+
+## Limits
 
 | Constraint | Value |
 |-----------|-------|
@@ -114,6 +251,8 @@ src/
 | REST retry attempts | 3 (exponential backoff) |
 | Schema cache TTL | 30 minutes |
 | Undo history | 10 entries, 1-hour TTL |
+
+---
 
 ## Tech Stack
 
@@ -129,6 +268,8 @@ src/
 | Extension | Chrome Manifest V3 |
 | Salesforce API | REST v59.0, Bulk API 2.0, Composite, Tooling |
 
+---
+
 ## Scripts
 
 | Command | Description |
@@ -143,18 +284,39 @@ src/
 | `npm run typecheck` | Type check without emitting |
 | `npm run clean` | Remove dist/ |
 
+---
+
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Shift+L` | Toggle WaveLink panel (global) |
+| `Ctrl+Shift+L` | Toggle WaveLink side panel |
 | `Ctrl+K` | Open command palette |
-| `Ctrl+Shift+Q` | Navigate to queries |
-| `Ctrl+Shift+P` | Navigate to push |
-| `Ctrl+Z` | Undo last operation |
+| `Ctrl+Shift+Q` | Navigate to Query |
+| `Ctrl+Shift+P` | Navigate to Data Push |
+| `Ctrl+Z` | Open undo panel |
 
-Shortcuts are customizable in Settings.
+All shortcuts are customizable in Settings > Keyboard Shortcuts.
+
+---
+
+## Contributing
+
+WaveLink is open source under the MIT license. Contributions are welcome — whether it's a bug fix, a new feature, better docs, or just an idea.
+
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Make your changes and run `npm run build` to verify
+4. Open a pull request
+
+If you find a bug or have a feature request, [open an issue](https://github.com/jc-wave/wave-link/issues). No contribution is too small.
+
+---
 
 ## License
 
-MIT
+MIT — use it, modify it, share it. See [LICENSE](LICENSE) for details.
+
+---
+
+Built with care for the Salesforce community. If WaveLink saves you time, give it a star and share it with your team.

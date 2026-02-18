@@ -13,7 +13,7 @@
  */
 
 import { MessageBus } from '../../services/messaging';
-import type { SObjectDescribe } from '../../core/types/salesforce';
+import type { SalesforceOrg, SObjectDescribe } from '../../core/types/salesforce';
 import type { UiSettings, SavedQuery, PushHistoryEntry, QueryFolder, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
 import type { DescribeGlobalResult, QueryResult } from '../../services/salesforce/api-client';
 import type { DataPushCancelResponse, DataPushResultGetResponse, PushHistoryGetResponse } from '../../core/types/messaging';
@@ -271,6 +271,60 @@ export class SfApi {
   async deleteQualityRuleSet(id: string): Promise<void> {
     const res = await this.bus.send<{ id: string }, object>('QUALITY_RULES_DELETE', { id });
     if (!res.success) throw new Error(res.error?.message ?? 'Failed to delete rule set');
+  }
+
+  // ── Org Management ──────────────────────────────────────────────
+
+  async listOrgs(): Promise<{ orgs: SalesforceOrg[]; activeOrgId: string | null }> {
+    const res = await this.bus.send<object, { orgs: SalesforceOrg[]; activeOrgId: string | null }>('ORG_LIST', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to list orgs');
+    return res.data;
+  }
+
+  async switchOrg(orgId: string): Promise<void> {
+    const res = await this.bus.send<{ orgId: string }, { orgId: string }>('ORG_SWITCH', { orgId });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to switch org');
+  }
+
+  async connectOrgFromTab(tabId: number): Promise<{ orgId: string; username: string; instanceUrl: string }> {
+    const res = await this.bus.send<{ tabId: number }, { orgId: string; username: string; instanceUrl: string }>('ORG_CONNECT_TAB', { tabId });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to connect org');
+    return res.data;
+  }
+
+  async refreshOrg(orgId: string): Promise<void> {
+    const res = await this.bus.send<{ orgId: string }, { valid: boolean; orgId: string }>('ORG_REFRESH', { orgId });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to refresh org');
+  }
+
+  async updateOrg(orgId: string, update: { nickname?: string }): Promise<void> {
+    const res = await this.bus.send<{ orgId: string; nickname?: string }, { orgId: string }>('ORG_UPDATE', { orgId, ...update });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to update org');
+  }
+
+  async disconnectOrg(orgId: string): Promise<void> {
+    const res = await this.bus.send<{ orgId?: string }, object>('AUTH_LOGOUT', { orgId });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to disconnect org');
+  }
+
+  // ── Cross-Org Operations ──────────────────────────────────────────
+
+  async crossOrgQuery(orgId: string, soql: string): Promise<QueryResult<Record<string, unknown>>> {
+    const res = await this.bus.send<{ orgId: string; soql: string }, QueryResult<Record<string, unknown>>>('CROSS_ORG_QUERY', { orgId, soql });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Cross-org query failed');
+    return res.data;
+  }
+
+  async crossOrgDescribeGlobal(orgId: string): Promise<DescribeGlobalResult> {
+    const res = await this.bus.send<{ orgId: string }, DescribeGlobalResult>('CROSS_ORG_DESCRIBE', { orgId });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Cross-org describe failed');
+    return res.data;
+  }
+
+  async crossOrgDescribeSObject(orgId: string, objectName: string): Promise<SObjectDescribe> {
+    const res = await this.bus.send<{ orgId: string; objectName: string }, SObjectDescribe>('CROSS_ORG_DESCRIBE', { orgId, objectName });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Cross-org describe SObject failed');
+    return res.data;
   }
 
   // ── Schema Cache Management ──────────────────────────────────────

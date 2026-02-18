@@ -166,6 +166,7 @@ export function PopupRoot(): VNode {
       <AppShell
         mode="popup"
         context={context ?? undefined}
+        sf={sf}
         titleRight={titleRight}
         navItems={navItems}
         route={route}

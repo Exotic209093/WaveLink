@@ -1342,4 +1342,40 @@ export const uiCss = `
 :root[data-theme="dark"] .wl-debugStep { background: rgba(17, 41, 62, 0.85); }
 :root[data-theme="dark"] .wl-debugStepError { background: rgba(239, 68, 96, 0.08); }
 :root[data-theme="dark"] .wl-pipelineStep[data-debug="error"] { background: rgba(239, 68, 96, 0.08); }
+
+/* ── Org Switcher ── */
+.wl-orgSwitcher { position: relative; }
+.wl-orgSwitcherTrigger { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--wl-line); border-radius: var(--wl-radius-sm); background: var(--wl-paper); cursor: pointer; font-size: 13px; color: var(--wl-ink); max-width: 260px; transition: border-color 160ms ease; }
+.wl-orgSwitcherTrigger:hover { border-color: var(--wl-accent); }
+.wl-orgColorDot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.wl-orgFlyout { position: absolute; top: calc(100% + 4px); left: 0; min-width: 300px; max-width: 380px; background: var(--wl-paper); border: 1px solid var(--wl-line); border-radius: var(--wl-radius); box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 100; padding: 6px 0; max-height: 420px; overflow-y: auto; }
+.wl-orgItem { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; transition: background 120ms ease; }
+.wl-orgItem:hover { background: var(--wl-accent-bg); }
+.wl-orgItem[data-active="true"] { border-left: 3px solid var(--wl-accent); background: var(--wl-accent-bg); }
+.wl-orgBadge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0; }
+.wl-orgBadge[data-env="production"] { background: rgba(239,68,96,0.12); color: var(--wl-danger); }
+.wl-orgBadge[data-env="sandbox"] { background: rgba(243,156,18,0.12); color: #e67e22; }
+.wl-orgMenu { padding: 4px 12px 4px 30px; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--wl-line); border-bottom: 1px solid var(--wl-line); background: var(--wl-base); }
+.wl-orgMenuBtn { background: none; border: none; padding: 5px 8px; text-align: left; font-size: 12px; cursor: pointer; border-radius: var(--wl-radius-sm); color: var(--wl-ink); }
+.wl-orgMenuBtn:hover { background: var(--wl-accent-bg); }
+.wl-orgMenuBtnDanger { color: var(--wl-danger); }
+.wl-orgMenuBtnDanger:hover { background: var(--wl-danger-bg); }
+.wl-orgColorPicker { display: flex; gap: 6px; padding: 8px 12px 8px 30px; flex-wrap: wrap; }
+.wl-orgColorSwatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform 120ms ease; }
+.wl-orgColorSwatch:hover { transform: scale(1.2); }
+.wl-orgColorSwatch[data-selected="true"] { border-color: var(--wl-ink); box-shadow: 0 0 0 2px var(--wl-paper); }
+
+/* ── Org Picker (dual-dropdown) ── */
+.wl-orgPicker { display: flex; gap: 12px; align-items: flex-end; }
+
+/* ── Data Diff ── */
+.wl-diffAdded { background: rgba(46,204,113,0.06); }
+.wl-diffRemoved { background: rgba(239,68,96,0.06); }
+.wl-diffChanged { background: rgba(2,132,168,0.06); }
+.wl-diffCellChanged { background: rgba(2,132,168,0.10); }
+:root[data-theme="dark"] .wl-diffAdded { background: rgba(46,204,113,0.10); }
+:root[data-theme="dark"] .wl-diffRemoved { background: rgba(239,68,96,0.10); }
+:root[data-theme="dark"] .wl-diffChanged { background: rgba(2,132,168,0.12); }
+:root[data-theme="dark"] .wl-diffCellChanged { background: rgba(2,132,168,0.18); }
+:root[data-theme="dark"] .wl-orgFlyout { box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
 `;

@@ -15,7 +15,9 @@
 import type { ComponentChildren, VNode } from 'preact';
 import { h } from 'preact';
 import { ThemeToggle } from './ThemeToggle';
+import { OrgSwitcher } from './OrgSwitcher';
 import type { Theme } from '../utils/theme';
+import type { SfApi } from '../api/sf';
 
 export interface NavItem {
   key: string;
@@ -32,6 +34,8 @@ export interface AppShellContext {
 export function AppShell(props: {
   mode: 'app' | 'panel' | 'popup';
   context?: AppShellContext;
+  sf?: SfApi;
+  onOrgSwitch?: (orgId: string) => void;
   titleRight?: ComponentChildren;
   navItems: NavItem[];
   route: string;
@@ -40,7 +44,7 @@ export function AppShell(props: {
   theme?: Theme;
   onThemeChange?: (theme: Theme) => void;
 }): VNode {
-  const { mode, context, titleRight, navItems, route, onRouteChange, children, theme, onThemeChange } = props;
+  const { mode, context, sf, onOrgSwitch, titleRight, navItems, route, onRouteChange, children, theme, onThemeChange } = props;
 
   const chipText = context?.instanceUrl
     ? `${new URL(context.instanceUrl).hostname}${context.environment === 'sandbox' ? ' (Sandbox)' : ''}`
@@ -51,7 +55,9 @@ export function AppShell(props: {
       <div class="wl-topbar">
         <div class="wl-brand">
           <h1>WaveLink</h1>
-          {mode !== 'popup' ? (
+          {mode !== 'popup' && sf ? (
+            <OrgSwitcher sf={sf} onOrgSwitch={onOrgSwitch} />
+          ) : mode !== 'popup' ? (
             <span class="wl-chip" title={context?.orgId ?? ''}>
               <span>{chipText}</span>
               {context?.username ? <span> - {context.username}</span> : null}

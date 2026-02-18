@@ -93,6 +93,8 @@ export interface UiSettings {
   schemaCacheTtlMinutes?: number;
   /** Accent color hex string */
   accentColor?: string;
+  /** User-assigned org colors for visual differentiation, keyed by orgId */
+  orgColorMap?: Record<string, string>;
 }
 
 /** Saved data template for reusable data pushes */
