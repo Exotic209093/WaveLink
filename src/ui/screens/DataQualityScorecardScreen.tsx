@@ -15,7 +15,7 @@
 import { h } from 'preact';
 import type { VNode } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import type { SfApi, SfContext } from '../api/sf';
+import type { SfApi } from '../api/sf';
 import { scoreDataset, getDefaultRulesForField } from '../utils/dataQuality';
 import type { ScorecardResult } from '../utils/dataQuality';
 import { Skeleton } from '../components/Skeleton';

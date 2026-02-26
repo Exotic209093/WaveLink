@@ -24,22 +24,17 @@ import { SalesforceAuth } from '../services/salesforce/auth';
 import { SalesforceApiClient } from '../services/salesforce/api-client';
 import { BulkApiService } from '../services/salesforce/bulk-api';
 import { buildUpsertSubrequests, parseUpsertCompositeResponse } from '../services/salesforce/composite-upsert';
-import { DataMapper } from '../data/mappers';
-import { DataValidator } from '../data/validators';
-import { API_BASE_PATH, DEFAULT_API_VERSION, DEFAULT_BATCH_SIZE, BULK_API_THRESHOLD, MAX_COMPOSITE_BATCH_SIZE, SCHEMA_CACHE_TTL, UNDO_TTL_MS } from '../core/constants';
+import { DEFAULT_API_VERSION, DEFAULT_BATCH_SIZE, BULK_API_THRESHOLD, MAX_COMPOSITE_BATCH_SIZE, SCHEMA_CACHE_TTL, UNDO_TTL_MS } from '../core/constants';
 import { generateId } from '../core/utils';
 import { isSalesforceUrl } from '../core/utils';
 import type { MessageResponse } from '../core/types/messaging';
-import type { SalesforceOrg, SObjectDescribe } from '../core/types/salesforce';
+import type { SalesforceOrg } from '../core/types/salesforce';
 import type { PushHistoryEntry, PushResult, PushTransaction } from '../core/types/storage';
 
 // ── Service Instances ────────────────────────────────────────────────
 
 const messageBus = new MessageBus('background');
 const storage = new StorageService();
-const dataMapper = new DataMapper();
-const dataValidator = new DataValidator();
-
 const auth = new SalesforceAuth();
 
 // In-memory registry for cancellation; cleared when the MV3 service worker is restarted.
@@ -1307,6 +1302,7 @@ async function executeRestPush(
 
   let next = 0;
   async function worker(): Promise<void> {
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       if (ctx.abortSignal.aborted) {
         cancelled = true;

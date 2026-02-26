@@ -53,7 +53,6 @@ export function OrgHealthScreen(props: { sf: SfApi; tabId: number }): VNode {
 
   useEffect(() => {
     refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId]);
 
   const limitRows = useMemo(() => (limits ? sortLimits(limits) : []), [limits]);

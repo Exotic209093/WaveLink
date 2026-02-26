@@ -86,7 +86,6 @@ export function DataPushScreen(props: {
   const [threads, setThreads] = useState<number>(1);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [retryModalOpen, setRetryModalOpen] = useState(false);
-  const [templateName, setTemplateName] = useState('');
 
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean }>>([]);
   const [describeFields, setDescribeFields] = useState<SObjectField[] | null>(null);

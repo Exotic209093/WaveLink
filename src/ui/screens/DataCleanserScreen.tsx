@@ -28,7 +28,6 @@ import { BulkActions } from '../components/cleanser/BulkActions';
 import { ColumnEditor } from '../components/cleanser/ColumnEditor';
 import { PreviewGrid } from '../components/cleanser/PreviewGrid';
 import { ValidationPanel } from '../components/cleanser/ValidationPanel';
-import type { TransformationType } from '../../core/types/storage';
 import { downloadTextFile } from '../utils/download';
 import { flattenRecord } from '../utils/records';
 import { recordsToCsv } from '../utils/csv';
@@ -104,7 +103,7 @@ export function DataCleanserScreen(props: {
   const [showOnlyErrorFields, setShowOnlyErrorFields] = useState(false);
   const [bulkUpdateModalOpen, setBulkUpdateModalOpen] = useState(false);
 
-  const { dragHandlers, dragOverIndex } = useDragList({
+  useDragList({
     items: ops,
     onReorder: (newOps) => {
       setOps(newOps);

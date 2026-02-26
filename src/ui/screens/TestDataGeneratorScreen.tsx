@@ -75,7 +75,6 @@ export function TestDataGeneratorScreen(props: { sf: SfApi; tabId: number }): VN
         if (!cancelled) setBusy(false);
       });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId]);
 
   /** Fetch field metadata when an object is selected. O(1) network call. */
@@ -111,7 +110,6 @@ export function TestDataGeneratorScreen(props: { sf: SfApi; tabId: number }): VN
         if (!cancelled) setBusy(false);
       });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedObject]);
 
   /** Filtered object list based on search. O(O) where O is object count. */

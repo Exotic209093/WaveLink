@@ -60,7 +60,6 @@ export function BulkUpdateModal(props: BulkUpdateModalProps): VNode | null {
   /** Preview records (first 5). */
   const previewRecords = useMemo(
     () => computeUpdated(records.slice(0, PREVIEW_LIMIT)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [records, mode, template, targetField, rule],
   );
 

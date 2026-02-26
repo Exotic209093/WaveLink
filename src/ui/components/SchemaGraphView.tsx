@@ -263,7 +263,7 @@ function SchemaGraphViewInner(props: {
     if (!isFullscreen) return;
     const id = requestAnimationFrame(() => fitAll());
     return () => cancelAnimationFrame(id);
-  }, [isFullscreen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isFullscreen]);
 
   // ── Orbit rings — memoized, only recomputes when layout changes ──
   const orbitRadii = useMemo(() => {

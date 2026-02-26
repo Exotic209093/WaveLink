@@ -23,7 +23,7 @@ import { ObjectsScreen } from '../screens/ObjectsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { Toast } from '../components/Toast';
 import type { Theme } from '../utils/theme';
-import { resolveTheme, applyTheme, watchSystemTheme, applyAccentColor } from '../utils/theme';
+import { resolveTheme, watchSystemTheme, applyAccentColor } from '../utils/theme';
 
 export function PanelRoot(props: { shadowRoot: ShadowRoot }): VNode {
   const sf = useMemo(() => new SfApi('content'), []);

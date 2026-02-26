@@ -95,13 +95,6 @@ export function getCurrentTheme(): ResolvedTheme {
   return 'light';
 }
 
-/** Darken a hex color by a percentage (0-1). O(1). */
-function darkenHex(hex: string, amount: number): string {
-  const r = Math.max(0, Math.round(parseInt(hex.slice(1, 3), 16) * (1 - amount)));
-  const g = Math.max(0, Math.round(parseInt(hex.slice(3, 5), 16) * (1 - amount)));
-  const b = Math.max(0, Math.round(parseInt(hex.slice(5, 7), 16) * (1 - amount)));
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-}
 
 /** Lighten a hex color by a percentage (0-1). O(1). */
 function lightenHex(hex: string, amount: number): string {

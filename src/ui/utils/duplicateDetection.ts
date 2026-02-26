@@ -77,7 +77,7 @@ function getFieldKey(record: Record<string, unknown>, fields: string[], caseSens
   }).join('|');
 }
 
-function matchScore(a: string, b: string, strategy: MatchStrategy, threshold: number): number {
+function matchScore(a: string, b: string, strategy: MatchStrategy, _threshold: number): number {
   switch (strategy) {
     case 'exact':
       return a === b ? 1 : 0;

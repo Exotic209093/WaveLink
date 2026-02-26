@@ -16,7 +16,7 @@
  */
 
 import { MessageBus } from '../services/messaging';
-import { isSalesforceUrl, extractSalesforceInstance } from '../core/utils';
+import { isSalesforceUrl } from '../core/utils';
 import type { OrgDetectPayload } from '../core/types/messaging';
 import { h, render } from 'preact';
 import { uiCss } from '../ui/styles/uiCss';
@@ -43,8 +43,6 @@ function detectSalesforceOrg(): OrgDetectPayload | null {
   if (!isSalesforceUrl(url)) {
     return null;
   }
-
-  const instance = extractSalesforceInstance(url);
 
   const payload: OrgDetectPayload = {
     url,

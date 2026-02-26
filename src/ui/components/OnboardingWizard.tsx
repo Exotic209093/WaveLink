@@ -17,7 +17,6 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import {
   ONBOARDING_STEPS,
-  getNextStep,
   getCategoryProgress,
   isOnboardingComplete,
 } from '../utils/onboarding';

@@ -57,7 +57,6 @@ export function FieldAnalyticsScreen(props: { sf: SfApi; tabId: number }): VNode
         if (!cancelled) setBusy(false);
       });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId]);
 
   /** Filter objects by search. O(O). */

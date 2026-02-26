@@ -112,7 +112,7 @@ export function BulkObjectOpsScreen(props: { sf: SfApi; tabId: number }): VNode 
     try {
       // Fetch all IDs
       const allIds: string[] = [];
-      let soql = `SELECT Id FROM ${selectedObject}`;
+      const soql = `SELECT Id FROM ${selectedObject}`;
       let done = false;
 
       while (!done) {

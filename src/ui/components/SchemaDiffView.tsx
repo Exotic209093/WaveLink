@@ -10,7 +10,7 @@
 import { h } from 'preact';
 import type { VNode } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
-import type { SchemaDiff, FieldDiffStatus } from '../utils/schemaDiff';
+import type { SchemaDiff } from '../utils/schemaDiff';
 import { FieldDiffDetail } from './FieldDiffDetail';
 
 export interface SchemaDiffViewProps {

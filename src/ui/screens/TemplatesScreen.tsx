@@ -48,7 +48,6 @@ export function TemplatesScreen(props: { sf: SfApi }): VNode {
 
   useEffect(() => {
     loadTemplates();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /** Filter templates by search query (name or category). O(T). */

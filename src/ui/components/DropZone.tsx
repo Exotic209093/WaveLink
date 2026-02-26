@@ -20,7 +20,7 @@ export interface DropZoneProps {
 export function DropZone(props: DropZoneProps): VNode {
   const { accept, onDrop, disabled = false, children, className = '' } = props;
   const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [dragCounter, setDragCounter] = useState<number>(0);
+  const [, setDragCounter] = useState<number>(0);
 
   const handleDragEnter = (e: DragEvent) => {
     e.preventDefault();

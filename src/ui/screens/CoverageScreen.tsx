@@ -139,7 +139,6 @@ export function CoverageScreen(props: { sf: SfApi; tabId: number }): VNode {
 
   useEffect(() => {
     load(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId]);
 
   const filtered = useMemo(() => {

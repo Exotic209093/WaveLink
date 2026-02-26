@@ -5,7 +5,7 @@
 
 import type { VNode } from 'preact';
 import { h } from 'preact';
-import { useState, useMemo } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import { OrgPicker } from '../components/OrgPicker';
 import { DataDiffView } from '../components/DataDiffView';

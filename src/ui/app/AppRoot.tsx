@@ -293,7 +293,7 @@ export function AppRoot(): VNode {
         mode="app"
         context={context ?? undefined}
         sf={sf}
-        onOrgSwitch={(orgId) => {
+        onOrgSwitch={(_orgId) => {
           // Re-resolve context after org switch
           refreshTabs();
         }}

@@ -9,6 +9,8 @@
 export interface SchemaNode {
   objectName: string;
   label: string;
+  custom?: boolean;
+  queryable?: boolean;
   fields: Array<{ name: string; type: string; referenceTo?: string[]; nillable?: boolean }>;
   childRelationships: Array<{ childSObject: string; field: string; relationshipName: string | null; restrictedDelete: boolean }>;
 }

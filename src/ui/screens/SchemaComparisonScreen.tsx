@@ -52,7 +52,6 @@ export function SchemaComparisonScreen(props: { sf: SfApi; tabId: number }): VNo
         if (!cancelled) setBusy(false);
       });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId]);
 
   /** Filter objects for left selector. O(O). */

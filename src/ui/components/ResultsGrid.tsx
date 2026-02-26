@@ -119,7 +119,6 @@ export function ResultsGrid(props: {
 
   // Virtual scroll calculations
   const totalRows = sortedRecords.length;
-  const totalHeight = totalRows * ROW_HEIGHT;
   const startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_ROWS);
   const endIdx = Math.min(totalRows, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + BUFFER_ROWS);
   const visibleRows = sortedRecords.slice(startIdx, endIdx);

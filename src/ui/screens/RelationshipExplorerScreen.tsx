@@ -35,6 +35,9 @@ import { downloadTextFile } from '../utils/download';
 
 type FieldFilter = 'all' | 'reference' | 'text' | 'number' | 'date' | 'other';
 type ViewMode = 'orbital' | 'tree' | 'list';
+type ObjectTypeFilter = 'all' | 'standard' | 'custom';
+type RelationshipTypeFilter = 'all' | 'lookup' | 'masterDetail';
+type ObjectScopeFilter = 'strict' | 'related';
 
 const TEXT_TYPES = new Set(['string', 'textarea', 'email', 'phone', 'url', 'picklist', 'multipicklist', 'combobox', 'encryptedstring']);
 const NUMBER_TYPES = new Set(['int', 'double', 'currency', 'percent']);
@@ -49,6 +52,23 @@ const FILTER_TABS: Array<{ key: FieldFilter; label: string }> = [
   { key: 'other', label: 'Other' },
 ];
 
+const OBJECT_TYPE_TABS: Array<{ key: ObjectTypeFilter; label: string }> = [
+  { key: 'all', label: 'All Objects' },
+  { key: 'standard', label: 'Standard' },
+  { key: 'custom', label: 'Custom' },
+];
+
+const RELATIONSHIP_TYPE_TABS: Array<{ key: RelationshipTypeFilter; label: string }> = [
+  { key: 'all', label: 'All Relationships' },
+  { key: 'lookup', label: 'Lookup' },
+  { key: 'masterDetail', label: 'Master-Detail' },
+];
+
+const OBJECT_SCOPE_TABS: Array<{ key: ObjectScopeFilter; label: string }> = [
+  { key: 'related', label: 'Related Scope' },
+  { key: 'strict', label: 'Strict Matches' },
+];
+
 function matchesFilter(fieldType: string, filter: FieldFilter): boolean {
   if (filter === 'all') return true;
   if (filter === 'reference') return fieldType === 'reference';
@@ -57,6 +77,21 @@ function matchesFilter(fieldType: string, filter: FieldFilter): boolean {
   if (filter === 'date') return DATE_TYPES.has(fieldType);
   if (filter === 'other') return !TEXT_TYPES.has(fieldType) && !NUMBER_TYPES.has(fieldType) && !DATE_TYPES.has(fieldType) && fieldType !== 'reference';
   return true;
+}
+
+function matchesObjectType(node: SchemaNode, filter: ObjectTypeFilter): boolean {
+  if (filter === 'all') return true;
+  const isCustom = node.custom ?? node.objectName.endsWith('__c');
+  return filter === 'custom' ? isCustom : !isCustom;
+}
+
+function matchesObjectSearch(node: SchemaNode, query: string): boolean {
+  if (!query) return true;
+  const haystack = `${node.objectName} ${node.label}`.toLowerCase();
+  return query
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((token) => haystack.includes(token));
 }
 
 export function RelationshipExplorerScreen(props: {
@@ -76,7 +111,7 @@ export function RelationshipExplorerScreen(props: {
     return () => { exploreAbortRef.current?.abort(); };
   }, []);
 
-  const [objects, setObjects] = useState<Array<{ name: string; label: string }>>([]);
+  const [objects, setObjects] = useState<Array<{ name: string; label: string; custom: boolean; queryable: boolean }>>([]);
   const [objSearch, setObjSearch] = useState('');
 
   const [rootObject, setRootObject] = useState('');
@@ -88,6 +123,10 @@ export function RelationshipExplorerScreen(props: {
   const [fieldFilter, setFieldFilter] = useState<FieldFilter>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('orbital');
   const [edgeSearch, setEdgeSearch] = useState('');
+  const [graphObjectSearch, setGraphObjectSearch] = useState('');
+  const [objectTypeFilter, setObjectTypeFilter] = useState<ObjectTypeFilter>('all');
+  const [relationshipTypeFilter, setRelationshipTypeFilter] = useState<RelationshipTypeFilter>('all');
+  const [objectScopeFilter, setObjectScopeFilter] = useState<ObjectScopeFilter>('related');
 
   /** Load global object list on mount. */
   useEffect(() => {
@@ -95,7 +134,12 @@ export function RelationshipExplorerScreen(props: {
     sf.describeGlobal(tabId)
       .then((res) => {
         if (cancelled) return;
-        setObjects(res.sobjects.map((s) => ({ name: s.name, label: s.label })));
+        setObjects(res.sobjects.map((s) => ({
+          name: s.name,
+          label: s.label,
+          custom: s.custom,
+          queryable: s.queryable,
+        })));
       })
       .catch((e) => {
         if (!cancelled) {
@@ -112,6 +156,14 @@ export function RelationshipExplorerScreen(props: {
       (o) => o.name.toLowerCase().includes(q) || o.label.toLowerCase().includes(q),
     );
   }, [objects, objSearch]);
+
+  const objectMetaByName = useMemo(() => {
+    const map = new Map<string, { custom: boolean; queryable: boolean }>();
+    for (const obj of objects) {
+      map.set(obj.name, { custom: obj.custom, queryable: obj.queryable });
+    }
+    return map;
+  }, [objects]);
 
   /**
    * Explore relationships bidirectionally: traverse outgoing reference fields
@@ -140,11 +192,14 @@ export function RelationshipExplorerScreen(props: {
     try {
       const rootDescribe = await sf.describeSObject(rootObject, tabId);
       if (signal.aborted) return;
+      const rootMeta = objectMetaByName.get(rootObject);
 
       const describes = new Map<string, SchemaNode>();
       describes.set(rootObject, {
         objectName: rootObject,
         label: rootDescribe.label,
+        custom: rootMeta?.custom ?? rootObject.endsWith('__c'),
+        queryable: rootMeta?.queryable ?? true,
         fields: rootDescribe.fields.map((f) => ({
           name: f.name,
           type: f.type,
@@ -190,9 +245,12 @@ export function RelationshipExplorerScreen(props: {
           try {
             const desc = await sf.describeSObject(name, tabId);
             if (signal.aborted) return;
+            const meta = objectMetaByName.get(name);
             describes.set(name, {
               objectName: name,
               label: desc.label,
+              custom: meta?.custom ?? name.endsWith('__c'),
+              queryable: meta?.queryable ?? true,
               fields: desc.fields.map((f) => ({
                 name: f.name,
                 type: f.type,
@@ -235,30 +293,135 @@ export function RelationshipExplorerScreen(props: {
     } finally {
       if (!signal.aborted) setBusy(false);
     }
-  }, [rootObject, depth, sf, tabId]);
+  }, [rootObject, depth, sf, tabId, objectMetaByName]);
+
+  const normalizedGraphObjectSearch = graphObjectSearch.trim().toLowerCase();
+  const hasGraphSearch = normalizedGraphObjectSearch.length > 0;
+
+  const filteredGraph = useMemo((): SchemaGraph | null => {
+    if (!graph) return null;
+
+    const directlyMatched = new Set<string>();
+    for (const [name, node] of graph.nodes.entries()) {
+      if (!matchesObjectType(node, objectTypeFilter)) continue;
+      if (!matchesObjectSearch(node, normalizedGraphObjectSearch)) continue;
+      directlyMatched.add(name);
+    }
+
+    const visibleNodes = new Set<string>(directlyMatched);
+
+    // Related scope keeps one-hop object context around matched nodes.
+    if (hasGraphSearch && objectScopeFilter === 'related') {
+      for (const edge of graph.edges) {
+        if (!directlyMatched.has(edge.from) && !directlyMatched.has(edge.to)) continue;
+        const fromNode = graph.nodes.get(edge.from);
+        const toNode = graph.nodes.get(edge.to);
+        if (fromNode && matchesObjectType(fromNode, objectTypeFilter)) visibleNodes.add(edge.from);
+        if (toNode && matchesObjectType(toNode, objectTypeFilter)) visibleNodes.add(edge.to);
+      }
+    }
+
+    if (graph.nodes.has(rootObject)) visibleNodes.add(rootObject);
+
+    let edges = graph.edges.filter((edge) => {
+      if (relationshipTypeFilter !== 'all' && edge.type !== relationshipTypeFilter) return false;
+      return visibleNodes.has(edge.from) && visibleNodes.has(edge.to);
+    });
+
+    let finalNodeNames = visibleNodes;
+    if (relationshipTypeFilter !== 'all') {
+      const connected = new Set<string>();
+      for (const edge of edges) {
+        connected.add(edge.from);
+        connected.add(edge.to);
+      }
+      if (graph.nodes.has(rootObject)) connected.add(rootObject);
+      finalNodeNames = new Set(Array.from(visibleNodes).filter((name) => connected.has(name)));
+      edges = edges.filter((edge) => finalNodeNames.has(edge.from) && finalNodeNames.has(edge.to));
+    }
+
+    const nodes = new Map<string, SchemaNode>();
+    for (const name of finalNodeNames) {
+      const node = graph.nodes.get(name);
+      if (node) nodes.set(name, node);
+    }
+
+    const adjacency = new Map<string, string[]>();
+    for (const name of nodes.keys()) adjacency.set(name, []);
+    for (const edge of edges) {
+      if (!adjacency.has(edge.from)) adjacency.set(edge.from, []);
+      if (!adjacency.has(edge.to)) adjacency.set(edge.to, []);
+      adjacency.get(edge.from)!.push(edge.to);
+      adjacency.get(edge.to)!.push(edge.from);
+    }
+
+    return { nodes, edges, adjacency };
+  }, [
+    graph,
+    hasGraphSearch,
+    normalizedGraphObjectSearch,
+    objectTypeFilter,
+    relationshipTypeFilter,
+    objectScopeFilter,
+    rootObject,
+  ]);
+
+  const hasActiveGraphFilters =
+    hasGraphSearch ||
+    objectTypeFilter !== 'all' ||
+    relationshipTypeFilter !== 'all';
+
+  const displayGraph = hasActiveGraphFilters ? filteredGraph : graph;
+
+  const displayOrbitalLayout = useMemo(() => {
+    if (!displayGraph) return null;
+    if (!hasActiveGraphFilters && layout) return layout;
+    return computeLayout(displayGraph, rootObject);
+  }, [displayGraph, hasActiveGraphFilters, layout, rootObject]);
+
+  const displayTreeLayout = useMemo(() => {
+    if (!displayGraph) return null;
+    return computeTreeLayout(displayGraph, rootObject);
+  }, [displayGraph, rootObject]);
+
+  const activeLayout = viewMode === 'tree' ? displayTreeLayout : displayOrbitalLayout;
+
+  useEffect(() => {
+    if (!displayGraph) return;
+    if (selectedObject && displayGraph.nodes.has(selectedObject)) return;
+
+    if (displayGraph.nodes.has(rootObject)) {
+      if (selectedObject !== rootObject) setSelectedObject(rootObject);
+      return;
+    }
+
+    const firstVisible = displayGraph.nodes.keys().next().value as string | undefined;
+    const nextSelected = firstVisible ?? null;
+    if (nextSelected !== selectedObject) setSelectedObject(nextSelected);
+  }, [displayGraph, selectedObject, rootObject]);
 
   const selectedNode: SchemaNode | null =
-    graph && selectedObject ? graph.nodes.get(selectedObject) ?? null : null;
+    displayGraph && selectedObject ? displayGraph.nodes.get(selectedObject) ?? null : null;
 
   const selectedRelationships = useMemo(() => {
-    if (!graph || !selectedObject) return [];
-    return getFieldRelationships(graph, selectedObject);
-  }, [graph, selectedObject]);
+    if (!displayGraph || !selectedObject) return [];
+    return getFieldRelationships(displayGraph, selectedObject);
+  }, [displayGraph, selectedObject]);
 
   const selectedRelatedObjects = useMemo(() => {
-    if (!graph || !selectedObject) return new Set<string>();
-    return getRelatedObjects(graph, selectedObject, 1);
-  }, [graph, selectedObject]);
+    if (!displayGraph || !selectedObject) return new Set<string>();
+    return getRelatedObjects(displayGraph, selectedObject, 1);
+  }, [displayGraph, selectedObject]);
 
   /** SOQL traversal path from root to the selected object. */
   const soqlPath = useMemo((): string | null => {
-    if (!graph || !selectedObject || selectedObject === rootObject) return null;
-    const pathEdges = findPath(graph, rootObject, selectedObject);
+    if (!displayGraph || !selectedObject || selectedObject === rootObject) return null;
+    const pathEdges = findPath(displayGraph, rootObject, selectedObject);
     if (!pathEdges || pathEdges.length === 0) return null;
     return pathEdges
       .map(e => e.relationshipName ?? e.field)
       .join('.');
-  }, [graph, rootObject, selectedObject]);
+  }, [displayGraph, rootObject, selectedObject]);
 
   const copyToClipboard = useCallback((text: string, label: string): void => {
     navigator.clipboard.writeText(text).then(() => {
@@ -269,16 +432,25 @@ export function RelationshipExplorerScreen(props: {
   }, []);
 
   const exportGraph = useCallback((): void => {
-    if (!graph) return;
+    const graphToExport = hasActiveGraphFilters ? filteredGraph : graph;
+    if (!graphToExport) return;
     const exportData = {
       rootObject,
       depth,
-      nodes: Array.from(graph.nodes.values()).map((n) => ({
+      filters: {
+        objectSearch: graphObjectSearch,
+        objectType: objectTypeFilter,
+        relationshipType: relationshipTypeFilter,
+        objectScope: objectScopeFilter,
+      },
+      nodes: Array.from(graphToExport.nodes.values()).map((n) => ({
         objectName: n.objectName,
         label: n.label,
         fieldCount: n.fields.length,
+        custom: n.custom ?? n.objectName.endsWith('__c'),
+        queryable: n.queryable ?? true,
       })),
-      edges: graph.edges.map((e) => ({
+      edges: graphToExport.edges.map((e) => ({
         from: e.from,
         to: e.to,
         field: e.field,
@@ -291,27 +463,35 @@ export function RelationshipExplorerScreen(props: {
       JSON.stringify(exportData, null, 2),
       'application/json',
     );
-    setToast({ title: 'Exported', body: 'Relationship data saved as JSON.' });
-  }, [graph, rootObject, depth]);
-
-  const treeLayout = useMemo(() => {
-    if (!graph) return null;
-    return computeTreeLayout(graph, rootObject);
-  }, [graph, rootObject]);
-
-  const activeLayout = viewMode === 'tree' ? treeLayout : layout;
+    setToast({
+      title: 'Exported',
+      body: hasActiveGraphFilters
+        ? 'Filtered relationship data saved as JSON.'
+        : 'Relationship data saved as JSON.',
+    });
+  }, [
+    graph,
+    filteredGraph,
+    hasActiveGraphFilters,
+    rootObject,
+    depth,
+    graphObjectSearch,
+    objectTypeFilter,
+    relationshipTypeFilter,
+    objectScopeFilter,
+  ]);
 
   const filteredEdges = useMemo(() => {
-    if (!graph) return [];
+    if (!displayGraph) return [];
     const q = edgeSearch.trim().toLowerCase();
-    if (!q) return graph.edges;
-    return graph.edges.filter(e =>
+    if (!q) return displayGraph.edges;
+    return displayGraph.edges.filter(e =>
       e.from.toLowerCase().includes(q) ||
       e.to.toLowerCase().includes(q) ||
       e.field.toLowerCase().includes(q) ||
       (e.relationshipName ?? '').toLowerCase().includes(q),
     );
-  }, [graph, edgeSearch]);
+  }, [displayGraph, edgeSearch]);
 
   const filteredFields = useMemo(() => {
     if (!selectedNode) return [];
@@ -406,13 +586,15 @@ export function RelationshipExplorerScreen(props: {
               <span class="wl-chip"><span style="font-weight:900">Depth:</span> {depth}</span>
               {graph ? <span class="wl-chip"><span style="font-weight:900">Objects:</span> {graph.nodes.size}</span> : null}
               {graph ? <span class="wl-chip"><span style="font-weight:900">Edges:</span> {graph.edges.length}</span> : null}
+              {displayGraph && hasActiveGraphFilters ? <span class="wl-chip"><span style="font-weight:900">Shown Objects:</span> {displayGraph.nodes.size}</span> : null}
+              {displayGraph && hasActiveGraphFilters ? <span class="wl-chip"><span style="font-weight:900">Shown Edges:</span> {displayGraph.edges.length}</span> : null}
             </div>
           ) : null}
         </div>
       </div>
 
       {/* Graph + Detail split layout */}
-      {graph && layout ? (
+      {displayGraph && activeLayout ? (
         <div class="wl-split" style="grid-template-columns:minmax(0,1fr) 380px">
           {/* Graph pane */}
           <div class="wl-card">
@@ -434,15 +616,91 @@ export function RelationshipExplorerScreen(props: {
                     >{m.label}</button>
                   ))}
                 </div>
-                <div class="wl-muted" style="font-size:12px">{graph.nodes.size} objects · {graph.edges.length} edges</div>
+                <div class="wl-muted" style="font-size:12px">
+                  {displayGraph.nodes.size} objects | {displayGraph.edges.length} edges
+                  {hasActiveGraphFilters ? ` (filtered from ${graph?.nodes.size ?? 0}/${graph?.edges.length ?? 0})` : ''}
+                </div>
               </div>
+            </div>
+
+            <div style="padding:10px 14px;border-bottom:1px solid var(--wl-line-2);display:flex;flex-direction:column;gap:8px">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px">
+                <input
+                  class="wl-input"
+                  type="text"
+                  placeholder="Filter objects by name or label..."
+                  value={graphObjectSearch}
+                  onInput={(e) => setGraphObjectSearch((e.currentTarget as HTMLInputElement).value)}
+                />
+                {hasActiveGraphFilters ? (
+                  <button
+                    class="wl-btn"
+                    onClick={() => {
+                      setGraphObjectSearch('');
+                      setObjectTypeFilter('all');
+                      setRelationshipTypeFilter('all');
+                      setObjectScopeFilter('related');
+                      setEdgeSearch('');
+                    }}
+                  >
+                    Clear Filters
+                  </button>
+                ) : null}
+              </div>
+
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span class="wl-muted" style="font-size:11px;min-width:72px">Object Type</span>
+                {OBJECT_TYPE_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    class="wl-subNavBtn"
+                    data-active={objectTypeFilter === tab.key}
+                    style="padding:3px 8px;font-size:11px;margin-bottom:0;border-bottom:2px solid transparent"
+                    onClick={() => setObjectTypeFilter(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span class="wl-muted" style="font-size:11px;min-width:72px">Edge Type</span>
+                {RELATIONSHIP_TYPE_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    class="wl-subNavBtn"
+                    data-active={relationshipTypeFilter === tab.key}
+                    style="padding:3px 8px;font-size:11px;margin-bottom:0;border-bottom:2px solid transparent"
+                    onClick={() => setRelationshipTypeFilter(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {hasGraphSearch ? (
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <span class="wl-muted" style="font-size:11px;min-width:72px">Scope</span>
+                  {OBJECT_SCOPE_TABS.map((tab) => (
+                    <button
+                      key={tab.key}
+                      class="wl-subNavBtn"
+                      data-active={objectScopeFilter === tab.key}
+                      style="padding:3px 8px;font-size:11px;margin-bottom:0;border-bottom:2px solid transparent"
+                      onClick={() => setObjectScopeFilter(tab.key)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             {/* Orbital / Tree views share SchemaGraphView */}
             {viewMode !== 'list' && activeLayout ? (
               <div class="wl-row" style="padding:0">
                 <SchemaGraphView
-                  graph={graph}
+                  graph={displayGraph}
                   rootObject={rootObject}
                   layout={activeLayout}
                   selectedObject={selectedObject}
@@ -507,7 +765,7 @@ export function RelationshipExplorerScreen(props: {
                 </div>
                 {edgeSearch ? (
                   <div style="padding:6px 14px;font-size:11px;color:var(--wl-ink-dim);border-top:1px solid var(--wl-line-2)">
-                    {filteredEdges.length} of {graph.edges.length} relationships
+                    {filteredEdges.length} of {displayGraph.edges.length} relationships
                   </div>
                 ) : null}
               </div>
@@ -585,7 +843,7 @@ export function RelationshipExplorerScreen(props: {
                                 key={`${edge.from}-${edge.to}-${edge.field}`}
                                 style="cursor:pointer"
                                 onClick={() => {
-                                  if (graph.nodes.has(targetObj)) setSelectedObject(targetObj);
+                                  if (displayGraph.nodes.has(targetObj)) setSelectedObject(targetObj);
                                 }}
                               >
                                 <td class="wl-muted">{isOutgoing ? '→ out' : '← in'}</td>
