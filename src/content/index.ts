@@ -215,6 +215,7 @@ async function mountPanel(): Promise<void> {
 
   edgeBtn = document.createElement('button');
   edgeBtn.className = 'wl-panelEdgeBtn';
+  edgeBtn.dataset.open = 'false';
   edgeBtn.textContent = 'WaveLink';
   edgeBtn.addEventListener('click', () => setPanelOpen(!panelOpen));
 
@@ -225,20 +226,26 @@ async function mountPanel(): Promise<void> {
   appMount.style.height = '100%';
   appMount.style.overflow = 'auto';
 
-  panelEl.appendChild(edgeBtn);
+  // edgeBtn is appended to the shadow root as a sibling of panelEl so that
+  // panelEl's overflow:hidden does not clip the button when the panel slides off-screen.
   panelEl.appendChild(resizeHandle);
   panelEl.appendChild(appMount);
   shadow.appendChild(panelEl);
+  shadow.appendChild(edgeBtn);
 
   const sf = new SfApi('content');
   try {
     const ui = await sf.getUiSettings();
-    panelEl.style.setProperty('--wl-panel-w', `${ui.panelWidth}px`);
+    const w = ui.panelWidth ?? 420;
+    panelEl.style.setProperty('--wl-panel-w', `${w}px`);
+    edgeBtn.style.setProperty('--wl-panel-w', `${w}px`);
     if (ui.panelDock === 'left') {
       panelEl.classList.add('wl-panelDockLeft');
+      edgeBtn.classList.add('wl-edgeBtnLeft');
     }
   } catch {
     panelEl.style.setProperty('--wl-panel-w', '420px');
+    edgeBtn.style.setProperty('--wl-panel-w', '420px');
   }
 
   wireResize();
@@ -248,13 +255,14 @@ async function mountPanel(): Promise<void> {
 function setPanelOpen(next: boolean): void {
   /**
    * Toggle panel open/closed state by updating a data attribute used by CSS.
+   * Both panelEl and edgeBtn carry the same data-open attribute so CSS can
+   * position/hide each independently.
    *
    * Complexity: O(1).
    */
   panelOpen = next;
-  if (panelEl) {
-    panelEl.dataset.open = String(panelOpen);
-  }
+  if (panelEl) panelEl.dataset.open = String(panelOpen);
+  if (edgeBtn) edgeBtn.dataset.open = String(panelOpen);
 }
 
 function wireResize(): void {
@@ -278,6 +286,8 @@ function wireResize(): void {
     const dx = e.clientX - startX;
     const nextW = Math.max(320, Math.min(760, dockLeft ? startW + dx : startW - dx));
     panelEl.style.setProperty('--wl-panel-w', `${nextW}px`);
+    // Keep edge button in sync so its CSS transition tracks the panel width.
+    if (edgeBtn) edgeBtn.style.setProperty('--wl-panel-w', `${nextW}px`);
   }
 
   async function onUp(e: PointerEvent): Promise<void> {

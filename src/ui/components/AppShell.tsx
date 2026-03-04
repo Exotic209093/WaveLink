@@ -157,28 +157,32 @@ export function AppShell(props: {
         </div>
       ) : null}
 
-      <div class="wl-layout">
-        {mode === 'panel' ? (
-          <aside class="wl-nav">
-            <div class="wl-navCard">
-              {navItems.map(item => (
-                <button
-                  key={item.key}
-                  class="wl-navBtn"
-                  data-active={route === item.key}
-                  onClick={() => onRouteChange(item.key)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </aside>
-        ) : null}
-
-        <main class="wl-main">
-          {children}
-        </main>
-      </div>
+      {mode === 'panel' ? (
+        <>
+          <div class="wl-panelTabBar" role="tablist">
+            {navItems.map(item => (
+              <button
+                key={item.key}
+                class="wl-panelTab"
+                role="tab"
+                data-active={route === item.key}
+                onClick={() => onRouteChange(item.key)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <main class="wl-main wl-panelMain">
+            {children}
+          </main>
+        </>
+      ) : (
+        <div class="wl-layout">
+          <main class="wl-main">
+            {children}
+          </main>
+        </div>
+      )}
     </div>
   );
 }

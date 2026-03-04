@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "npm", "run", "dev"],
+      "port": 0
+    },
+    {
+      "name": "test:watch",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "npm", "run", "test:watch"],
+      "port": 3001
+    }
+  ]
+}

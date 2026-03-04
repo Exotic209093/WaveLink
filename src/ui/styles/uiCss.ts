@@ -154,10 +154,18 @@ export const uiCss = `
   backdrop-filter: blur(12px);
 }
 
-:root[data-theme="dark"] .wl-panelEdgeBtn {
-  background:
-    radial-gradient(120px 80px at 30% 30%, rgba(86, 200, 232, 0.18), transparent 60%),
-    rgba(17, 41, 62, 0.88);
+/* Edge button dark mode — applies to the shadow-sibling element (no :root ancestor) */
+.wl-panelEdgeBtn {
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  .wl-panelEdgeBtn {
+    background:
+      radial-gradient(80px 60px at 20% 30%, rgba(86, 200, 232, 0.18), transparent 70%),
+      rgba(17, 41, 62, 0.90);
+    border-color: rgba(255,255,255,0.08);
+    color: rgba(180,200,220,0.8);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -240,6 +248,23 @@ export const uiCss = `
 
 .wl-app[data-mode="app"] .wl-layout {
   grid-template-columns: 1fr;
+}
+
+/* Panel mode: the wl-app is itself the flex column container inside panelRoot */
+.wl-app[data-mode="panel"] {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.wl-app[data-mode="panel"] .wl-topbar {
+  flex-shrink: 0;
+  padding: 0 10px;
+  min-height: 44px;
+  height: 44px;
+}
+.wl-app[data-mode="panel"] .wl-topbar .wl-brand h1 {
+  font-size: 13px;
 }
 
 /* Sticky wrapper when using grouped two-tier nav */
@@ -642,39 +667,75 @@ export const uiCss = `
 
 .wl-sampleTable td { white-space: nowrap; }
 
-/* Panel-specific layout (in-page) */
+/* ── Panel root ── */
 .wl-panelRoot {
   position: fixed;
   top: 0;
   bottom: 0;
   right: 0;
   width: var(--wl-panel-w, 420px);
+  overflow: hidden;
   transform: translateX(0%);
   transition: transform 220ms cubic-bezier(0.2, 0.9, 0.25, 1);
-  z-index: 999999;
+  z-index: 999998;
+  background: var(--wl-surface);
+  border-left: 1px solid var(--wl-line-2);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.10);
+  display: flex;
+  flex-direction: column;
 }
-.wl-panelRoot[data-open="false"] { transform: translateX(calc(100% - 52px)); }
-.wl-panelDockLeft { left: 0; right: auto; }
-.wl-panelDockLeft[data-open="false"] { transform: translateX(calc(-100% + 52px)); }
+.wl-panelRoot[data-open="false"] { transform: translateX(100%); }
+.wl-panelDockLeft { left: 0; right: auto; border-left: none; border-right: 1px solid var(--wl-line-2); box-shadow: 4px 0 24px rgba(0,0,0,0.10); }
+.wl-panelDockLeft[data-open="false"] { transform: translateX(-100%); }
 
+/* ── Edge (toggle) button — lives as a shadow sibling of panelEl so it is
+      never clipped by panelEl's overflow:hidden.  Its position tracks the
+      panel open/closed state via a CSS transition on the "right" property. ── */
 .wl-panelEdgeBtn {
-  position: absolute;
-  top: 18px;
-  left: -10px;
-  width: 64px;
-  height: 44px;
-  border-radius: 999px;
-  border: 1px solid rgba(21,21,21,0.08);
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 72px;
+  border-radius: 8px 0 0 8px;
+  border: 1px solid rgba(21,21,21,0.10);
+  border-right: none;
   background:
-    radial-gradient(120px 80px at 30% 30%, rgba(2, 132, 168, 0.16), transparent 60%),
-    rgba(255,255,255,0.82);
+    radial-gradient(80px 60px at 20% 30%, rgba(2, 132, 168, 0.18), transparent 70%),
+    rgba(255,255,255,0.90);
   backdrop-filter: blur(10px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+  box-shadow: -3px 0 12px rgba(0,0,0,0.08);
   cursor: pointer;
+  z-index: 999999;
+  font-size: 10px;
   font-weight: 700;
+  color: var(--wl-ink-dim);
+  writing-mode: vertical-rl;
+  letter-spacing: 0.04em;
+  transition: right 220ms cubic-bezier(0.2, 0.9, 0.25, 1), background 150ms, color 150ms;
 }
-.wl-panelDockLeft .wl-panelEdgeBtn { left: auto; right: -10px; }
+.wl-panelEdgeBtn[data-open="true"] {
+  right: var(--wl-panel-w, 420px);
+  color: var(--wl-accent);
+  background:
+    radial-gradient(80px 60px at 20% 30%, rgba(2, 132, 168, 0.22), transparent 70%),
+    rgba(255,255,255,0.95);
+}
+.wl-panelEdgeBtn:hover { color: var(--wl-accent); background: rgba(2,132,168,0.08); }
+/* Left-docked variant */
+.wl-edgeBtnLeft {
+  right: auto;
+  left: 0;
+  border-radius: 0 8px 8px 0;
+  border-right: 1px solid rgba(21,21,21,0.10);
+  border-left: none;
+  box-shadow: 3px 0 12px rgba(0,0,0,0.08);
+  transition: left 220ms cubic-bezier(0.2, 0.9, 0.25, 1), background 150ms, color 150ms;
+}
+.wl-edgeBtnLeft[data-open="true"] { right: auto; left: var(--wl-panel-w, 420px); }
 
+/* ── Resize handle ── */
 .wl-resizeHandle {
   position: absolute;
   top: 0;
@@ -682,8 +743,43 @@ export const uiCss = `
   left: -6px;
   width: 10px;
   cursor: ew-resize;
+  z-index: 1;
 }
 .wl-panelDockLeft .wl-resizeHandle { left: auto; right: -6px; }
+
+/* ── Panel tab bar ── */
+.wl-panelTabBar {
+  display: flex;
+  flex-shrink: 0;
+  background: var(--wl-surface-2);
+  border-bottom: 1px solid var(--wl-line-2);
+}
+.wl-panelTab {
+  flex: 1;
+  padding: 10px 6px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--wl-ink-dim);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 150ms, border-color 150ms, background 150ms;
+}
+.wl-panelTab:hover { color: var(--wl-ink); background: rgba(2, 132, 168, 0.05); }
+.wl-panelTab[data-active="true"] {
+  color: var(--wl-accent);
+  border-bottom-color: var(--wl-accent);
+  background: rgba(2, 132, 168, 0.06);
+}
+
+/* ── Panel main content area ── */
+.wl-panelMain {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
 
 .wl-link {
   color: var(--wl-accent);
@@ -741,7 +837,7 @@ export const uiCss = `
 
 @media (prefers-reduced-motion: reduce) {
   .wl-app, .wl-card, .wl-toast { animation: none !important; }
-  .wl-btn, .wl-navBtn, .wl-topNavBtn, .wl-navGroupBtn, .wl-subNavBtn, .wl-panelRoot { transition: none !important; animation: none !important; }
+  .wl-btn, .wl-navBtn, .wl-topNavBtn, .wl-navGroupBtn, .wl-subNavBtn, .wl-panelRoot, .wl-panelEdgeBtn, .wl-panelTab { transition: none !important; animation: none !important; }
 }
 
 /* ── Query Builder ── */
