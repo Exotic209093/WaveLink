@@ -18,6 +18,7 @@
 import { StorageError } from '../../core/errors';
 import { STORAGE_KEYS, MAX_PUSH_HISTORY, MAX_UNDO_ENTRIES } from '../../core/constants';
 import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry, PushResult, ActivePush, SavedQuery, QueryFolder, UiSettings, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
+import type { MigrationProject, IdMap, IdMapEntry, MigrationTemplate, MigrationSummaryReport } from '../../core/types/migration';
 import type { SalesforceOrg } from '../../core/types/salesforce';
 
 /**
@@ -351,6 +352,144 @@ export class StorageService {
 
   async setOnboarding(progress: OnboardingProgress): Promise<void> {
     await this.setLocal(STORAGE_KEYS.ONBOARDING, progress);
+  }
+
+  // ── Migration Projects ──────────────────────────────────────────
+
+  async getMigrationProjects(): Promise<MigrationProject[]> {
+    return (await this.getLocal<MigrationProject[]>(STORAGE_KEYS.MIGRATION_PROJECTS)) ?? [];
+  }
+
+  async getMigrationProject(id: string): Promise<MigrationProject | null> {
+    const projects = await this.getMigrationProjects();
+    return projects.find(p => p.id === id) ?? null;
+  }
+
+  async upsertMigrationProject(
+    project: Omit<MigrationProject, 'createdAt' | 'updatedAt'> & Partial<Pick<MigrationProject, 'createdAt' | 'updatedAt'>>,
+  ): Promise<MigrationProject> {
+    const now = Date.now();
+    const list = await this.getMigrationProjects();
+    const idx = list.findIndex(p => p.id === project.id);
+    const existing = idx >= 0 ? list[idx] : null;
+    const next: MigrationProject = {
+      ...project,
+      createdAt: project.createdAt ?? existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    if (idx >= 0) {
+      list[idx] = next;
+    } else {
+      list.push(next);
+    }
+    await this.setLocal(STORAGE_KEYS.MIGRATION_PROJECTS, list);
+    return next;
+  }
+
+  async deleteMigrationProject(id: string): Promise<void> {
+    const list = await this.getMigrationProjects();
+    await this.setLocal(STORAGE_KEYS.MIGRATION_PROJECTS, list.filter(p => p.id !== id));
+  }
+
+  // ── ID Maps ────────────────────────────────────────────────────
+
+  async getIdMaps(): Promise<IdMap[]> {
+    const all = (await this.getLocal<Record<string, IdMap>>(STORAGE_KEYS.ID_MAPS)) ?? {};
+    return Object.values(all);
+  }
+
+  async getIdMap(id: string): Promise<IdMap | null> {
+    const all = (await this.getLocal<Record<string, IdMap>>(STORAGE_KEYS.ID_MAPS)) ?? {};
+    return all[id] ?? null;
+  }
+
+  async createIdMap(map: IdMap): Promise<IdMap> {
+    const all = (await this.getLocal<Record<string, IdMap>>(STORAGE_KEYS.ID_MAPS)) ?? {};
+    all[map.id] = map;
+    await this.setLocal(STORAGE_KEYS.ID_MAPS, all);
+    return map;
+  }
+
+  /** Add entries to an existing ID map. O(E) where E = entries to add. */
+  async addIdMapEntries(mapId: string, entries: IdMapEntry[]): Promise<IdMap> {
+    const all = (await this.getLocal<Record<string, IdMap>>(STORAGE_KEYS.ID_MAPS)) ?? {};
+    const map = all[mapId];
+    if (!map) throw new StorageError(`ID map not found: ${mapId}`, null);
+    for (const entry of entries) {
+      map.entries[entry.sourceId] = entry;
+      map.objectCounts[entry.objectName] = (map.objectCounts[entry.objectName] ?? 0) + 1;
+    }
+    map.updatedAt = Date.now();
+    all[mapId] = map;
+    await this.setLocal(STORAGE_KEYS.ID_MAPS, all);
+    return map;
+  }
+
+  async deleteIdMap(id: string): Promise<void> {
+    const all = (await this.getLocal<Record<string, IdMap>>(STORAGE_KEYS.ID_MAPS)) ?? {};
+    delete all[id];
+    await this.setLocal(STORAGE_KEYS.ID_MAPS, all);
+  }
+
+  // ── Migration Templates (Phase 3) ───────────────────────────────
+
+  async getMigrationTemplates(): Promise<MigrationTemplate[]> {
+    return (await this.getLocal<MigrationTemplate[]>(STORAGE_KEYS.MIGRATION_TEMPLATES)) ?? [];
+  }
+
+  async upsertMigrationTemplate(
+    template: Omit<MigrationTemplate, 'createdAt' | 'updatedAt'> & Partial<Pick<MigrationTemplate, 'createdAt' | 'updatedAt'>>,
+  ): Promise<MigrationTemplate> {
+    const now = Date.now();
+    const list = await this.getMigrationTemplates();
+    const idx = list.findIndex(t => t.id === template.id);
+    const existing = idx >= 0 ? list[idx] : null;
+    const next: MigrationTemplate = {
+      ...template,
+      createdAt: template.createdAt ?? existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    if (idx >= 0) {
+      list[idx] = next;
+    } else {
+      list.push(next);
+    }
+    await this.setLocal(STORAGE_KEYS.MIGRATION_TEMPLATES, list);
+    return next;
+  }
+
+  async deleteMigrationTemplate(id: string): Promise<void> {
+    const list = await this.getMigrationTemplates();
+    await this.setLocal(STORAGE_KEYS.MIGRATION_TEMPLATES, list.filter(t => t.id !== id));
+  }
+
+  // ── Migration Reports (Phase 2) ───────────────────────────────
+
+  async getMigrationReports(): Promise<MigrationSummaryReport[]> {
+    return (await this.getLocal<MigrationSummaryReport[]>(STORAGE_KEYS.MIGRATION_REPORTS)) ?? [];
+  }
+
+  async getMigrationReport(runId: string): Promise<MigrationSummaryReport | null> {
+    const reports = await this.getMigrationReports();
+    return reports.find(r => r.runId === runId) ?? null;
+  }
+
+  async saveMigrationReport(report: MigrationSummaryReport): Promise<void> {
+    const reports = await this.getMigrationReports();
+    const idx = reports.findIndex(r => r.runId === report.runId);
+    if (idx >= 0) {
+      reports[idx] = report;
+    } else {
+      reports.unshift(report);
+    }
+    // Keep at most 50 reports
+    if (reports.length > 50) reports.length = 50;
+    await this.setLocal(STORAGE_KEYS.MIGRATION_REPORTS, reports);
+  }
+
+  async deleteMigrationReport(runId: string): Promise<void> {
+    const reports = await this.getMigrationReports();
+    await this.setLocal(STORAGE_KEYS.MIGRATION_REPORTS, reports.filter(r => r.runId !== runId));
   }
 
   // ── Schema Cache ────────────────────────────────────────────────

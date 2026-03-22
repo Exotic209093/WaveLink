@@ -4,6 +4,7 @@
  */
 
 import type { SalesforceOrg } from './salesforce';
+import type { MigrationProject, IdMap, MigrationTemplate, MigrationSummaryReport } from './migration';
 
 /** Data stored in chrome.storage.local (large, device-specific data) */
 export interface LocalStorageSchema {
@@ -31,6 +32,14 @@ export interface LocalStorageSchema {
   qualityRuleSets: QualityRuleSet[];
   /** User onboarding progress */
   onboarding: OnboardingProgress;
+  /** Migration projects */
+  migrationProjects: MigrationProject[];
+  /** Persistent ID maps keyed by map ID */
+  idMaps: Record<string, IdMap>;
+  /** Migration templates (Phase 3) */
+  migrationTemplates: MigrationTemplate[];
+  /** Migration summary reports (Phase 2) */
+  migrationReports: MigrationSummaryReport[];
 }
 
 /** Data stored in chrome.storage.session (ephemeral, cleared on browser close) */

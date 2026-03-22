@@ -85,7 +85,28 @@ export type MessageType =
   | 'DATA_IMPORT'
   // Onboarding
   | 'ONBOARDING_GET'
-  | 'ONBOARDING_SET';
+  | 'ONBOARDING_SET'
+  // Migration projects
+  | 'MIGRATION_PROJECTS_LIST'
+  | 'MIGRATION_PROJECTS_GET'
+  | 'MIGRATION_PROJECTS_UPSERT'
+  | 'MIGRATION_PROJECTS_DELETE'
+  // ID maps
+  | 'ID_MAPS_LIST'
+  | 'ID_MAPS_GET'
+  | 'ID_MAPS_CREATE'
+  | 'ID_MAPS_ADD_ENTRIES'
+  | 'ID_MAPS_DELETE'
+  | 'ID_MAPS_EXPORT'
+  // Migration templates (Phase 3)
+  | 'MIGRATION_TEMPLATES_LIST'
+  | 'MIGRATION_TEMPLATES_UPSERT'
+  | 'MIGRATION_TEMPLATES_DELETE'
+  // Migration reports (Phase 2)
+  | 'MIGRATION_REPORTS_LIST'
+  | 'MIGRATION_REPORTS_GET'
+  | 'MIGRATION_REPORTS_SAVE'
+  | 'MIGRATION_REPORTS_DELETE';
 
 /** Base message shape */
 export interface ExtensionMessage<T extends MessageType = MessageType, P = unknown> {

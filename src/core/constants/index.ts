@@ -85,6 +85,12 @@ export const SALESFORCE_DOMAIN_PATTERNS = [
   /^https:\/\/([a-zA-Z0-9-]+)\.salesforce\.com/,
 ] as const;
 
+/** Max migration projects to store */
+export const MAX_MIGRATION_PROJECTS = 50;
+
+/** Max ID map entries before recommending export/purge */
+export const ID_MAP_WARN_THRESHOLD = 50_000;
+
 /** Extension storage keys */
 export const STORAGE_KEYS = {
   ORGS: 'orgs',
@@ -102,4 +108,8 @@ export const STORAGE_KEYS = {
   PIPELINES: 'pipelines',
   QUALITY_RULE_SETS: 'qualityRuleSets',
   ONBOARDING: 'onboarding',
+  MIGRATION_PROJECTS: 'migrationProjects',
+  ID_MAPS: 'idMaps',
+  MIGRATION_TEMPLATES: 'migrationTemplates',
+  MIGRATION_REPORTS: 'migrationReports',
 } as const;
