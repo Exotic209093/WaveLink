@@ -1,24 +1,27 @@
-# WaveLink — Salesforce Data Seeding Chrome Extension
+# WaveLink — Salesforce Data Migration & Management Tool
 
-Push CSV/JSON/Excel data into Salesforce orgs, run SOQL queries, compare schemas and data across orgs, and seed test data — all directly from your browser.
+Migrate data between Salesforce orgs, compare schemas and records across environments, transform and validate data, and manage multi-object migrations with dependency ordering and ID remapping — all from your browser.
 
 ---
 
 ## Features
 
+### Migration
+- **Migration Projects** — Plan, configure, and execute multi-object data migrations between Salesforce orgs. Automatic dependency graph detection, topological ordering, and ID remapping for lookups and master-detail relationships.
+- **Schema Gap Analysis** — Diff fields across objects or orgs side-by-side before migration. Detect field type mismatches, missing fields, and configuration differences. Export to CSV, JSON, or HTML.
+- **Pre/Post Migration Validation** — Data quality scorecards with rule sets (required fields, regex, range, picklist, uniqueness). Record count verification and field-level data comparison after migration.
+- **Migration Templates** — Save and reuse complete migration configurations: object lists, field mappings, transformation rules, and filters. Replay across different org pairs.
+
 ### Data Operations
 - **Data Push** — Upload CSV, JSON, or Excel files and push records into any Salesforce object using the REST Collections API or Bulk API 2.0. Supports field mapping, data transformation, retry on failure, and type-to-confirm deletes.
+- **SOQL Query Editor** — Visual query builder with aggregate functions (COUNT, SUM, AVG, MIN, MAX), GROUP BY, date literals, subqueries, syntax highlighting, autocomplete, query history, and explain plans.
 - **Data Cleanser** — Rename, drop, and reorder columns. Apply bulk field updates with formula interpolation and conditional rules. Preview changes before applying.
 - **Pipeline Builder** — Visual step-chain builder for data transformation (filter, transform, lookup, aggregate, join steps) with intermediate result preview.
 - **Test Data Generator** — Auto-generate test data using faker.js. Configure null rates, static values, formulas, and relationship ID injection per field.
-- **Data Templates** — Save and reuse field mapping configurations. Organise templates by category with usage tracking.
-
-### Querying
-- **SOQL Query Editor** — Structured SOQL builder with context-aware autocomplete, or raw SOQL text mode. Performance metrics, query folders, favourites, tags, and fuzzy search.
 
 ### Schema & Analytics
 - **Schema Explorer** — Browse Salesforce object schemas, view field metadata, and explore object relationships as an interactive graph.
-- **Schema Comparison** — Diff the fields of any two objects or two orgs side-by-side with export to CSV, JSON, or HTML.
+- **Dependency Visualiser** — Interactive graph of object relationships showing lookup and master-detail dependencies. Understand migration ordering at a glance.
 - **Field Usage Analytics** — Population rate, cardinality analysis, and optimisation recommendations per field.
 - **API Usage Dashboard** — View all Salesforce governor limits with colour-coded consumption bars.
 - **Org Health** — Monitor org health metrics at a glance.
@@ -31,11 +34,10 @@ Push CSV/JSON/Excel data into Salesforce orgs, run SOQL queries, compare schemas
 - **Duplicate Detection & Merging** — Find duplicates using exact, Levenshtein (fuzzy), or Soundex (phonetic) matching. 3-step merge wizard with field-level control.
 - **Cross-Object Cloning** — Clone records with automatic dependency graph detection, topological ordering, and ID remapping for lookups.
 - **Bulk Object Operations** — Record counts, bulk delete with safety confirmations, and production org warnings.
-- **Data Quality Scorecards** — Define rule sets (required fields, regex, range, picklist, uniqueness) and score datasets before pushing.
 
 ### History & Recovery
-- **Push History** — Sortable, filterable push log with error grouping and CSV/JSON export.
-- **Undo / Rollback** — Automatic capture of inserted record IDs. One-click undo via `Ctrl+Z` or the undo panel.
+- **Migration Audit Trail** — Sortable, filterable log of all push and migration operations with error grouping and CSV/JSON export.
+- **Rollback** — Automatic capture of inserted record IDs. One-click undo via `Ctrl+Z` or the undo panel. Migration-level rollback deletes all inserted records in reverse dependency order.
 
 ### User Interface
 - Three UI modes: popup, in-page side panel, and full-page app
@@ -49,7 +51,7 @@ Push CSV/JSON/Excel data into Salesforce orgs, run SOQL queries, compare schemas
 
 ## Installation
 
-### From the Chrome Web Store *(coming soon)*
+### From the Chrome Web Store
 
 Search for **WaveLink** in the Chrome Web Store and click **Add to Chrome**.
 

@@ -42,20 +42,20 @@ Excluded from zip: `src/`, `tests/`, `.d.ts`, `.d.ts.map`, `.LICENSE.txt`
 
 ### Description
 
-> Push CSV/JSON/Excel data into Salesforce orgs, run SOQL queries, compare schemas and data across orgs, and seed test data — all directly from your browser.
+> Migrate data between Salesforce orgs with dependency ordering, ID remapping, schema comparison, data validation, and transformation pipelines — all from your browser.
 >
 > Features:
-> - Data Push — Upload CSV, JSON, or Excel files and push records into any Salesforce object using REST or Bulk API 2.0
-> - SOQL Query Editor — Visual query builder with autocomplete, syntax highlighting, query history, and explain plans
-> - Schema Explorer — Browse object schemas, view field metadata, and explore relationships as an interactive graph
-> - Schema Comparison — Diff fields across objects or orgs side-by-side
-> - Test Data Generator — Auto-generate test data with faker.js
-> - Data Cleanser — Rename, drop, reorder columns with formula interpolation
-> - Pipeline Builder — Visual step-chain for data transformation
+> - Migration Projects — Plan and execute multi-object data migrations with automatic dependency ordering and ID remapping
+> - Schema Gap Analysis — Diff fields across orgs to catch mismatches before migration
+> - Data Push — Upload CSV, JSON, or Excel files and push records via REST or Bulk API 2.0
+> - SOQL Query Editor — Visual query builder with aggregates, GROUP BY, date literals, subqueries, syntax highlighting, and explain plans
+> - Data Validation — Pre/post migration validation with quality scorecards and record count comparison
+> - Pipeline Builder — Visual step-chain for data transformation during migration
 > - Multi-Org Support — Connect and switch between multiple Salesforce orgs
-> - Data Comparison — Compare records across orgs with colour-coded diffs
+> - Data Comparison — Compare records across orgs with colour-coded diffs and selective sync
+> - Cross-Object Cloning — Clone records with dependency graph detection and ID remapping
 > - Duplicate Detection — Find duplicates using exact, fuzzy, or phonetic matching
-> - Push History & Undo — Full push log with one-click rollback
+> - Audit Trail & Rollback — Full operation log with one-click undo
 > - Dark mode, command palette (Ctrl+K), keyboard shortcuts
 >
 > All data stays on your device. No analytics, telemetry, or external servers.
@@ -98,7 +98,7 @@ $dst.Dispose()
 
 ### Single Purpose Description
 
-> WaveLink helps Salesforce developers and admins push data into Salesforce orgs, run SOQL queries, and compare schemas — all from the browser.
+> WaveLink helps Salesforce developers and admins migrate data between Salesforce orgs, compare schemas, validate data, and manage multi-object migrations — all from the browser.
 
 ### Permission Justifications
 

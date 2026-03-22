@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "WaveLink - Salesforce Data Seeding",
+  "name": "WaveLink - Salesforce Data Migration Tool",
   "version": "0.1.0",
-  "description": "Push CSV/JSON data into Salesforce orgs, run SOQL queries, compare schemas, and seed test data — all from your browser.",
+  "description": "Migrate data between Salesforce orgs with dependency ordering, ID remapping, schema comparison, data validation, and transformation pipelines — all from your browser.",
   "homepage_url": "https://github.com/jc-wave/wave-link",
   "permissions": [
     "storage",

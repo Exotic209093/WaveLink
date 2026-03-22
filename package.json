@@ -1,7 +1,7 @@
 {
   "name": "wavelink",
   "version": "0.1.0",
-  "description": "Salesforce Data Seeding Tool - Chrome Extension for pushing data into Salesforce orgs",
+  "description": "Salesforce Data Migration & Management Tool - Chrome Extension for migrating data between Salesforce orgs",
   "private": true,
   "scripts": {
     "dev": "webpack --watch --config webpack.config.ts --mode development",
