@@ -9,7 +9,8 @@ import type { SalesforceFieldType } from '../../core/types/salesforce';
 export type SoqlOperator =
   | '=' | '!=' | '<' | '>' | '<=' | '>='
   | 'LIKE' | 'IN' | 'NOT IN'
-  | 'INCLUDES' | 'EXCLUDES';
+  | 'INCLUDES' | 'EXCLUDES'
+  | 'IS NULL' | 'IS NOT NULL';
 
 export interface WhereCondition {
   id: string;
@@ -24,12 +25,44 @@ export interface OrderByClause {
   direction: 'ASC' | 'DESC';
 }
 
+export type AggregateFunction = 'COUNT' | 'COUNT_DISTINCT' | 'SUM' | 'AVG' | 'MIN' | 'MAX';
+
+export const AGGREGATE_FUNCTIONS: AggregateFunction[] = ['COUNT', 'COUNT_DISTINCT', 'SUM', 'AVG', 'MIN', 'MAX'];
+
+export interface AggregateField {
+  id: string;
+  fn: AggregateFunction;
+  field: string;   // empty for bare COUNT()
+  alias: string;   // optional alias
+}
+
+/** SOQL date literals supported by Salesforce. */
+export const SOQL_DATE_LITERALS: string[] = [
+  'TODAY', 'YESTERDAY', 'TOMORROW',
+  'LAST_WEEK', 'THIS_WEEK', 'NEXT_WEEK',
+  'LAST_MONTH', 'THIS_MONTH', 'NEXT_MONTH',
+  'LAST_QUARTER', 'THIS_QUARTER', 'NEXT_QUARTER',
+  'LAST_YEAR', 'THIS_YEAR', 'NEXT_YEAR',
+  'LAST_90_DAYS', 'NEXT_90_DAYS',
+  'LAST_N_DAYS:n', 'NEXT_N_DAYS:n',
+  'LAST_N_WEEKS:n', 'NEXT_N_WEEKS:n',
+  'LAST_N_MONTHS:n', 'NEXT_N_MONTHS:n',
+  'LAST_N_QUARTERS:n', 'NEXT_N_QUARTERS:n',
+  'LAST_N_YEARS:n', 'NEXT_N_YEARS:n',
+];
+
+/** Pattern matching a SOQL date literal (with or without :n parameter). */
+const DATE_LITERAL_RE = /^(TODAY|YESTERDAY|TOMORROW|LAST_WEEK|THIS_WEEK|NEXT_WEEK|LAST_MONTH|THIS_MONTH|NEXT_MONTH|LAST_QUARTER|THIS_QUARTER|NEXT_QUARTER|LAST_YEAR|THIS_YEAR|NEXT_YEAR|LAST_90_DAYS|NEXT_90_DAYS|LAST_N_DAYS|NEXT_N_DAYS|LAST_N_WEEKS|NEXT_N_WEEKS|LAST_N_MONTHS|NEXT_N_MONTHS|LAST_N_QUARTERS|NEXT_N_QUARTERS|LAST_N_YEARS|NEXT_N_YEARS)(:\d+)?$/i;
+
 export interface QueryBuilderState {
   objectName: string;
   selectedFields: string[];
+  aggregateFields?: AggregateField[];
   whereConditions: WhereCondition[];
   orderBy: OrderByClause | null;
+  groupBy?: string[];
   limit: number | null;
+  offset: number | null;
 }
 
 /** Build a SOQL string from structured builder state. */
@@ -37,10 +70,32 @@ export function buildSoql(
   state: QueryBuilderState,
   fieldTypeMap?: Map<string, SalesforceFieldType>,
 ): string {
-  if (!state.objectName || state.selectedFields.length === 0) return '';
+  if (!state.objectName) return '';
+
+  const selectParts: string[] = [...state.selectedFields];
+
+  // Append aggregate expressions
+  if (state.aggregateFields) {
+    for (const agg of state.aggregateFields) {
+      let expr: string;
+      if (agg.fn === 'COUNT' && !agg.field) {
+        expr = 'COUNT()';
+      } else if (agg.fn === 'COUNT_DISTINCT') {
+        if (!agg.field) continue;
+        expr = `COUNT_DISTINCT(${agg.field})`;
+      } else {
+        if (!agg.field) continue;
+        expr = `${agg.fn}(${agg.field})`;
+      }
+      if (agg.alias) expr += ` ${agg.alias}`;
+      selectParts.push(expr);
+    }
+  }
+
+  if (selectParts.length === 0) return '';
 
   const parts: string[] = [];
-  parts.push(`SELECT ${state.selectedFields.join(', ')}`);
+  parts.push(`SELECT ${selectParts.join(', ')}`);
   parts.push(`FROM ${state.objectName}`);
 
   if (state.whereConditions.length > 0) {
@@ -48,9 +103,18 @@ export function buildSoql(
     for (let i = 0; i < state.whereConditions.length; i++) {
       const cond = state.whereConditions[i];
       if (!cond.field || !cond.operator) continue;
-      const ft = fieldTypeMap?.get(cond.field) ?? 'string';
-      const formatted = formatSoqlValue(cond.value, ft, cond.operator);
-      const expr = `${cond.field} ${cond.operator} ${formatted}`;
+
+      let expr: string;
+      if (cond.operator === 'IS NULL') {
+        expr = `${cond.field} = NULL`;
+      } else if (cond.operator === 'IS NOT NULL') {
+        expr = `${cond.field} != NULL`;
+      } else {
+        const ft = fieldTypeMap?.get(cond.field) ?? 'string';
+        const formatted = formatSoqlValue(cond.value, ft, cond.operator);
+        expr = `${cond.field} ${cond.operator} ${formatted}`;
+      }
+
       if (i === 0) {
         clauses.push(expr);
       } else {
@@ -58,6 +122,10 @@ export function buildSoql(
       }
     }
     if (clauses.length > 0) parts.push(`WHERE ${clauses.join(' ')}`);
+  }
+
+  if (state.groupBy && state.groupBy.length > 0) {
+    parts.push(`GROUP BY ${state.groupBy.join(', ')}`);
   }
 
   if (state.orderBy) {
@@ -68,7 +136,16 @@ export function buildSoql(
     parts.push(`LIMIT ${state.limit}`);
   }
 
+  if (state.offset !== null && state.offset > 0) {
+    parts.push(`OFFSET ${state.offset}`);
+  }
+
   return parts.join('\n');
+}
+
+/** Check if a string is a SOQL date literal (e.g. TODAY, LAST_N_DAYS:30). */
+export function isDateLiteral(value: string): boolean {
+  return DATE_LITERAL_RE.test(value.trim());
 }
 
 /** Format a value for embedding in a SOQL string. */
@@ -91,26 +168,50 @@ export function formatSoqlValue(
   }
 
   if (fieldType === 'boolean') return value === 'true' ? 'true' : 'false';
-  if (isNumericType(fieldType)) return value || '0';
-  if (fieldType === 'date') return value; // YYYY-MM-DD, no quotes in SOQL
-  if (fieldType === 'datetime') return value; // YYYY-MM-DDThh:mm:ssZ, no quotes
+
+  if (isNumericType(fieldType)) {
+    const n = Number(value);
+    return isNaN(n) ? '0' : String(n);
+  }
+
+  if (fieldType === 'date') {
+    if (!value) return 'NULL';
+    // Support date literals (TODAY, LAST_N_DAYS:30, etc.)
+    if (isDateLiteral(value)) return value.trim().toUpperCase();
+    return value; // YYYY-MM-DD, no quotes in SOQL
+  }
+
+  if (fieldType === 'datetime') {
+    if (!value) return 'NULL';
+    // Support date literals
+    if (isDateLiteral(value)) return value.trim().toUpperCase();
+    // Normalize browser datetime-local format (YYYY-MM-DDThh:mm) to SOQL (YYYY-MM-DDThh:mm:ssZ)
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return `${value}:00Z`;
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(value)) return `${value}Z`;
+    return value;
+  }
+
   return `'${escapeSoqlString(value)}'`;
 }
 
 /** Get valid SOQL operators for a Salesforce field type. */
 export function getOperatorsForFieldType(fieldType: SalesforceFieldType): SoqlOperator[] {
-  if (fieldType === 'boolean') return ['=', '!='];
+  const nullOps: SoqlOperator[] = ['IS NULL', 'IS NOT NULL'];
 
-  if (fieldType === 'multipicklist') return ['=', '!=', 'INCLUDES', 'EXCLUDES'];
-  if (fieldType === 'picklist' || fieldType === 'combobox') return ['=', '!=', 'IN', 'NOT IN', 'INCLUDES', 'EXCLUDES'];
+  if (fieldType === 'boolean') return ['=', '!=', ...nullOps];
 
-  if (isNumericType(fieldType)) return ['=', '!=', '<', '>', '<=', '>='];
-  if (fieldType === 'date' || fieldType === 'datetime' || fieldType === 'time') return ['=', '!=', '<', '>', '<=', '>='];
+  if (fieldType === 'multipicklist') return ['=', '!=', 'INCLUDES', 'EXCLUDES', ...nullOps];
+  if (fieldType === 'picklist' || fieldType === 'combobox') return ['=', '!=', 'IN', 'NOT IN', ...nullOps];
 
-  if (fieldType === 'id' || fieldType === 'reference') return ['=', '!=', 'IN', 'NOT IN'];
+  if (isNumericType(fieldType)) return ['=', '!=', '<', '>', '<=', '>=', ...nullOps];
+  if (fieldType === 'date' || fieldType === 'datetime' || fieldType === 'time') return ['=', '!=', '<', '>', '<=', '>=', ...nullOps];
+
+  if (fieldType === 'id' || fieldType === 'reference') return ['=', '!=', 'IN', 'NOT IN', ...nullOps];
+
+  if (fieldType === 'encryptedstring') return ['=', '!=', ...nullOps];
 
   // string, textarea, email, phone, url, etc.
-  return ['=', '!=', 'LIKE', 'IN', 'NOT IN'];
+  return ['=', '!=', 'LIKE', 'IN', 'NOT IN', ...nullOps];
 }
 
 function isNumericType(ft: SalesforceFieldType): boolean {

@@ -48,6 +48,7 @@ export type MessageType =
   | 'SF_DESCRIBE_GLOBAL'
   | 'SF_DESCRIBE_SOBJECT'
   | 'SF_LIMITS_GET'
+  | 'SF_QUERY_EXPLAIN'
   // UI control
   | 'PANEL_TOGGLE'
   | 'UI_SETTINGS_GET'

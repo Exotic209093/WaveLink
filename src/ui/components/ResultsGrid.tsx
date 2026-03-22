@@ -34,9 +34,17 @@ export function ResultsGrid(props: {
   columns: string[];
   selectedColumns: string[];
   onSelectedColumnsChange: (cols: string[]) => void;
+  sf?: { updateRecord: (objectName: string, recordId: string, data: Record<string, unknown>) => Promise<void> };
+  objectName?: string;
 }): VNode {
-  const { instanceUrl, records, columns, selectedColumns, onSelectedColumnsChange } = props;
+  const { instanceUrl, records, columns, selectedColumns, onSelectedColumnsChange, sf, objectName } = props;
   const [showCols, setShowCols] = useState(false);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
+
+  // Inline edit state
+  const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
 
   // Sort state
   const [sortCol, setSortCol] = useState<string | null>(null);
@@ -45,6 +53,54 @@ export function ResultsGrid(props: {
   // Filter state
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [showFilters, setShowFilters] = useState(false);
+
+  function showCopyFeedback(msg: string): void {
+    setCopyToast(msg);
+    setTimeout(() => setCopyToast(null), 1500);
+  }
+
+  async function copyCell(value: string): Promise<void> {
+    await navigator.clipboard.writeText(value);
+    showCopyFeedback('Cell copied');
+  }
+
+  async function copyRow(record: FlatRecord): Promise<void> {
+    await navigator.clipboard.writeText(JSON.stringify(record, null, 2));
+    showCopyFeedback('Row copied as JSON');
+  }
+
+  async function copyColumn(col: string): Promise<void> {
+    const values = sortedRecords.map(r => String(r[col] ?? '')).join('\n');
+    await navigator.clipboard.writeText(values);
+    showCopyFeedback(`Column "${col}" copied (${sortedRecords.length} values)`);
+  }
+
+  function startEdit(rowIdx: number, col: string, currentValue: string): void {
+    if (!sf || !objectName) return;
+    setEditingCell({ row: rowIdx, col });
+    setEditValue(currentValue);
+  }
+
+  async function commitEdit(recordId: string): Promise<void> {
+    if (!editingCell || !sf || !objectName) return;
+    setEditBusy(true);
+    try {
+      await sf.updateRecord(objectName, recordId, { [editingCell.col]: editValue || null });
+      // Update local record
+      const rec = sortedRecords[editingCell.row];
+      if (rec) (rec as Record<string, unknown>)[editingCell.col] = editValue || null;
+    } catch {
+      // silently fail — value stays in edit mode
+    } finally {
+      setEditBusy(false);
+      setEditingCell(null);
+    }
+  }
+
+  function cancelEdit(): void {
+    setEditingCell(null);
+    setEditValue('');
+  }
 
   // Virtual scroll state
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -142,7 +198,7 @@ export function ResultsGrid(props: {
   const idColIdx = visibleCols.indexOf('Id');
 
   return (
-    <div class="wl-card">
+    <div class="wl-card" style="position:relative">
       <div class="wl-cardHeader">
         <h2>Results</h2>
         <div class="wl-actions">
@@ -195,10 +251,17 @@ export function ResultsGrid(props: {
                   }`}
                   onClick={() => handleSort(c)}
                 >
-                  {c}
+                  <span>{c}</span>
                   {sortCol === c ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
+                  <button
+                    class="wl-btn wl-grid-copyCol"
+                    style="padding:0 3px;font-size:9px;margin-left:4px;opacity:0;vertical-align:middle"
+                    onClick={(e) => { e.stopPropagation(); copyColumn(c); }}
+                    title={`Copy all "${c}" values`}
+                  >{'\u2398'}</button>
                 </th>
               ))}
+              <th style="width:28px;border:none" />
             </tr>
             {showFilters ? (
               <tr>
@@ -229,30 +292,68 @@ export function ResultsGrid(props: {
                 <td colSpan={visibleCols.length} />
               </tr>
             ) : null}
-            {visibleRows.map((r, vi) => (
-              <tr key={startIdx + vi} style={`height:${ROW_HEIGHT}px`}>
-                {visibleCols.map((c, ci) => {
-                  const v = r[c];
-                  const display = v === null ? '' : String(v ?? '');
-                  const isId = c === 'Id' && looksLikeSfId(v) && instanceUrl;
-                  return (
-                    <td
-                      key={c}
-                      title={display}
-                      style={`max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap${
-                        ci === idColIdx ? ';position:sticky;left:0;z-index:1;background:inherit' : ''
-                      }`}
-                    >
-                      {isId ? (
-                        <a class="wl-link" href={`${instanceUrl}/${v}`} target="_blank" rel="noreferrer">
-                          {display}
-                        </a>
-                      ) : display}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {visibleRows.map((r, vi) => {
+              const absIdx = startIdx + vi;
+              const recordId = typeof r['Id'] === 'string' ? r['Id'] : null;
+              return (
+                <tr key={absIdx} style={`height:${ROW_HEIGHT}px`}>
+                  {visibleCols.map((c, ci) => {
+                    const v = r[c];
+                    const display = v === null ? '' : String(v ?? '');
+                    const isId = c === 'Id' && looksLikeSfId(v) && instanceUrl;
+                    const isEditing = editingCell?.row === absIdx && editingCell?.col === c;
+                    const canEdit = sf && objectName && recordId && c !== 'Id';
+
+                    return (
+                      <td
+                        key={c}
+                        title={display}
+                        class="wl-grid-cell"
+                        style={`max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap${
+                          ci === idColIdx ? ';position:sticky;left:0;z-index:1;background:inherit' : ''
+                        }`}
+                        onDblClick={() => {
+                          if (canEdit) startEdit(absIdx, c, display);
+                          else copyCell(display);
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          copyCell(display);
+                        }}
+                      >
+                        {isEditing ? (
+                          <input
+                            class="wl-input"
+                            style="font-size:12px;padding:1px 4px;width:100%"
+                            value={editValue}
+                            disabled={editBusy}
+                            autoFocus
+                            onInput={(e) => setEditValue((e.currentTarget as HTMLInputElement).value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && recordId) commitEdit(recordId);
+                              if (e.key === 'Escape') cancelEdit();
+                            }}
+                            onBlur={cancelEdit}
+                          />
+                        ) : isId ? (
+                          <a class="wl-link" href={`${instanceUrl}/${v}`} target="_blank" rel="noreferrer">
+                            {display}
+                          </a>
+                        ) : display}
+                      </td>
+                    );
+                  })}
+                  <td style="padding:0;width:28px;border:none">
+                    <button
+                      class="wl-btn wl-grid-copyRow"
+                      style="padding:0 4px;font-size:10px;opacity:0"
+                      onClick={() => copyRow(r)}
+                      title="Copy row as JSON"
+                    >{'\u2398'}</button>
+                  </td>
+                </tr>
+              );
+            })}
             {/* Spacer row for remaining virtual scroll space */}
             {endIdx < totalRows ? (
               <tr style={`height:${(totalRows - endIdx) * ROW_HEIGHT}px`}>
@@ -262,6 +363,11 @@ export function ResultsGrid(props: {
           </tbody>
         </table>
       </div>
+      {copyToast && (
+        <div style="position:absolute;bottom:8px;right:8px;background:var(--wl-accent);color:white;padding:4px 12px;border-radius:8px;font-size:11px;pointer-events:none;z-index:10">
+          {copyToast}
+        </div>
+      )}
     </div>
   );
 }

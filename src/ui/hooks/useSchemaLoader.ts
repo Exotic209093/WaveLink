@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
-import type { SObjectField } from '../../core/types/salesforce';
+import type { SObjectField, ChildRelationship } from '../../core/types/salesforce';
 import type { SfApi } from '../api/sf';
 import type { DescribeGlobalSObject } from '../../services/salesforce/api-client';
 
@@ -15,6 +15,7 @@ export interface SchemaLoaderResult {
   objectsLoading: boolean;
   fields: SObjectField[];
   fieldsLoading: boolean;
+  childRelationships: ChildRelationship[];
   describedObject: string | null;
   loadFields: (objectName: string) => void;
   error: string | null;
@@ -25,10 +26,11 @@ export function useSchemaLoader(sf: SfApi, tabId?: number): SchemaLoaderResult {
   const [objectsLoading, setObjectsLoading] = useState(false);
   const [fields, setFields] = useState<SObjectField[]>([]);
   const [fieldsLoading, setFieldsLoading] = useState(false);
+  const [childRelationships, setChildRelationships] = useState<ChildRelationship[]>([]);
   const [describedObject, setDescribedObject] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const fieldsCacheRef = useRef(new Map<string, SObjectField[]>());
+  const fieldsCacheRef = useRef(new Map<string, { fields: SObjectField[]; childRelationships: ChildRelationship[] }>());
   const loadingRef = useRef<string | null>(null);
 
   // Load objects once on mount
@@ -46,6 +48,7 @@ export function useSchemaLoader(sf: SfApi, tabId?: number): SchemaLoaderResult {
   const loadFields = useCallback((objectName: string) => {
     if (!objectName) {
       setFields([]);
+      setChildRelationships([]);
       setDescribedObject(null);
       return;
     }
@@ -53,22 +56,27 @@ export function useSchemaLoader(sf: SfApi, tabId?: number): SchemaLoaderResult {
     // Check local cache first
     const cached = fieldsCacheRef.current.get(objectName);
     if (cached) {
-      setFields(cached);
+      setFields(cached.fields);
+      setChildRelationships(cached.childRelationships);
       setDescribedObject(objectName);
       return;
     }
 
-    // Prevent duplicate requests for the same object
+    // Prevent duplicate in-flight requests for the same object
     if (loadingRef.current === objectName) return;
     loadingRef.current = objectName;
 
     setFieldsLoading(true);
+    setFields([]);
+    setChildRelationships([]);
     sf.describeSObject(objectName, tabId)
       .then(desc => {
-        fieldsCacheRef.current.set(objectName, desc.fields);
-        // Only update if this is still the requested object
+        const cr = desc.childRelationships ?? [];
+        fieldsCacheRef.current.set(objectName, { fields: desc.fields, childRelationships: cr });
+        // Only update UI if this is still the most recent request
         if (loadingRef.current === objectName) {
           setFields(desc.fields);
+          setChildRelationships(cr);
           setDescribedObject(objectName);
           setError(null);
         }
@@ -79,12 +87,13 @@ export function useSchemaLoader(sf: SfApi, tabId?: number): SchemaLoaderResult {
         }
       })
       .finally(() => {
+        // Always clear loadingRef if it still matches, so the same object can be re-requested
         if (loadingRef.current === objectName) {
           loadingRef.current = null;
-          setFieldsLoading(false);
         }
+        setFieldsLoading(false);
       });
   }, [sf, tabId]);
 
-  return { objects, objectsLoading, fields, fieldsLoading, describedObject, loadFields, error };
+  return { objects, objectsLoading, fields, fieldsLoading, childRelationships, describedObject, loadFields, error };
 }

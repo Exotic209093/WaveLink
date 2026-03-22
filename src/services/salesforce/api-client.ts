@@ -255,6 +255,12 @@ export class SalesforceApiClient {
     return this.request('/limits');
   }
 
+  /** Get query explain plan for a SOQL query */
+  async queryExplain(soql: string): Promise<QueryExplainResult> {
+    const encodedQuery = encodeURIComponent(soql);
+    return this.request<QueryExplainResult>(`/query?explain=${encodedQuery}`);
+  }
+
   // ── Core Request Method ──────────────────────────────────────────
 
   private async request<T>(
@@ -379,4 +385,18 @@ export interface DescribeGlobalSObject {
   updateable: boolean;
   deletable: boolean;
   queryable: boolean;
+}
+
+export interface QueryExplainPlan {
+  cardinality: number;
+  fields: string[];
+  leadingOperationType: string;
+  relativeCost: number;
+  sobjectCardinality: number;
+  sobjectType: string;
+  notes?: Array<{ description: string; fields: string[]; tableEnumOrId: string }>;
+}
+
+export interface QueryExplainResult {
+  plans: QueryExplainPlan[];
 }

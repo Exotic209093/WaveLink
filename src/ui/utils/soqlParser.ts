@@ -28,7 +28,7 @@ const CLAUSE_PATTERNS: Array<{ clause: SoqlClause; re: RegExp }> = [
   { clause: 'LIMIT', re: /\blimit\b/gi },
 ];
 
-const OPERATORS = new Set(['=', '!=', '<', '>', '<=', '>=', 'LIKE', 'IN', 'NOT IN', 'INCLUDES', 'EXCLUDES']);
+const OPERATORS = new Set(['=', '!=', '<', '>', '<=', '>=', 'LIKE', 'IN', 'NOT IN', 'INCLUDES', 'EXCLUDES', 'IS NULL', 'IS NOT NULL']);
 
 /** SOQL keywords that should suppress autocomplete when partially typed. */
 const SOQL_KEYWORDS = [

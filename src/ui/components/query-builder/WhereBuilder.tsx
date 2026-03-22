@@ -1,8 +1,14 @@
 import type { VNode } from 'preact';
 import { h } from 'preact';
+import { useMemo } from 'preact/hooks';
 import type { SObjectField } from '../../../core/types/salesforce';
 import type { WhereCondition, SoqlOperator } from '../../utils/soqlBuilder';
-import { getOperatorsForFieldType } from '../../utils/soqlBuilder';
+import { getOperatorsForFieldType, SOQL_DATE_LITERALS } from '../../utils/soqlBuilder';
+
+/** Operators that take no value input. */
+const NULL_OPERATORS = new Set<SoqlOperator>(['IS NULL', 'IS NOT NULL']);
+/** Operators that need multi-value text input even for picklist fields. */
+const MULTI_VALUE_OPERATORS = new Set<SoqlOperator>(['IN', 'NOT IN', 'INCLUDES', 'EXCLUDES']);
 
 export function WhereBuilder(props: {
   conditions: WhereCondition[];
@@ -10,7 +16,7 @@ export function WhereBuilder(props: {
   onChange: (conditions: WhereCondition[]) => void;
 }): VNode {
   const { conditions, fields, onChange } = props;
-  const fieldMap = new Map(fields.map(f => [f.name, f]));
+  const fieldMap = useMemo(() => new Map(fields.map(f => [f.name, f])), [fields]);
 
   function update(index: number, patch: Partial<WhereCondition>): void {
     const next = conditions.map((c, i) => i === index ? { ...c, ...patch } : c);
@@ -24,7 +30,7 @@ export function WhereBuilder(props: {
 
   function add(): void {
     onChange([...conditions, {
-      id: `w_${Date.now()}`,
+      id: crypto.randomUUID(),
       field: '',
       operator: '=',
       value: '',
@@ -105,7 +111,10 @@ export function WhereBuilder(props: {
     field: SObjectField | undefined,
     picklist: Array<{ value: string; label: string }> | undefined,
     index: number,
-  ): VNode {
+  ): VNode | null {
+    // NULL operators take no value
+    if (NULL_OPERATORS.has(cond.operator)) return null;
+
     const ft = field?.type;
 
     if (ft === 'boolean') {
@@ -121,7 +130,8 @@ export function WhereBuilder(props: {
       );
     }
 
-    if (picklist && picklist.length > 0 && cond.operator !== 'LIKE') {
+    // Show single-select dropdown for picklist fields only with simple equality operators
+    if (picklist && picklist.length > 0 && !MULTI_VALUE_OPERATORS.has(cond.operator) && cond.operator !== 'LIKE') {
       return (
         <select
           class="wl-select wl-qb-condVal"
@@ -134,25 +144,75 @@ export function WhereBuilder(props: {
       );
     }
 
-    if (ft === 'date') {
-      return (
-        <input
-          type="date"
-          class="wl-input wl-qb-condVal"
-          value={cond.value}
-          onInput={(e) => update(index, { value: (e.currentTarget as HTMLInputElement).value })}
-        />
+    if (ft === 'date' || ft === 'datetime') {
+      // Check if current value is a date literal
+      const isLiteral = SOQL_DATE_LITERALS.some(l =>
+        cond.value.toUpperCase().startsWith(l.replace(':n', '').toUpperCase()),
       );
-    }
-
-    if (ft === 'datetime') {
+      const simpleLiterals = SOQL_DATE_LITERALS.filter(l => !l.includes(':n'));
       return (
-        <input
-          type="datetime-local"
-          class="wl-input wl-qb-condVal"
-          value={cond.value}
-          onInput={(e) => update(index, { value: (e.currentTarget as HTMLInputElement).value })}
-        />
+        <div class="wl-qb-condVal" style="display:flex;gap:4px;flex:1;min-width:80px">
+          <select
+            class="wl-select"
+            style="width:auto;min-width:70px"
+            value={isLiteral ? 'literal' : 'value'}
+            onChange={(e) => {
+              const mode = (e.currentTarget as HTMLSelectElement).value;
+              if (mode === 'value') update(index, { value: '' });
+              else update(index, { value: 'TODAY' });
+            }}
+          >
+            <option value="value">{ft === 'date' ? 'Date' : 'Datetime'}</option>
+            <option value="literal">Literal</option>
+          </select>
+          {isLiteral ? (
+            <div style="display:flex;gap:4px;flex:1">
+              <select
+                class="wl-select"
+                style="flex:1"
+                value={cond.value.toUpperCase().replace(/:\d+$/, ':n')}
+                onChange={(e) => {
+                  const val = (e.currentTarget as HTMLSelectElement).value;
+                  update(index, { value: val.includes(':n') ? val.replace(':n', ':30') : val });
+                }}
+              >
+                {SOQL_DATE_LITERALS.map(l => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </select>
+              {cond.value.includes(':') && (
+                <input
+                  class="wl-input"
+                  type="number"
+                  min="1"
+                  style="width:60px;flex-shrink:0"
+                  value={cond.value.split(':')[1] || '30'}
+                  onInput={(e) => {
+                    const n = (e.currentTarget as HTMLInputElement).value;
+                    const base = cond.value.split(':')[0];
+                    update(index, { value: `${base}:${n}` });
+                  }}
+                />
+              )}
+            </div>
+          ) : ft === 'date' ? (
+            <input
+              type="date"
+              class="wl-input"
+              style="flex:1"
+              value={cond.value}
+              onInput={(e) => update(index, { value: (e.currentTarget as HTMLInputElement).value })}
+            />
+          ) : (
+            <input
+              type="datetime-local"
+              class="wl-input"
+              style="flex:1"
+              value={cond.value}
+              onInput={(e) => update(index, { value: (e.currentTarget as HTMLInputElement).value })}
+            />
+          )}
+        </div>
       );
     }
 

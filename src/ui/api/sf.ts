@@ -15,7 +15,7 @@
 import { MessageBus } from '../../services/messaging';
 import type { SalesforceOrg, SObjectDescribe } from '../../core/types/salesforce';
 import type { UiSettings, SavedQuery, PushHistoryEntry, QueryFolder, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
-import type { DescribeGlobalResult, QueryResult } from '../../services/salesforce/api-client';
+import type { DescribeGlobalResult, QueryResult, QueryExplainResult } from '../../services/salesforce/api-client';
 import type { DataPushCancelResponse, DataPushResultGetResponse, PushHistoryGetResponse } from '../../core/types/messaging';
 
 export interface SfTabInfo {
@@ -67,6 +67,15 @@ export class SfApi {
       { tabId, nextRecordsUrl },
     );
     if (!res.success || !res.data) throw new Error(res.error?.message ?? 'QueryMore failed');
+    return res.data;
+  }
+
+  async queryExplain(soql: string, tabId?: number): Promise<QueryExplainResult> {
+    const res = await this.bus.send<{ tabId?: number; soql: string }, QueryExplainResult>(
+      'SF_QUERY_EXPLAIN',
+      { tabId, soql },
+    );
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Explain failed');
     return res.data;
   }
 

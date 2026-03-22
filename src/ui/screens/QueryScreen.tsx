@@ -33,6 +33,11 @@ import { useSchemaLoader } from '../hooks/useSchemaLoader';
 import { parseSoqlContext, isKeywordPrefix } from '../utils/soqlParser';
 import { fuzzyFilter } from '../utils/fuzzyMatch';
 import { QueryManager } from '../components/QueryManager';
+import { QueryHistory } from '../components/QueryHistory';
+import { SoqlHighlighter } from '../components/SoqlHighlighter';
+import { QueryExplainPanel } from '../components/QueryExplainPanel';
+import { QueryMetricsStore, formatDuration } from '../utils/queryMetrics';
+import { extractFromObject } from '../utils/soqlParser';
 
 export function QueryScreen(props: {
   sf: SfApi;
@@ -58,7 +63,10 @@ export function QueryScreen(props: {
   const [selectedSaved, setSelectedSaved] = useState<string>('');
 
   const [managerVisible, setManagerVisible] = useState(false);
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [explainVisible, setExplainVisible] = useState(false);
   const [queryFolders, setQueryFolders] = useState<QueryFolder[]>([]);
+  const [lastExecMs, setLastExecMs] = useState<number | null>(null);
 
   // Builder & autocomplete state
   const [builderVisible, setBuilderVisible] = useState(false);
@@ -106,11 +114,61 @@ export function QueryScreen(props: {
       case 'WHERE':
       case 'ORDER_BY':
       case 'GROUP_BY':
-      case 'HAVING':
+      case 'HAVING': {
         if (!acCtx.fromObject) return [];
-        return fuzzyFilter(schema.fields, acCtx.partialToken, f => f.name)
-          .slice(0, 50)
-          .map(f => ({ text: f.name, label: f.name, detail: f.type, kind: 'field' }));
+
+        // Build suggestions: direct fields + relationship traversal (e.g. Account.Name)
+        const suggestions: Suggestion[] = [];
+
+        // Check if the partial token includes a dot (relationship traversal)
+        const dotIdx = acCtx.partialToken.lastIndexOf('.');
+        if (dotIdx >= 0) {
+          // User is typing e.g. "Account.Na" — suggest fields from the related object
+          const relName = acCtx.partialToken.substring(0, dotIdx);
+          const afterDot = acCtx.partialToken.substring(dotIdx + 1);
+          // Find the reference field that matches this relationship name
+          const refField = schema.fields.find(
+            f => f.type === 'reference' && f.relationshipName === relName,
+          );
+          if (refField?.referenceTo?.length) {
+            // We can't load the related object's fields inline without an async call,
+            // so suggest common fields on any related object
+            const commonRelFields = ['Id', 'Name', 'Email', 'Phone', 'Type', 'Status', 'OwnerId', 'CreatedDate', 'LastModifiedDate', 'RecordTypeId'];
+            return commonRelFields
+              .filter(f => f.toLowerCase().startsWith(afterDot.toLowerCase()))
+              .map(f => ({
+                text: `${relName}.${f}`,
+                label: `${relName}.${f}`,
+                detail: refField.referenceTo![0],
+                kind: 'field' as const,
+              }));
+          }
+          return [];
+        }
+
+        // Direct field suggestions
+        const fieldSuggs = fuzzyFilter(schema.fields, acCtx.partialToken, f => f.name)
+          .slice(0, 40)
+          .map(f => ({ text: f.name, label: f.name, detail: f.type, kind: 'field' as const }));
+        suggestions.push(...fieldSuggs);
+
+        // Relationship name suggestions (for SELECT clause traversal)
+        if (acCtx.clause === 'SELECT' || acCtx.clause === 'WHERE' || acCtx.clause === 'ORDER_BY') {
+          const relSuggs = schema.fields
+            .filter(f => f.type === 'reference' && f.relationshipName)
+            .filter(f => !acCtx.partialToken || f.relationshipName!.toLowerCase().startsWith(acCtx.partialToken.toLowerCase()))
+            .slice(0, 10)
+            .map(f => ({
+              text: f.relationshipName! + '.',
+              label: f.relationshipName! + '.',
+              detail: f.referenceTo?.[0] ?? 'reference',
+              kind: 'field' as const,
+            }));
+          suggestions.push(...relSuggs);
+        }
+
+        return suggestions.slice(0, 50);
+      }
       case 'LIMIT':
         return ['10', '50', '100', '200', '1000', '2000']
           .filter(v => v.startsWith(acCtx.partialToken))
@@ -123,12 +181,12 @@ export function QueryScreen(props: {
   // Autocomplete is visible when we have suggestions and the user hasn't dismissed
   const acVisible = acSuggestions.length > 0 && !acDismissed;
 
-  // Auto-load fields when FROM object is detected
+  // Auto-load fields when FROM object is detected or after a failed load
   useEffect(() => {
-    if (acCtx.fromObject && acCtx.fromObject !== schema.describedObject) {
+    if (acCtx.fromObject && acCtx.fromObject !== schema.describedObject && !schema.fieldsLoading) {
       schema.loadFields(acCtx.fromObject);
     }
-  }, [acCtx.fromObject]);
+  }, [acCtx.fromObject, schema.describedObject, schema.fieldsLoading]);
 
   // Reset active index and un-dismiss when suggestions change
   useEffect(() => {
@@ -159,13 +217,30 @@ export function QueryScreen(props: {
 
   async function runQuery(): Promise<void> {
     setBusy(true);
+    setSelectedColumns([]); // Reset columns so new results get fresh defaults
+    setLastExecMs(null);
+    const t0 = performance.now();
     try {
       const res = await sf.runQuery(soql, tabId);
+      const elapsed = Math.round(performance.now() - t0);
+      setLastExecMs(elapsed);
       setRawRecords(res.records ?? []);
       setNextUrl(res.nextRecordsUrl);
       setTotalSize(res.totalSize ?? null);
       props.onSoqlChange?.(soql);
+
+      // Track in metrics store
+      QueryMetricsStore.getInstance().add({
+        id: crypto.randomUUID(),
+        soql,
+        executionTimeMs: elapsed,
+        recordCount: res.records?.length ?? 0,
+        timestamp: Date.now(),
+        hasMore: !!res.nextRecordsUrl,
+        objectName: extractFromObject(soql) ?? undefined,
+      });
     } catch (e) {
+      setLastExecMs(Math.round(performance.now() - t0));
       setToast({ title: 'Query Failed', body: e instanceof Error ? e.message : 'Unknown error' });
     } finally {
       setBusy(false);
@@ -213,6 +288,10 @@ export function QueryScreen(props: {
     const q = savedQueries.find(s => s.id === id);
     if (!q) return;
     setSoql(q.soql);
+    setRawRecords([]);
+    setNextUrl(undefined);
+    setTotalSize(null);
+    setSelectedColumns([]);
     props.onSoqlChange?.(q.soql);
   }
 
@@ -286,6 +365,8 @@ export function QueryScreen(props: {
             <button class="wl-btn" onClick={loadMore} disabled={busy || !nextUrl}>Load More</button>
             <button class="wl-btn" onClick={saveQuery} disabled={!soql.trim()}>Save</button>
             <button class="wl-btn" data-active={managerVisible ? 'true' : undefined} onClick={() => setManagerVisible(v => !v)}>Manage</button>
+            <button class="wl-btn" data-active={historyVisible ? 'true' : undefined} onClick={() => setHistoryVisible(v => !v)}>History</button>
+            <button class="wl-btn" data-active={explainVisible ? 'true' : undefined} onClick={() => setExplainVisible(v => !v)}>Explain</button>
             <button class="wl-btn" onClick={exportCsv} disabled={flatRecords.length === 0}>CSV</button>
             <button class="wl-btn" onClick={exportJson} disabled={rawRecords.length === 0}>JSON</button>
           </div>
@@ -321,10 +402,11 @@ export function QueryScreen(props: {
               disabled
             />
           </div>
-          <div style="position:relative">
+          <div style="position:relative" class="wl-soql-editor">
+            <SoqlHighlighter soql={soql} />
             <textarea
               ref={textareaRef}
-              class="wl-textarea"
+              class="wl-textarea wl-soql-textarea"
               value={soql}
               onInput={(e) => {
                 const ta = e.currentTarget as HTMLTextAreaElement;
@@ -350,13 +432,33 @@ export function QueryScreen(props: {
               />
             )}
           </div>
-          <div class="wl-muted">
-            {totalSize !== null ? `${rawRecords.length} loaded (totalSize: ${totalSize})` : `${rawRecords.length} loaded`}
-            {nextUrl ? ' - more available' : ''}
-            <span style="margin-left:8px;opacity:0.6">Ctrl+Enter to run</span>
+          <div class="wl-muted" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span>
+              {totalSize !== null ? `${rawRecords.length} loaded (totalSize: ${totalSize})` : `${rawRecords.length} loaded`}
+              {nextUrl ? ' - more available' : ''}
+            </span>
+            {lastExecMs !== null && (
+              <span style={`font-weight:600;color:${lastExecMs > 3000 ? 'var(--wl-danger)' : lastExecMs > 1000 ? '#f0a030' : 'var(--wl-accent)'}`}>
+                {formatDuration(lastExecMs)}
+              </span>
+            )}
+            <span style="opacity:0.6">Ctrl+Enter to run</span>
           </div>
         </div>
       </div>
+
+      {explainVisible && (
+        <QueryExplainPanel sf={sf} soql={soql} tabId={tabId} />
+      )}
+
+      {historyVisible && (
+        <QueryHistory
+          onLoadQuery={(historySoql) => {
+            setSoql(historySoql);
+            props.onSoqlChange?.(historySoql);
+          }}
+        />
+      )}
 
       {managerVisible ? (
         <QueryManager
@@ -376,6 +478,8 @@ export function QueryScreen(props: {
           columns={columns}
           selectedColumns={selectedColumns.length ? selectedColumns : columns}
           onSelectedColumnsChange={setSelectedColumns}
+          sf={sf as any}
+          objectName={acCtx.fromObject ?? undefined}
         />
       ) : (
         <div class="wl-card">

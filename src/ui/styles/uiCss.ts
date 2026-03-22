@@ -1578,4 +1578,53 @@ export const uiCss = `
 :root[data-theme="dark"] .wl-diffChanged { background: rgba(2,132,168,0.12); }
 :root[data-theme="dark"] .wl-diffCellChanged { background: rgba(2,132,168,0.18); }
 :root[data-theme="dark"] .wl-orgFlyout { box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+
+/* ── SOQL Syntax Highlighting ── */
+.wl-soql-editor {
+  position: relative;
+}
+.wl-soql-highlight {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  margin: 0;
+  padding: 10px 12px;
+  font-family: var(--wl-font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow: hidden;
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-radius: var(--wl-radius-sm);
+  color: var(--wl-ink);
+}
+.wl-soql-textarea {
+  position: relative;
+  background: transparent !important;
+  color: transparent;
+  caret-color: var(--wl-ink);
+}
+.wl-hl-keyword { color: #0070c0; font-weight: 600; }
+.wl-hl-string { color: #a31515; }
+.wl-hl-number { color: #098658; }
+.wl-hl-operator { color: #d4a530; }
+.wl-hl-paren { color: var(--wl-ink-dim); }
+.wl-hl-relation { color: #7c3aed; }
+
+:root[data-theme="dark"] .wl-hl-keyword { color: #56c8e8; }
+:root[data-theme="dark"] .wl-hl-string { color: #ce9178; }
+:root[data-theme="dark"] .wl-hl-number { color: #b5cea8; }
+:root[data-theme="dark"] .wl-hl-operator { color: #d4d4a8; }
+:root[data-theme="dark"] .wl-hl-paren { color: rgba(229, 242, 255, 0.5); }
+:root[data-theme="dark"] .wl-hl-relation { color: #c084fc; }
+:root[data-theme="dark"] .wl-soql-textarea { caret-color: #e5f2ff; }
+
+/* ── ResultsGrid Copy/Edit ── */
+.wl-table tr:hover .wl-grid-copyRow { opacity: 0.5 !important; }
+.wl-table tr:hover .wl-grid-copyRow:hover { opacity: 1 !important; }
+.wl-table th:hover .wl-grid-copyCol { opacity: 0.5 !important; }
+.wl-table th:hover .wl-grid-copyCol:hover { opacity: 1 !important; }
+.wl-grid-cell { cursor: default; }
+.wl-grid-cell:hover { background: rgba(2, 132, 168, 0.04); }
 `;
