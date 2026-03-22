@@ -48,6 +48,7 @@ export function MigrationProjectsScreen({ sf, tabId, onOpenProject }: Props): VN
   const [wizSourceOrg, setWizSourceOrg] = useState('');
   const [wizTargetOrg, setWizTargetOrg] = useState('');
   const [wizError, setWizError] = useState('');
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     loadData();
@@ -62,8 +63,8 @@ export function MigrationProjectsScreen({ sf, tabId, onOpenProject }: Props): VN
       ]);
       setProjects(projList);
       setOrgs(orgData.orgs);
-    } catch {
-      // silent
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : 'Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -101,8 +102,8 @@ export function MigrationProjectsScreen({ sf, tabId, onOpenProject }: Props): VN
     try {
       await sf.deleteMigrationProject(id);
       setProjects(prev => prev.filter(p => p.id !== id));
-    } catch {
-      // silent
+    } catch (e) {
+      setWizError(e instanceof Error ? e.message : 'Failed to delete project');
     }
   }
 
@@ -113,6 +114,13 @@ export function MigrationProjectsScreen({ sf, tabId, onOpenProject }: Props): VN
 
   if (loading) {
     return h('div', { class: 'wl-card' }, h('div', { class: 'wl-muted' }, 'Loading migration projects...'));
+  }
+
+  if (loadError) {
+    return h('div', { class: 'wl-card', style: 'padding:16px' },
+      h('div', { style: 'color:#ef4444;font-size:13px' }, loadError),
+      h('button', { class: 'wl-btn', style: 'margin-top:8px', onClick: () => { setLoadError(''); loadData(); } }, 'Retry'),
+    );
   }
 
   return h('div', { class: 'wl-stack' },

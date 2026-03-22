@@ -404,7 +404,7 @@ export const uiCss = `
   background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(12px);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.04);
-  overflow: hidden;
+  overflow: visible;
   animation: wl-rise 420ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 
@@ -466,9 +466,17 @@ export const uiCss = `
   border-color: rgba(2, 132, 168, 0.55);
   box-shadow: 0 0 0 3px var(--wl-glow);
 }
+.wl-select:disabled, .wl-input:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .wl-row { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 14px; }
 .wl-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.wl-label { display: block; font-size: 12px; font-weight: 600; color: var(--wl-ink-dim); }
+.wl-label > .wl-input,
+.wl-label > .wl-select,
+.wl-label > .wl-textarea { margin-top: 4px; }
+
+.wl-stack { display: flex; flex-direction: column; gap: 12px; }
 
 .wl-muted { color: var(--wl-ink-dim); font-size: 12px; }
 .wl-mono { font-family: var(--wl-font-mono); }

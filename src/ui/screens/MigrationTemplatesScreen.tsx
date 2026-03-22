@@ -27,6 +27,7 @@ export function MigrationTemplatesScreen({ sf, tabId, onApplyTemplate }: Props):
   const [templateName, setTemplateName] = useState('');
   const [templateDesc, setTemplateDesc] = useState('');
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     loadData();
@@ -41,8 +42,8 @@ export function MigrationTemplatesScreen({ sf, tabId, onApplyTemplate }: Props):
       ]);
       setTemplates(tList);
       setProjects(pList);
-    } catch {
-      // silent
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : 'Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -83,13 +84,20 @@ export function MigrationTemplatesScreen({ sf, tabId, onApplyTemplate }: Props):
     try {
       await sf.deleteMigrationTemplate(id);
       setTemplates(prev => prev.filter(t => t.id !== id));
-    } catch {
-      // silent
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete template');
     }
   }
 
   if (loading) {
     return h('div', { class: 'wl-card' }, h('div', { class: 'wl-muted' }, 'Loading templates...'));
+  }
+
+  if (loadError) {
+    return h('div', { class: 'wl-card', style: 'padding:16px' },
+      h('div', { style: 'color:#ef4444;font-size:13px' }, loadError),
+      h('button', { class: 'wl-btn', style: 'margin-top:8px', onClick: () => { setLoadError(''); loadData(); } }, 'Retry'),
+    );
   }
 
   return h('div', { class: 'wl-stack' },
