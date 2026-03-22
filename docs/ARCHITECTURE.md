@@ -264,7 +264,7 @@ Chrome's `storage.local` has a default quota of **5 MB** (or unlimited with the 
 
 **Styling:** CSS-in-JS via `src/ui/styles/uiCss.ts` — a single large CSS string injected into the document with design tokens. Dark mode is implemented with a `data-theme="dark"` attribute on the root element.
 
-### Screen Inventory
+### Screen Inventory (21 screens)
 
 | Screen | Route / Nav | Description |
 |--------|-------------|-------------|
@@ -274,16 +274,21 @@ Chrome's `storage.local` has a default quota of **5 MB** (or unlimited with the 
 | `PipelineBuilderScreen` | Pipeline | Visual step-chain builder |
 | `DataComparisonScreen` | Compare Data | Cross-org record diff |
 | `SchemaComparisonScreen` | Compare Schema | Field-level schema diff |
+| `ObjectsScreen` | Objects | Browse SObject schemas and field metadata |
 | `FieldAnalyticsScreen` | Analytics | Population/cardinality metrics |
 | `RelationshipExplorerScreen` | Relationships | Interactive object graph |
 | `ApiUsageDashboardScreen` | API Usage | Governor limits display |
+| `OrgHealthScreen` | Org Health | Org health metrics overview |
+| `CoverageScreen` | Coverage | Object/field coverage analysis |
 | `TestDataGeneratorScreen` | Generate | faker.js data generation |
 | `TemplatesScreen` | Templates | Template library CRUD |
 | `DuplicateDetectionScreen` | Duplicates | Find & merge duplicates |
+| `CloneWizardScreen` | Clone | Cross-object cloning with dependency graph |
 | `BulkObjectOpsScreen` | Bulk Ops | Record count, bulk delete |
 | `DataQualityScorecardScreen` | Quality | Rule-based scoring |
 | `PushHistoryScreen` | History | Filterable push log |
 | `SettingsScreen` | Settings | All user preferences |
+| `HelpScreen` | Help | In-app help and documentation |
 
 ### Component Hierarchy
 

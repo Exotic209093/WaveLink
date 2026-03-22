@@ -152,6 +152,16 @@ Initial public release. All features below shipped in v0.1.0.
 - Per-record detail view showing which rules each record passed or failed
 - Quality score summary (pass/fail counts, overall percentage)
 
+#### Schema Browser
+- Object browser screen — browse all SObjects in the org with field metadata, types, and permissions
+
+#### Org Health & Coverage
+- Org health dashboard — monitor org health metrics at a glance
+- Coverage analysis screen — view object and field coverage across the org
+
+#### Help
+- In-app help screen with documentation and guidance for all features
+
 #### User Interface
 - Three UI modes: popup, in-page side panel, full-page app
 - Dark mode: light, dark, or auto (follows OS preference)
@@ -175,7 +185,7 @@ Initial public release. All features below shipped in v0.1.0.
 #### Developer Experience
 - TypeScript 5.5 with strict mode
 - Webpack 5 build with four entry point bundles
-- Jest 29 + JSDOM test suite (25+ unit tests)
+- Jest 29 + JSDOM test suite (26 unit test files)
 - ESLint with TypeScript plugin
 - Path aliases (`@core/`, `@services/`, etc.) for clean imports
 - Source maps in development builds

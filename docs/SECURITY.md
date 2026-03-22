@@ -1,6 +1,6 @@
 # WaveLink — Security
 
-> Version 0.1.0 · Last reviewed: 2026-02-18
+> Version 0.1.0 · Last reviewed: 2026-03-21
 
 ---
 
@@ -25,7 +25,7 @@
 
 | Property | Status |
 |----------|--------|
-| Data sent to Anthropic / third-party servers | **Never** |
+| Data sent to third-party servers | **Never** |
 | Data sent outside your Salesforce org | **Never** |
 | Credentials stored in plaintext | **No** — tokens are stored in `chrome.storage.local` (Chrome's encrypted profile store) |
 | OAuth connected app required | **No** — uses existing browser session |

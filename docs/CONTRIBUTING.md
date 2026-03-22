@@ -124,7 +124,7 @@ src/
     ├── popup/           PopupRoot — popup component
     ├── panel/           PanelRoot — in-page side panel component
     ├── components/      Reusable Preact components
-    ├── screens/         One component per screen (19+ screens)
+    ├── screens/         One component per screen (21 screens)
     ├── hooks/           Custom Preact hooks
     ├── api/             UI-specific API wrappers (thin layer over messaging)
     ├── utils/           Pure UI utility functions (SOQL builder, exports, diffs, etc.)

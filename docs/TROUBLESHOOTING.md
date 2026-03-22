@@ -1,6 +1,6 @@
 # WaveLink — Troubleshooting
 
-> Version 0.1.0 · Last updated: 2026-02-18
+> Version 0.1.0 · Last updated: 2026-03-21
 
 ---
 

@@ -1,6 +1,6 @@
 # WaveLink Roadmap
 
-> Last updated: 2026-02-17
+> Last updated: 2026-03-21
 
 ---
 
@@ -24,13 +24,13 @@ Everything below shipped in the initial release:
 
 ## Roadmap
 
-### Phase 1 — Multi-Org & Collaboration
+### Phase 1 — Collaboration
 
-| # | Feature | Description | Priority |
-|---|---------|-------------|----------|
-| 1.1 | **Multi-Org Workspace** | Switch between connected Salesforce orgs without re-authenticating; org switcher in the header; org-specific settings and schema caches; side-by-side org comparison view | High |
-| 1.2 | **Data Comparison Between Orgs** | Diff records of the same object across sandbox and production; highlight field-level differences; selective sync (push specific records from one org to another) | High |
-| 1.3 | **Team Sharing** | Export/import queries, templates, pipelines, and quality rule sets as shareable JSON bundles; clipboard-friendly single-click copy | Medium |
+| # | Feature | Description | Priority | Status |
+|---|---------|-------------|----------|--------|
+| ~~1.1~~ | ~~**Multi-Org Workspace**~~ | ~~Switch between connected Salesforce orgs without re-authenticating; org switcher in the header; org-specific settings and schema caches; side-by-side org comparison view~~ | ~~High~~ | **Shipped in v0.1.0** |
+| ~~1.2~~ | ~~**Data Comparison Between Orgs**~~ | ~~Diff records of the same object across sandbox and production; highlight field-level differences; selective sync (push specific records from one org to another)~~ | ~~High~~ | **Shipped in v0.1.0** |
+| 1.3 | **Team Sharing** | Export/import queries, templates, pipelines, and quality rule sets as shareable JSON bundles; clipboard-friendly single-click copy | Medium | Planned |
 
 ---
 
