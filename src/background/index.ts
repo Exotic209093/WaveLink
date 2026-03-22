@@ -30,6 +30,7 @@ import { isSalesforceUrl } from '../core/utils';
 import type { MessageResponse } from '../core/types/messaging';
 import type { SalesforceOrg } from '../core/types/salesforce';
 import type { PushHistoryEntry, PushResult, PushTransaction } from '../core/types/storage';
+import type { MigrationProject } from '../core/types/migration';
 
 // ── Service Instances ────────────────────────────────────────────────
 
@@ -1759,6 +1760,63 @@ messageBus.on('PUSH_HISTORY_GET', async (message): Promise<MessageResponse> => {
         code: 'PUSH_HISTORY_GET_ERROR',
         message: error instanceof Error ? error.message : 'Failed to get push history',
       },
+      requestId: message.requestId,
+    };
+  }
+});
+
+// ── Migration Project Handlers ────────────────────────────────────────
+
+messageBus.on('MIGRATION_PROJECTS_LIST', async (message): Promise<MessageResponse> => {
+  try {
+    const projects = await storage.getMigrationProjects();
+    return { success: true, data: { projects }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'MIGRATION_PROJECTS_LIST_ERROR', message: error instanceof Error ? error.message : 'Failed to list migration projects' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('MIGRATION_PROJECTS_GET', async (message): Promise<MessageResponse> => {
+  try {
+    const { id } = message.payload as { id: string };
+    const project = await storage.getMigrationProject(id);
+    return { success: true, data: { project }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'MIGRATION_PROJECTS_GET_ERROR', message: error instanceof Error ? error.message : 'Failed to get migration project' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('MIGRATION_PROJECTS_UPSERT', async (message): Promise<MessageResponse> => {
+  try {
+    const project = message.payload as Omit<MigrationProject, 'createdAt' | 'updatedAt'> & Partial<Pick<MigrationProject, 'createdAt' | 'updatedAt'>>;
+    const result = await storage.upsertMigrationProject(project);
+    return { success: true, data: result, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'MIGRATION_PROJECTS_UPSERT_ERROR', message: error instanceof Error ? error.message : 'Failed to upsert migration project' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('MIGRATION_PROJECTS_DELETE', async (message): Promise<MessageResponse> => {
+  try {
+    const { id } = message.payload as { id: string };
+    await storage.deleteMigrationProject(id);
+    return { success: true, data: {}, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'MIGRATION_PROJECTS_DELETE_ERROR', message: error instanceof Error ? error.message : 'Failed to delete migration project' },
       requestId: message.requestId,
     };
   }

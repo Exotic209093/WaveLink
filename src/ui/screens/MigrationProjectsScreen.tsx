@@ -56,12 +56,12 @@ export function MigrationProjectsScreen({ sf, tabId, onOpenProject }: Props): VN
   async function loadData(): Promise<void> {
     setLoading(true);
     try {
-      const [projList, orgData] = await Promise.all([
+      const [projResult, orgResult] = await Promise.allSettled([
         sf.listMigrationProjects(),
         sf.listOrgs(),
       ]);
-      setProjects(projList);
-      setOrgs(orgData.orgs);
+      if (projResult.status === 'fulfilled') setProjects(projResult.value);
+      if (orgResult.status === 'fulfilled') setOrgs(orgResult.value.orgs);
     } catch {
       // silent
     } finally {
