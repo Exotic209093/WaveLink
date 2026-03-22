@@ -15,6 +15,7 @@
 import { MessageBus } from '../../services/messaging';
 import type { SalesforceOrg, SObjectDescribe } from '../../core/types/salesforce';
 import type { UiSettings, SavedQuery, PushHistoryEntry, QueryFolder, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
+import type { MigrationProject, IdMap, IdMapEntry, MigrationTemplate, MigrationSummaryReport } from '../../core/types/migration';
 import type { DescribeGlobalResult, QueryResult, QueryExplainResult } from '../../services/salesforce/api-client';
 import type { DataPushCancelResponse, DataPushResultGetResponse, PushHistoryGetResponse } from '../../core/types/messaging';
 
@@ -370,6 +371,111 @@ export class SfApi {
     const res = await this.bus.send<Record<string, unknown>, { imported: string[] }>('DATA_IMPORT', data);
     if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to import data');
     return res.data;
+  }
+
+  // ── Migration Projects ──────────────────────────────────────────
+
+  async listMigrationProjects(): Promise<MigrationProject[]> {
+    const res = await this.bus.send<object, { projects: MigrationProject[] }>('MIGRATION_PROJECTS_LIST', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to list migration projects');
+    return res.data.projects;
+  }
+
+  async getMigrationProject(id: string): Promise<MigrationProject | null> {
+    const res = await this.bus.send<{ id: string }, { project: MigrationProject | null }>('MIGRATION_PROJECTS_GET', { id });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to get migration project');
+    return res.data.project;
+  }
+
+  async upsertMigrationProject(project: Partial<MigrationProject> & { id: string; name: string; sourceOrgId: string; targetOrgId: string }): Promise<MigrationProject> {
+    const res = await this.bus.send<typeof project, MigrationProject>('MIGRATION_PROJECTS_UPSERT', project);
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to save migration project');
+    return res.data;
+  }
+
+  async deleteMigrationProject(id: string): Promise<void> {
+    const res = await this.bus.send<{ id: string }, object>('MIGRATION_PROJECTS_DELETE', { id });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to delete migration project');
+  }
+
+  // ── ID Maps ────────────────────────────────────────────────────
+
+  async listIdMaps(): Promise<IdMap[]> {
+    const res = await this.bus.send<object, { maps: IdMap[] }>('ID_MAPS_LIST', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to list ID maps');
+    return res.data.maps;
+  }
+
+  async getIdMap(id: string): Promise<IdMap | null> {
+    const res = await this.bus.send<{ id: string }, { map: IdMap | null }>('ID_MAPS_GET', { id });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to get ID map');
+    return res.data.map;
+  }
+
+  async createIdMap(map: { id: string; name: string; sourceOrgId: string; targetOrgId: string }): Promise<IdMap> {
+    const res = await this.bus.send<typeof map, IdMap>('ID_MAPS_CREATE', map);
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to create ID map');
+    return res.data;
+  }
+
+  async addIdMapEntries(mapId: string, entries: IdMapEntry[]): Promise<IdMap> {
+    const res = await this.bus.send<{ mapId: string; entries: IdMapEntry[] }, IdMap>('ID_MAPS_ADD_ENTRIES', { mapId, entries });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to add ID map entries');
+    return res.data;
+  }
+
+  async deleteIdMap(id: string): Promise<void> {
+    const res = await this.bus.send<{ id: string }, object>('ID_MAPS_DELETE', { id });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to delete ID map');
+  }
+
+  async exportIdMap(id: string): Promise<Record<string, IdMapEntry>> {
+    const res = await this.bus.send<{ id: string }, { entries: Record<string, IdMapEntry> }>('ID_MAPS_EXPORT', { id });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to export ID map');
+    return res.data.entries;
+  }
+
+  // ── Migration Templates (Phase 3) ───────────────────────────────
+
+  async listMigrationTemplates(): Promise<MigrationTemplate[]> {
+    const res = await this.bus.send<object, { templates: MigrationTemplate[] }>('MIGRATION_TEMPLATES_LIST', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to list migration templates');
+    return res.data.templates;
+  }
+
+  async upsertMigrationTemplate(template: Partial<MigrationTemplate> & { id: string; name: string }): Promise<MigrationTemplate> {
+    const res = await this.bus.send<typeof template, MigrationTemplate>('MIGRATION_TEMPLATES_UPSERT', template);
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to save migration template');
+    return res.data;
+  }
+
+  async deleteMigrationTemplate(id: string): Promise<void> {
+    const res = await this.bus.send<{ id: string }, object>('MIGRATION_TEMPLATES_DELETE', { id });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to delete migration template');
+  }
+
+  // ── Migration Reports (Phase 2) ───────────────────────────────
+
+  async listMigrationReports(): Promise<MigrationSummaryReport[]> {
+    const res = await this.bus.send<object, { reports: MigrationSummaryReport[] }>('MIGRATION_REPORTS_LIST', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to list migration reports');
+    return res.data.reports;
+  }
+
+  async getMigrationReport(runId: string): Promise<MigrationSummaryReport | null> {
+    const res = await this.bus.send<{ runId: string }, { report: MigrationSummaryReport | null }>('MIGRATION_REPORTS_GET', { runId });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to get migration report');
+    return res.data.report;
+  }
+
+  async saveMigrationReport(report: MigrationSummaryReport): Promise<void> {
+    const res = await this.bus.send<MigrationSummaryReport, object>('MIGRATION_REPORTS_SAVE', report);
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to save migration report');
+  }
+
+  async deleteMigrationReport(runId: string): Promise<void> {
+    const res = await this.bus.send<{ runId: string }, object>('MIGRATION_REPORTS_DELETE', { runId });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to delete migration report');
   }
 
   // ── Onboarding ─────────────────────────────────────────────────

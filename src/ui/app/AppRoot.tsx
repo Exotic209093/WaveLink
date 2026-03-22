@@ -49,10 +49,16 @@ import { RelationshipExplorerScreen } from '../screens/RelationshipExplorerScree
 import { HelpScreen } from '../screens/HelpScreen';
 import { DataComparisonScreen } from '../screens/DataComparisonScreen';
 import { OnboardingWizard } from '../components/OnboardingWizard';
+import { MigrationProjectsScreen } from '../screens/MigrationProjectsScreen';
+import { MigrationWorkspaceScreen } from '../screens/MigrationWorkspaceScreen';
+import { MigrationValidationScreen } from '../screens/MigrationValidationScreen';
+import { MigrationReportsScreen } from '../screens/MigrationReportsScreen';
+import { MigrationTemplatesScreen } from '../screens/MigrationTemplatesScreen';
+import { IdMapViewerScreen } from '../screens/IdMapViewerScreen';
 
 export function AppRoot(): VNode {
   const sf = useMemo(() => new SfApi('app'), []);
-  const [route, setRoute] = useState<string>('query');
+  const [route, setRoute] = useState<string>('migrationProjects');
 
   const [tabs, setTabs] = useState<Array<{ tabId: number; title?: string; hostname: string }>>([]);
   const [selectedTabId, setSelectedTabId] = useState<number | null>(null);
@@ -73,6 +79,7 @@ export function AppRoot(): VNode {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [undoPanelOpen, setUndoPanelOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   async function refreshTabs(): Promise<void> {
     /**
@@ -249,27 +256,34 @@ export function AppRoot(): VNode {
   );
 
   const navGroups: NavGroup[] = [
-    { key: 'query-explore', label: 'Query & Explore', items: [
-      { key: 'query', label: 'Query' },
+    { key: 'migration', label: 'Migration', items: [
+      { key: 'migrationProjects', label: 'Projects' },
+      { key: 'migrationValidation', label: 'Validation' },
+      { key: 'migrationReports', label: 'Reports' },
+      { key: 'migrationTemplates', label: 'Templates' },
+      { key: 'idMaps', label: 'ID Maps' },
+    ]},
+    { key: 'schema', label: 'Schema', items: [
       { key: 'objects', label: 'Objects' },
       { key: 'relationships', label: 'Explorer' },
-      { key: 'schemaCompare', label: 'Schema' },
+      { key: 'schemaCompare', label: 'Gap Analysis' },
+      { key: 'fieldAnalytics', label: 'Analytics' },
     ]},
     { key: 'data-ops', label: 'Data Ops', items: [
+      { key: 'query', label: 'Query' },
       { key: 'push', label: 'Data Push' },
-      { key: 'history', label: 'Push History' },
+      { key: 'history', label: 'Audit Trail' },
       { key: 'clone', label: 'Clone' },
       { key: 'bulkOps', label: 'Bulk Ops' },
-      { key: 'templates', label: 'Templates' },
+      { key: 'templates', label: 'Data Templates' },
       { key: 'testData', label: 'Test Data' },
     ]},
     { key: 'quality', label: 'Quality', items: [
       { key: 'cleanse', label: 'Cleanser' },
       { key: 'duplicates', label: 'Duplicates' },
-      { key: 'quality', label: 'Quality' },
-      { key: 'fieldAnalytics', label: 'Analytics' },
+      { key: 'quality', label: 'Scorecards' },
     ]},
-    { key: 'insights', label: 'Insights', items: [
+    { key: 'monitoring', label: 'Monitoring', items: [
       { key: 'pipeline', label: 'Pipeline' },
       { key: 'apiUsage', label: 'API Usage' },
       { key: 'compare', label: 'Compare' },
@@ -314,6 +328,20 @@ export function AppRoot(): VNode {
               <button class="wl-btn wl-btnPrimary" onClick={refreshTabs}>Refresh Tabs</button>
             </div>
           </div>
+        ) : route === 'migrationProjects' && activeProjectId ? (
+          <MigrationWorkspaceScreen sf={sf} tabId={selectedTabId} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />
+        ) : route === 'migrationProjects' ? (
+          <MigrationProjectsScreen sf={sf} tabId={selectedTabId} onOpenProject={(id) => setActiveProjectId(id)} />
+        ) : route === 'migrationValidation' && activeProjectId ? (
+          <MigrationValidationScreen sf={sf} tabId={selectedTabId} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />
+        ) : route === 'migrationValidation' ? (
+          <MigrationProjectsScreen sf={sf} tabId={selectedTabId} onOpenProject={(id) => { setActiveProjectId(id); setRoute('migrationValidation'); }} />
+        ) : route === 'migrationReports' ? (
+          <MigrationReportsScreen sf={sf} />
+        ) : route === 'migrationTemplates' ? (
+          <MigrationTemplatesScreen sf={sf} tabId={selectedTabId} />
+        ) : route === 'idMaps' ? (
+          <IdMapViewerScreen sf={sf} />
         ) : route === 'query' ? (
           <QueryScreen sf={sf} tabId={selectedTabId} context={context ?? undefined} soql={soql} onSoqlChange={setSoql} />
         ) : route === 'objects' ? (
