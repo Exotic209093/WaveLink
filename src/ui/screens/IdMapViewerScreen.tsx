@@ -8,7 +8,7 @@ import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
-import type { IdMap, IdMapEntry } from '../../core/types/migration';
+import type { IdMap } from '../../core/types/migration';
 import type { SalesforceOrg } from '../../core/types/salesforce';
 
 interface Props {

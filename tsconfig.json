@@ -22,14 +22,13 @@
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "paths": {
-      "@core/*": ["src/core/*"],
-      "@services/*": ["src/services/*"],
-      "@background/*": ["src/background/*"],
-      "@popup/*": ["src/popup/*"],
-      "@content/*": ["src/content/*"],
-      "@data/*": ["src/data/*"]
+      "@core/*": ["./src/core/*"],
+      "@services/*": ["./src/services/*"],
+      "@background/*": ["./src/background/*"],
+      "@popup/*": ["./src/popup/*"],
+      "@content/*": ["./src/content/*"],
+      "@data/*": ["./src/data/*"]
     },
     "types": ["chrome", "jest"]
   },

@@ -32,7 +32,7 @@ export function SubqueryBuilder(props: {
     [childRelationships, search],
   );
 
-  function add(relName: string, childObject: string): void {
+  function add(relName: string): void {
     onChange([...subqueries, {
       id: crypto.randomUUID(),
       relationshipName: relName,
@@ -103,7 +103,7 @@ export function SubqueryBuilder(props: {
                   class="wl-btn"
                   style={`font-size:11px;padding:3px 8px${alreadyAdded ? ';opacity:0.4' : ''}`}
                   disabled={alreadyAdded}
-                  onClick={() => add(r.relationshipName!, r.childSObject)}
+                  onClick={() => add(r.relationshipName!)}
                   title={`Child: ${r.childSObject} via ${r.field}`}
                 >
                   {r.relationshipName}

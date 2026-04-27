@@ -6,3 +6,6 @@ coverage/
 .env
 .env.local
 *.vsix
+*.zip
+*.crx
+.idea/

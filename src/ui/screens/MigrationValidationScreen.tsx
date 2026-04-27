@@ -13,6 +13,11 @@ import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { MigrationProject, SchemaGap, PreMigrationValidation, PostMigrationValidation } from '../../core/types/migration';
 import type { SObjectDescribe } from '../../core/types/salesforce';
+import { Toast } from '../components/Toast';
+
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : 'Unknown error';
+}
 
 interface Props {
   sf: SfApi;
@@ -35,6 +40,8 @@ export function MigrationValidationScreen({ sf, tabId, projectId, onBack }: Prop
   // Post-migration validation
   const [postValidation, setPostValidation] = useState<PostMigrationValidation | null>(null);
 
+  const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
+
   useEffect(() => {
     loadProject();
   }, [projectId]);
@@ -44,8 +51,8 @@ export function MigrationValidationScreen({ sf, tabId, projectId, onBack }: Prop
     try {
       const p = await sf.getMigrationProject(projectId);
       setProject(p);
-    } catch {
-      // silent
+    } catch (e) {
+      setToast({ title: 'Failed to load project', body: errorMessage(e) });
     } finally {
       setLoading(false);
     }
@@ -133,8 +140,8 @@ export function MigrationValidationScreen({ sf, tabId, projectId, onBack }: Prop
         warnings,
         ready: blockers.length === 0,
       });
-    } catch {
-      // silent
+    } catch (e) {
+      setToast({ title: 'Pre-migration validation failed', body: errorMessage(e) });
     } finally {
       setRunning(false);
     }
@@ -181,8 +188,8 @@ export function MigrationValidationScreen({ sf, tabId, projectId, onBack }: Prop
         spotChecks: [],
         passed: recordCounts.every(r => r.match),
       });
-    } catch {
-      // silent
+    } catch (e) {
+      setToast({ title: 'Post-migration validation failed', body: errorMessage(e) });
     } finally {
       setRunning(false);
     }
@@ -212,6 +219,8 @@ export function MigrationValidationScreen({ sf, tabId, projectId, onBack }: Prop
     ),
 
     tab === 'pre' ? renderPreValidation() : renderPostValidation(),
+
+    toast ? h(Toast, { title: toast.title, severity: 'error', onClose: () => setToast(null) }, toast.body) : null,
   );
 
   function renderPreValidation(): VNode<any> {

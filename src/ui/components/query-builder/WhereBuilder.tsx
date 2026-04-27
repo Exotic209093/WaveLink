@@ -149,7 +149,6 @@ export function WhereBuilder(props: {
       const isLiteral = SOQL_DATE_LITERALS.some(l =>
         cond.value.toUpperCase().startsWith(l.replace(':n', '').toUpperCase()),
       );
-      const simpleLiterals = SOQL_DATE_LITERALS.filter(l => !l.includes(':n'));
       return (
         <div class="wl-qb-condVal" style="display:flex;gap:4px;flex:1;min-width:80px">
           <select

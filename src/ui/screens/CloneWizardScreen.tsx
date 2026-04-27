@@ -5,23 +5,14 @@
  * - Step 1: Select root object from describeGlobal.
  * - Step 2: Configure - show RelationshipTree, select related objects, add record filters.
  * - Step 3: Handle cycles - show detectCircularReferences results with skip option.
- * - Step 4: Cross-org toggle - placeholder info about two-tab cross-org cloning.
+ * - Step 4: Cross-org - choose source and target Salesforce tabs (defaults to current).
  * - Step 5: Preview & Execute - summary in topological order, record counts, execute button.
- *
- * Why:
- * - Cross-object cloning with proper insert ordering and ID remapping is complex;
- *   a wizard breaks it into manageable steps.
- *
- * Complexity:
- * - Graph building is O(O * F) where O = objects, F = fields per object.
- * - Topological sort is O(O + E).
- * - Execution is O(O * N) where N = records per object (dominated by network).
  */
 
 import { h } from 'preact';
 import type { VNode } from 'preact';
 import { useState, useEffect, useMemo } from 'preact/hooks';
-import type { SfApi } from '../api/sf';
+import type { SfApi, SfTabInfo } from '../api/sf';
 import type { CloneGraph } from '../utils/crossObjectClone';
 import {
   buildDependencyGraph,
@@ -31,10 +22,52 @@ import {
 } from '../utils/crossObjectClone';
 import { RelationshipTree } from '../components/RelationshipTree';
 import { Toast } from '../components/Toast';
+import type { SObjectDescribe, SObjectField } from '../../core/types/salesforce';
 
 export interface CloneWizardScreenProps {
   sf: SfApi;
   tabId: number;
+}
+
+/** Field types that are not directly selectable in SOQL (compound fields). */
+const NON_QUERYABLE_TYPES: ReadonlySet<string> = new Set(['address', 'location']);
+
+/** Build the SOQL field list for cloning: Id plus every createable, queryable field. */
+function buildSoqlFieldList(describe: SObjectDescribe): string[] {
+  const fields = new Set<string>(['Id']);
+  for (const f of describe.fields) {
+    if (NON_QUERYABLE_TYPES.has(f.type)) continue;
+    if (f.createable) fields.add(f.name);
+  }
+  return Array.from(fields);
+}
+
+/** Strip fields that can't be inserted (Id, system fields, non-createable). */
+function stripForInsert(record: Record<string, unknown>, describe: SObjectDescribe): Record<string, unknown> {
+  const createable = new Set(describe.fields.filter((f: SObjectField) => f.createable).map((f) => f.name));
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(record)) {
+    if (k === 'attributes' || k === 'Id') continue;
+    if (!createable.has(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+/** Poll for a completed push result. Resolves with the inserted IDs in order, or null on timeout. */
+async function awaitPushResult(
+  sf: SfApi,
+  pushId: string,
+  timeoutMs = 5 * 60_000,
+  intervalMs = 1_000,
+): Promise<string[] | null> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const res = await sf.getDataPushResult(pushId);
+    if (res && Array.isArray(res.ids) && res.ids.length > 0) return res.ids;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return null;
 }
 
 /** Wizard step labels. O(1). */
@@ -56,12 +89,18 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
 
   // Step 2: Configuration
   const [graph, setGraph] = useState<CloneGraph | null>(null);
+  const [describes, setDescribes] = useState<Map<string, SObjectDescribe>>(new Map());
   const [selectedObjects, setSelectedObjects] = useState<Set<string>>(new Set());
   const [recordFilter, setRecordFilter] = useState('');
 
   // Step 3: Cycles
   const [cycles, setCycles] = useState<string[][]>([]);
   const [skipCycles, setSkipCycles] = useState(false);
+
+  // Step 4: Cross-org tab selection (defaults to current tab for both)
+  const [availableTabs, setAvailableTabs] = useState<SfTabInfo[]>([]);
+  const [sourceTabId, setSourceTabId] = useState<number>(tabId);
+  const [targetTabId, setTargetTabId] = useState<number>(tabId);
 
   // Step 5: Execution
   const [executing, setExecuting] = useState(false);
@@ -72,12 +111,21 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
 
   // Load objects on mount. O(1) JS + network.
   useEffect(() => {
-    sf.describeGlobal(tabId)
+    sf.describeGlobal(sourceTabId)
       .then((res) =>
         setObjects(res.sobjects.map((s: { name: string; label: string }) => ({ name: s.name, label: s.label })))
       )
       .catch(() => setToast({ title: 'Error', body: 'Failed to load objects' }));
-  }, [sf, tabId]);
+  }, [sf, sourceTabId]);
+
+  // Load available Salesforce tabs for the cross-org step.
+  useEffect(() => {
+    sf.listTabs()
+      .then(setAvailableTabs)
+      .catch(() => {
+        // tabs unavailable; cross-org step still works in single-tab mode
+      });
+  }, [sf]);
 
   /** Filtered objects for search. O(O). */
   const filteredObjects = useMemo(() => {
@@ -104,12 +152,9 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
 
     try {
       // Describe the root object first
-      const rootDesc = await sf.describeSObject(rootObject, tabId);
-      const describes = new Map<string, {
-        name: string;
-        fields: Array<{ name: string; type: string; referenceTo?: string[] }>;
-      }>();
-      describes.set(rootObject, rootDesc);
+      const rootDesc = await sf.describeSObject(rootObject, sourceTabId);
+      const descMap = new Map<string, SObjectDescribe>();
+      descMap.set(rootObject, rootDesc);
 
       // Find referenced objects and describe them
       const refObjects = new Set<string>();
@@ -120,18 +165,23 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
       }
 
       // Describe referenced objects (up to 20 to avoid excessive API calls)
-      const toDescribe = Array.from(refObjects).filter((n) => !describes.has(n)).slice(0, 20);
+      const toDescribe = Array.from(refObjects).filter((n) => !descMap.has(n)).slice(0, 20);
       for (const objName of toDescribe) {
         try {
-          const desc = await sf.describeSObject(objName, tabId);
-          describes.set(objName, desc);
+          const desc = await sf.describeSObject(objName, sourceTabId);
+          descMap.set(objName, desc);
         } catch {
           // Skip objects that fail to describe
         }
       }
 
-      const g = buildDependencyGraph(describes, rootObject);
+      // CloneGraph utility expects a thinner shape; cast describes for the call only.
+      const g = buildDependencyGraph(
+        descMap as unknown as Map<string, { name: string; fields: Array<{ name: string; type: string; referenceTo?: string[] }> }>,
+        rootObject,
+      );
       setGraph(g);
+      setDescribes(descMap);
 
       // Auto-select root object
       const sel = new Set<string>();
@@ -169,6 +219,7 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
     setExecutionLog([]);
     const log: string[] = [];
     const idMap = new Map<string, string>();
+    const isCrossOrg = sourceTabId !== targetTabId;
 
     try {
       for (const objectName of topoOrder) {
@@ -182,21 +233,42 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
           continue;
         }
 
-        // Query source records
+        // The describe captured during graph build drives both the SOQL field
+        // list and the insert payload shape. If we don't have it, we need to
+        // fetch it lazily so we don't fall back to `SELECT Id` only.
+        let describe = describes.get(objectName);
+        if (!describe) {
+          try {
+            describe = await sf.describeSObject(objectName, sourceTabId);
+            setDescribes((prev) => {
+              const next = new Map(prev);
+              next.set(objectName, describe!);
+              return next;
+            });
+          } catch (e) {
+            log.push(`  Failed to describe ${objectName}, skipping: ${e instanceof Error ? e.message : 'unknown'}`);
+            setExecutionLog([...log]);
+            continue;
+          }
+        }
+
         log.push(`Querying ${objectName}...`);
         setExecutionLog([...log]);
 
-        const filterClause = recordFilter.trim() ? ` WHERE ${recordFilter.trim()}` : '';
-        const soql = objectName === rootObject
-          ? `SELECT Id FROM ${objectName}${filterClause} LIMIT 200`
-          : `SELECT Id FROM ${objectName} LIMIT 200`;
+        // Apply the WHERE clause to the root object only — child objects come
+        // along via the dependency relationship.
+        const filterClause = objectName === rootObject && recordFilter.trim()
+          ? ` WHERE ${recordFilter.trim()}`
+          : '';
+        const fieldList = buildSoqlFieldList(describe).join(', ');
+        const soql = `SELECT ${fieldList} FROM ${objectName}${filterClause} LIMIT 200`;
 
         let sourceRecords: Record<string, unknown>[];
         try {
-          const res = await sf.runQuery(soql, tabId);
+          const res = await sf.runQuery(soql, sourceTabId);
           sourceRecords = res.records ?? [];
-        } catch {
-          log.push(`  Failed to query ${objectName}, skipping.`);
+        } catch (e) {
+          log.push(`  Failed to query ${objectName}, skipping: ${e instanceof Error ? e.message : 'unknown'}`);
           setExecutionLog([...log]);
           continue;
         }
@@ -207,46 +279,53 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
           continue;
         }
 
-        // Remap IDs for reference fields
+        // Remap reference-field IDs from source-org IDs to target-org IDs
+        // accumulated during this run. Records whose lookups haven't been
+        // remapped yet keep their original value (the API will reject those,
+        // surfacing missing dependencies in the per-record error report).
         const refFields = node.referenceFields.map((rf) => rf.field);
         const remapped = remapIds(sourceRecords, idMap, refFields);
 
-        // Remove Id field for insert, keep other fields
-        const insertRecords = remapped.map((r) => {
-          const copy = { ...r };
-          delete copy.Id;
-          delete copy.attributes;
-          return copy;
-        });
+        const insertRecords = remapped.map((r) => stripForInsert(r, describe!));
 
         log.push(`  Inserting ${insertRecords.length} ${objectName} records...`);
         setExecutionLog([...log]);
 
         try {
           const pushResult = await sf.startDataPush({
-            tabId,
+            tabId: targetTabId,
             objectName,
             operation: 'insert',
             records: insertRecords,
           });
-          log.push(`  Push started: ${pushResult.pushId} (${pushResult.strategy})`);
+          log.push(`  Push started: ${pushResult.pushId} (${pushResult.strategy}) — awaiting completion...`);
+          setExecutionLog([...log]);
 
-          // Map old IDs to new IDs (simplified: assumes push completes synchronously for mapping)
-          for (let i = 0; i < sourceRecords.length; i++) {
-            const oldId = sourceRecords[i].Id as string;
-            if (oldId) {
-              // The real ID mapping would come from the push result;
-              // here we just note the push was initiated
-              idMap.set(oldId, `pending_${pushResult.pushId}_${i}`);
+          const insertedIds = await awaitPushResult(sf, pushResult.pushId);
+          if (!insertedIds) {
+            log.push(`  Push timed out before inserted IDs were available; skipping ID remap for ${objectName}.`);
+            setExecutionLog([...log]);
+            continue;
+          }
+
+          let mapped = 0;
+          for (let i = 0; i < sourceRecords.length && i < insertedIds.length; i++) {
+            const oldId = sourceRecords[i].Id as string | undefined;
+            const newId = insertedIds[i];
+            if (oldId && newId) {
+              idMap.set(oldId, newId);
+              mapped++;
             }
           }
+          log.push(`  Inserted ${insertedIds.length} ${objectName} records; remapped ${mapped} IDs.`);
         } catch (e) {
           log.push(`  Insert failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
         }
         setExecutionLog([...log]);
       }
 
-      log.push('Clone operation complete.');
+      const mode = isCrossOrg ? 'cross-org' : 'in-org';
+      log.push(`Clone operation complete (${mode}, ${idMap.size} IDs remapped).`);
       setExecutionLog([...log]);
       setToast({ title: 'Clone Complete', body: `Processed ${topoOrder.length} objects.` });
     } catch (e) {
@@ -401,18 +480,56 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
             <div class="wl-wizardStep">
               <div class="wl-cloneStepHeader">Step 4: Cross-Org Cloning</div>
               <div class="wl-muted">
-                Cross-org cloning copies records from one Salesforce org to another.
-                This requires two active Salesforce tabs -- one for the source org and one for the target org.
+                Pick a source and target Salesforce tab. Records are read from the
+                source tab&apos;s org and inserted into the target tab&apos;s org. Leave
+                both set to the current tab to clone within a single org.
               </div>
-              <div style="padding:16px;border:1px dashed var(--wl-line);border-radius:var(--wl-radius-sm);background:rgba(0,166,200,0.04)">
-                <div style="font-weight:700;font-size:13px;margin-bottom:4px">
-                  Cross-Org Mode (Placeholder)
+
+              {availableTabs.length === 0 ? (
+                <div class="wl-muted" style="padding:8px 0">
+                  No Salesforce tabs detected. Open a logged-in Salesforce tab and reopen this wizard.
                 </div>
-                <div class="wl-muted">
-                  This feature will allow selecting a source tab and a target tab for cross-org data cloning.
-                  For now, cloning operates within the current org tab.
+              ) : (
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+                  <div>
+                    <div class="wl-muted" style="margin-bottom:4px">Source Tab (read records from)</div>
+                    <select
+                      class="wl-select"
+                      value={String(sourceTabId)}
+                      onChange={(e) => setSourceTabId(Number((e.currentTarget as HTMLSelectElement).value))}
+                    >
+                      {availableTabs.map((t) => (
+                        <option key={t.tabId} value={String(t.tabId)}>
+                          {t.title ?? t.hostname} ({t.hostname})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <div class="wl-muted" style="margin-bottom:4px">Target Tab (insert records into)</div>
+                    <select
+                      class="wl-select"
+                      value={String(targetTabId)}
+                      onChange={(e) => setTargetTabId(Number((e.currentTarget as HTMLSelectElement).value))}
+                    >
+                      {availableTabs.map((t) => (
+                        <option key={t.tabId} value={String(t.tabId)}>
+                          {t.title ?? t.hostname} ({t.hostname})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {sourceTabId === targetTabId ? (
+                    <div class="wl-muted" style="font-size:12px">
+                      Source and target are the same tab — running in single-org mode.
+                    </div>
+                  ) : (
+                    <div class="wl-bannerInfo" style="font-size:12px">
+                      Cross-org mode active. New IDs from the target org will be remapped into dependent records.
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -462,6 +579,10 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
                 <span class="wl-chip">
                   <span>Root</span>
                   <strong>{rootObject}</strong>
+                </span>
+                <span class="wl-chip">
+                  <span>Mode</span>
+                  <strong>{sourceTabId === targetTabId ? 'Same org' : 'Cross-org'}</strong>
                 </span>
                 {recordFilter.trim() && (
                   <span class="wl-chip">

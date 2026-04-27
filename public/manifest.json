@@ -3,7 +3,7 @@
   "name": "WaveLink - Salesforce Data Migration Tool",
   "version": "0.1.0",
   "description": "Migrate data between Salesforce orgs with dependency ordering, ID remapping, schema comparison, data validation, and transformation pipelines — all from your browser.",
-  "homepage_url": "https://github.com/jc-wave/wave-link",
+  "homepage_url": "https://github.com/Exotic209093/WaveLink",
   "permissions": [
     "storage",
     "cookies",

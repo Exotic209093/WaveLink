@@ -11,10 +11,10 @@ import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { MigrationProject, MigrationProjectStatus } from '../../core/types/migration';
 import type { SalesforceOrg } from '../../core/types/salesforce';
+import { Toast } from '../components/Toast';
 
 interface Props {
   sf: SfApi;
-  tabId: number;
   onOpenProject: (projectId: string) => void;
 }
 
@@ -36,7 +36,11 @@ const STATUS_COLORS: Record<MigrationProjectStatus, string> = {
   failed: '#ef4444',
 };
 
-export function MigrationProjectsScreen({ sf, tabId, onOpenProject }: Props): VNode<any> {
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : 'Unknown error';
+}
+
+export function MigrationProjectsScreen({ sf, onOpenProject }: Props): VNode<any> {
   const [projects, setProjects] = useState<MigrationProject[]>([]);
   const [orgs, setOrgs] = useState<SalesforceOrg[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +52,7 @@ export function MigrationProjectsScreen({ sf, tabId, onOpenProject }: Props): VN
   const [wizSourceOrg, setWizSourceOrg] = useState('');
   const [wizTargetOrg, setWizTargetOrg] = useState('');
   const [wizError, setWizError] = useState('');
+  const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -61,9 +66,9 @@ export function MigrationProjectsScreen({ sf, tabId, onOpenProject }: Props): VN
         sf.listOrgs(),
       ]);
       if (projResult.status === 'fulfilled') setProjects(projResult.value);
+      else setToast({ title: 'Failed to load projects', body: errorMessage(projResult.reason) });
       if (orgResult.status === 'fulfilled') setOrgs(orgResult.value.orgs);
-    } catch {
-      // silent
+      else setToast({ title: 'Failed to load orgs', body: errorMessage(orgResult.reason) });
     } finally {
       setLoading(false);
     }
@@ -101,8 +106,8 @@ export function MigrationProjectsScreen({ sf, tabId, onOpenProject }: Props): VN
     try {
       await sf.deleteMigrationProject(id);
       setProjects(prev => prev.filter(p => p.id !== id));
-    } catch {
-      // silent
+    } catch (e) {
+      setToast({ title: 'Failed to delete project', body: errorMessage(e) });
     }
   }
 
@@ -178,6 +183,8 @@ export function MigrationProjectsScreen({ sf, tabId, onOpenProject }: Props): VN
           h('div', { class: 'wl-muted', style: 'font-size:12px' }, 'Create a project to plan and execute multi-object data migrations between orgs.'),
         )
       : null,
+
+    toast ? h(Toast, { title: toast.title, severity: 'error', onClose: () => setToast(null) }, toast.body) : null,
 
     ...projects.map(p => h('div', {
       class: 'wl-card wl-card--hoverable',
