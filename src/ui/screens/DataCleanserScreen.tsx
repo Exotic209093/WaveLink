@@ -570,14 +570,10 @@ export function DataCleanserScreen(props: {
       <BulkUpdateModal
         open={bulkUpdateModalOpen && !!dataset}
         fields={dataset?.headers ?? []}
-        records={previewSourceRows}
+        records={dataset?.sourceRecords ?? []}
         onApply={(updatedRecords) => {
           if (!dataset) return;
-          const recs = [...dataset.sourceRecords];
-          for (let i = 0; i < Math.min(updatedRecords.length, recs.length); i++) {
-            recs[i] = { ...recs[i], ...updatedRecords[i] };
-          }
-          props.onDataset({ ...dataset, sourceRecords: recs });
+          props.onDataset({ ...dataset, sourceRecords: updatedRecords });
           setBulkUpdateModalOpen(false);
         }}
         onClose={() => setBulkUpdateModalOpen(false)}

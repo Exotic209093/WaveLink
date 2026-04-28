@@ -10,6 +10,11 @@ import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { MigrationSummaryReport } from '../../core/types/migration';
 import type { SalesforceOrg } from '../../core/types/salesforce';
+import { Toast } from '../components/Toast';
+
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : 'Unknown error';
+}
 
 interface Props {
   sf: SfApi;
@@ -20,6 +25,7 @@ export function MigrationReportsScreen({ sf }: Props): VNode<any> {
   const [orgs, setOrgs] = useState<SalesforceOrg[]>([]);
   const [selectedReport, setSelectedReport] = useState<MigrationSummaryReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
 
   useEffect(() => {
     loadReports();
@@ -34,8 +40,8 @@ export function MigrationReportsScreen({ sf }: Props): VNode<any> {
       ]);
       setReports(reportList);
       setOrgs(orgData.orgs);
-    } catch {
-      // silent
+    } catch (e) {
+      setToast({ title: 'Failed to load reports', body: errorMessage(e) });
     } finally {
       setLoading(false);
     }
@@ -76,8 +82,8 @@ export function MigrationReportsScreen({ sf }: Props): VNode<any> {
       await sf.deleteMigrationReport(runId);
       setReports(prev => prev.filter(r => r.runId !== runId));
       if (selectedReport?.runId === runId) setSelectedReport(null);
-    } catch {
-      // silent
+    } catch (e) {
+      setToast({ title: 'Failed to delete report', body: errorMessage(e) });
     }
   }
 
@@ -190,6 +196,8 @@ export function MigrationReportsScreen({ sf }: Props): VNode<any> {
             ),
           )
         : null,
+
+      toast ? h(Toast, { title: toast.title, severity: 'error', onClose: () => setToast(null) }, toast.body) : null,
     );
   }
 
@@ -204,6 +212,8 @@ export function MigrationReportsScreen({ sf }: Props): VNode<any> {
           h('div', { class: 'wl-muted', style: 'font-size:12px' }, 'Reports are generated automatically after each migration run.'),
         )
       : null,
+
+    toast ? h(Toast, { title: toast.title, severity: 'error', onClose: () => setToast(null) }, toast.body) : null,
 
     ...reports.map(r => {
       const successRate = r.totalRecords > 0 ? Math.round((r.totalSuccess / r.totalRecords) * 100) : 100;

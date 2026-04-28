@@ -9,14 +9,18 @@ import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { MigrationTemplate, MigrationProject } from '../../core/types/migration';
+import { Toast } from '../components/Toast';
+
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : 'Unknown error';
+}
 
 interface Props {
   sf: SfApi;
-  tabId: number;
   onApplyTemplate?: (template: MigrationTemplate) => void;
 }
 
-export function MigrationTemplatesScreen({ sf, tabId, onApplyTemplate }: Props): VNode<any> {
+export function MigrationTemplatesScreen({ sf, onApplyTemplate }: Props): VNode<any> {
   const [templates, setTemplates] = useState<MigrationTemplate[]>([]);
   const [projects, setProjects] = useState<MigrationProject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +31,7 @@ export function MigrationTemplatesScreen({ sf, tabId, onApplyTemplate }: Props):
   const [templateName, setTemplateName] = useState('');
   const [templateDesc, setTemplateDesc] = useState('');
   const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -41,8 +46,8 @@ export function MigrationTemplatesScreen({ sf, tabId, onApplyTemplate }: Props):
       ]);
       setTemplates(tList);
       setProjects(pList);
-    } catch {
-      // silent
+    } catch (e) {
+      setToast({ title: 'Failed to load templates', body: errorMessage(e) });
     } finally {
       setLoading(false);
     }
@@ -83,8 +88,8 @@ export function MigrationTemplatesScreen({ sf, tabId, onApplyTemplate }: Props):
     try {
       await sf.deleteMigrationTemplate(id);
       setTemplates(prev => prev.filter(t => t.id !== id));
-    } catch {
-      // silent
+    } catch (e) {
+      setToast({ title: 'Failed to delete template', body: errorMessage(e) });
     }
   }
 
@@ -143,6 +148,8 @@ export function MigrationTemplatesScreen({ sf, tabId, onApplyTemplate }: Props):
           h('div', { class: 'wl-muted', style: 'font-size:12px' }, 'Create a template from an existing migration project to reuse its configuration.'),
         )
       : null,
+
+    toast ? h(Toast, { title: toast.title, severity: 'error', onClose: () => setToast(null) }, toast.body) : null,
 
     ...templates.map(t => h('div', { class: 'wl-card', key: t.id },
       h('div', { style: 'display:flex;justify-content:space-between;align-items:flex-start' },

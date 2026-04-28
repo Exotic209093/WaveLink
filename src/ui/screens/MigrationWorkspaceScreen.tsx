@@ -40,7 +40,6 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
 
   // Dependency graph
   const [graph, setGraph] = useState<DependencyGraph | null>(null);
-  const [describes, setDescribes] = useState<Map<string, SObjectDescribe>>(new Map());
 
   // Execution
   const [running, setRunning] = useState(false);
@@ -92,7 +91,6 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
       for (const [name, desc] of results) {
         descMap.set(name, desc);
       }
-      setDescribes(descMap);
 
       const g = buildMigrationGraph(descMap as unknown as Map<string, { name: string; fields: Array<{ name: string; type: string; referenceTo?: string[] }> }>, objNames);
       setGraph(g);
@@ -360,7 +358,7 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
         'Objects will be migrated in this order to maintain referential integrity.',
       ),
       h('ol', { style: 'margin:0;padding-left:20px;font-size:13px' },
-        ...graph.insertionOrder.map((name, i) => {
+        ...graph.insertionOrder.map((name) => {
           const node = graph.nodes.get(name);
           return h('li', { key: name, style: `padding:4px 0;${node?.inCycle ? 'color:#f59e0b' : ''}` },
             h('strong', null, name),

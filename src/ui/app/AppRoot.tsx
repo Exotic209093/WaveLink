@@ -331,15 +331,15 @@ export function AppRoot(): VNode {
         ) : route === 'migrationProjects' && activeProjectId ? (
           <MigrationWorkspaceScreen sf={sf} tabId={selectedTabId} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />
         ) : route === 'migrationProjects' ? (
-          <MigrationProjectsScreen sf={sf} tabId={selectedTabId} onOpenProject={(id) => setActiveProjectId(id)} />
+          <MigrationProjectsScreen sf={sf} onOpenProject={(id) => setActiveProjectId(id)} />
         ) : route === 'migrationValidation' && activeProjectId ? (
           <MigrationValidationScreen sf={sf} tabId={selectedTabId} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />
         ) : route === 'migrationValidation' ? (
-          <MigrationProjectsScreen sf={sf} tabId={selectedTabId} onOpenProject={(id) => { setActiveProjectId(id); setRoute('migrationValidation'); }} />
+          <MigrationProjectsScreen sf={sf} onOpenProject={(id) => { setActiveProjectId(id); setRoute('migrationValidation'); }} />
         ) : route === 'migrationReports' ? (
           <MigrationReportsScreen sf={sf} />
         ) : route === 'migrationTemplates' ? (
-          <MigrationTemplatesScreen sf={sf} tabId={selectedTabId} />
+          <MigrationTemplatesScreen sf={sf} />
         ) : route === 'idMaps' ? (
           <IdMapViewerScreen sf={sf} />
         ) : route === 'query' ? (

@@ -87,7 +87,7 @@ export function DataPushScreen(props: {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [retryModalOpen, setRetryModalOpen] = useState(false);
 
-  const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean }>>([]);
+  const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean; updateable: boolean; deletable: boolean }>>([]);
   const [describeFields, setDescribeFields] = useState<SObjectField[] | null>(null);
 
   const dataset = props.dataset;
@@ -149,11 +149,16 @@ export function DataPushScreen(props: {
       });
       return { success: true, requestId: message.requestId };
     });
+
+    return () => {
+      bus.destroy();
+      busRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
     sf.describeGlobal(tabId)
-      .then(res => setAvailableObjects(res.sobjects.map(s => ({ name: s.name, label: s.label, createable: s.createable }))))
+      .then(res => setAvailableObjects(res.sobjects.map(s => ({ name: s.name, label: s.label, createable: s.createable, updateable: s.updateable, deletable: s.deletable }))))
       .catch(() => {
         // Ignore
       });
@@ -434,7 +439,12 @@ export function DataPushScreen(props: {
           <div class="wl-row2">
             <select class="wl-select" value={objectName} onChange={(e) => setObjectName((e.currentTarget as HTMLSelectElement).value)}>
               {availableObjects
-                .filter(o => o.createable)
+                .filter(o => {
+                  if (operation === 'insert') return o.createable;
+                  if (operation === 'update' || operation === 'upsert') return o.updateable;
+                  if (operation === 'delete') return o.deletable;
+                  return o.createable;
+                })
                 .slice(0, 2000)
                 .map(o => (
                   <option key={o.name} value={o.name}>
