@@ -40,6 +40,14 @@ export interface LocalStorageSchema {
   migrationTemplates: MigrationTemplate[];
   /** Migration summary reports (Phase 2) */
   migrationReports: MigrationSummaryReport[];
+  /** v0.2: saved export templates */
+  exportTemplates: ExportTemplate[];
+  /** v0.2: saved import templates */
+  importTemplates: ImportTemplate[];
+  /** v0.2: scheduled exports */
+  scheduledExports: ScheduledExport[];
+  /** v0.2: snapshots produced by scheduled exports (keyed by snapshot id) */
+  exportSnapshots: Record<string, ExportSnapshot>;
 }
 
 /** Data stored in chrome.storage.session (ephemeral, cleared on browser close) */
@@ -243,4 +251,92 @@ export interface ActivePush {
   startedAt: number;
   status: 'queued' | 'processing' | 'complete' | 'error' | 'cancelled';
   abortController?: string;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * v0.2 — Export/Import pivot types
+ * ════════════════════════════════════════════════════════════════════ */
+
+/** Supported export formats (mirrors `ExportFormat` in src/ui/utils/export.ts) */
+export type SavedExportFormat = 'csv' | 'json' | 'excel' | 'xml';
+
+/** A reusable export config saved by the user. */
+export interface ExportTemplate {
+  id: string;
+  kind: 'export';
+  name: string;
+  description?: string;
+  soql: string;
+  format: SavedExportFormat;
+  /** Optional column subset to include in the export (in order) */
+  columns?: string[];
+  /** If set, default name for the downloaded file (no extension) */
+  filenameBase?: string;
+  /** Used to remember which org this was last run against */
+  lastOrgId?: string;
+  createdAt: number;
+  updatedAt: number;
+  usageCount?: number;
+  lastUsedAt?: number;
+}
+
+/** A reusable import config saved by the user. */
+export interface ImportTemplate {
+  id: string;
+  kind: 'import';
+  name: string;
+  description?: string;
+  objectName: string;
+  operation: 'insert' | 'update' | 'upsert';
+  externalIdField?: string;
+  fieldMappings: FieldMapping[];
+  /** Whether to use Bulk API 2.0 vs REST */
+  strategy?: 'bulk' | 'rest';
+  createdAt: number;
+  updatedAt: number;
+  usageCount?: number;
+  lastUsedAt?: number;
+}
+
+/** Recurrence interval for scheduled exports. Minutes — `chrome.alarms` minimum is 1 in dev / 30 in prod. */
+export type ScheduleInterval =
+  | { kind: 'minutes'; minutes: number }
+  | { kind: 'hours'; hours: number }
+  | { kind: 'days'; days: number };
+
+/** A scheduled export job. */
+export interface ScheduledExport {
+  id: string;
+  name: string;
+  /** SOQL to run on each tick */
+  soql: string;
+  /** Target org for the query */
+  orgId: string;
+  /** Output format saved with each snapshot */
+  format: SavedExportFormat;
+  /** Recurrence cadence */
+  interval: ScheduleInterval;
+  /** Whether the schedule is currently active */
+  enabled: boolean;
+  /** Number of past snapshots to retain (older ones pruned) */
+  retention: number;
+  createdAt: number;
+  updatedAt: number;
+  lastRunAt?: number;
+  lastRunStatus?: 'success' | 'error';
+  lastRunError?: string;
+  nextRunAt?: number;
+}
+
+/** A single snapshot produced by a scheduled-export run. */
+export interface ExportSnapshot {
+  id: string;
+  scheduleId: string;
+  capturedAt: number;
+  recordCount: number;
+  columns: string[];
+  /** Inline records — kept reasonable by snapshot retention */
+  records: Record<string, unknown>[];
+  /** First error from this run, if any */
+  error?: string;
 }

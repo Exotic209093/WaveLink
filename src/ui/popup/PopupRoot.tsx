@@ -138,7 +138,7 @@ export function PopupRoot(): VNode {
   );
 
   const navItems: NavItem[] = [
-    { key: 'push', label: 'Data Push' },
+    { key: 'push', label: 'Import' },
     { key: 'templates', label: 'Templates' },
     { key: 'history', label: 'History' },
     { key: 'settings', label: 'Settings' },

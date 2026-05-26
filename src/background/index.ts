@@ -29,7 +29,7 @@ import { generateId } from '../core/utils';
 import { isSalesforceUrl } from '../core/utils';
 import type { MessageResponse } from '../core/types/messaging';
 import type { SalesforceOrg } from '../core/types/salesforce';
-import type { PushHistoryEntry, PushResult, PushTransaction } from '../core/types/storage';
+import type { PushHistoryEntry, PushResult, PushTransaction, ScheduledExport, ExportSnapshot, ScheduleInterval } from '../core/types/storage';
 import type { MigrationProject } from '../core/types/migration';
 
 // ── Service Instances ────────────────────────────────────────────────
@@ -1821,5 +1821,172 @@ messageBus.on('MIGRATION_PROJECTS_DELETE', async (message): Promise<MessageRespo
     };
   }
 });
+
+// ════════════════════════════════════════════════════════════════════
+// v0.2 — Scheduled exports (chrome.alarms)
+// ════════════════════════════════════════════════════════════════════
+
+const SCHEDULE_ALARM_PREFIX = 'wl-schedule-';
+
+function intervalToMinutes(i: ScheduleInterval): number {
+  switch (i.kind) {
+    case 'minutes': return i.minutes;
+    case 'hours': return i.hours * 60;
+    case 'days': return i.days * 60 * 24;
+  }
+}
+
+async function loadSchedules(): Promise<ScheduledExport[]> {
+  return new Promise(resolve => {
+    chrome.storage.local.get('scheduledExports', r => resolve((r.scheduledExports as ScheduledExport[]) ?? []));
+  });
+}
+
+async function saveSchedules(next: ScheduledExport[]): Promise<void> {
+  return new Promise(resolve => chrome.storage.local.set({ scheduledExports: next }, () => resolve()));
+}
+
+async function loadSnapshots(): Promise<Record<string, ExportSnapshot>> {
+  return new Promise(resolve => {
+    chrome.storage.local.get('exportSnapshots', r => resolve((r.exportSnapshots as Record<string, ExportSnapshot>) ?? {}));
+  });
+}
+
+async function saveSnapshots(next: Record<string, ExportSnapshot>): Promise<void> {
+  return new Promise(resolve => chrome.storage.local.set({ exportSnapshots: next }, () => resolve()));
+}
+
+async function setScheduleAlarm(id: string): Promise<void> {
+  const schedules = await loadSchedules();
+  const s = schedules.find(x => x.id === id);
+  if (!s || !s.enabled) {
+    await chrome.alarms.clear(SCHEDULE_ALARM_PREFIX + id);
+    return;
+  }
+  const minutes = Math.max(1, intervalToMinutes(s.interval));
+  await chrome.alarms.create(SCHEDULE_ALARM_PREFIX + id, {
+    delayInMinutes: minutes,
+    periodInMinutes: minutes,
+  });
+}
+
+async function clearScheduleAlarm(id: string): Promise<void> {
+  await chrome.alarms.clear(SCHEDULE_ALARM_PREFIX + id);
+}
+
+async function runSchedule(id: string): Promise<void> {
+  const schedules = await loadSchedules();
+  const idx = schedules.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  const s = schedules[idx];
+
+  const now = Date.now();
+  let status: 'success' | 'error' = 'success';
+  let errorMsg: string | undefined;
+  let records: Record<string, unknown>[] = [];
+  let columns: string[] = [];
+
+  try {
+    const orgs = await storage.getOrgs();
+    const org = orgs[s.orgId];
+    if (!org) throw new Error(`Org ${s.orgId} is not connected. Open a Salesforce tab and reconnect it.`);
+
+    const fresh = await auth.ensureValidToken(org);
+    if (fresh !== org) await storage.saveOrg(fresh);
+
+    const client = new SalesforceApiClient({
+      instanceUrl: fresh.instanceUrl,
+      accessToken: fresh.accessToken,
+      apiVersion: fresh.apiVersion ?? DEFAULT_API_VERSION,
+    });
+    const result = await client.query(s.soql);
+    records = (result.records ?? []) as Record<string, unknown>[];
+    // Derive columns from the first record (excluding `attributes`)
+    const colSet = new Set<string>();
+    for (const r of records.slice(0, 50)) {
+      for (const k of Object.keys(r)) {
+        if (k !== 'attributes') colSet.add(k);
+      }
+    }
+    columns = Array.from(colSet);
+  } catch (e) {
+    status = 'error';
+    errorMsg = e instanceof Error ? e.message : String(e);
+  }
+
+  // Write the snapshot (even if it's an error snapshot, so the user can see what failed).
+  const snapshots = await loadSnapshots();
+  const snapId = `snap-${id}-${now}`;
+  snapshots[snapId] = {
+    id: snapId,
+    scheduleId: id,
+    capturedAt: now,
+    recordCount: records.length,
+    columns,
+    records,
+    error: errorMsg,
+  };
+
+  // Prune older snapshots for this schedule beyond retention
+  const sameSchedule = Object.values(snapshots).filter(x => x.scheduleId === id).sort((a, b) => b.capturedAt - a.capturedAt);
+  const toKeep = new Set(sameSchedule.slice(0, Math.max(1, s.retention)).map(x => x.id));
+  for (const [key, snap] of Object.entries(snapshots)) {
+    if (snap.scheduleId === id && !toKeep.has(key)) delete snapshots[key];
+  }
+  await saveSnapshots(snapshots);
+
+  const nextRun = now + intervalToMinutes(s.interval) * 60 * 1000;
+  schedules[idx] = {
+    ...s,
+    lastRunAt: now,
+    lastRunStatus: status,
+    lastRunError: errorMsg,
+    nextRunAt: nextRun,
+  };
+  await saveSchedules(schedules);
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (!alarm.name.startsWith(SCHEDULE_ALARM_PREFIX)) return;
+  const id = alarm.name.slice(SCHEDULE_ALARM_PREFIX.length);
+  runSchedule(id).catch(e => console.error('Schedule run failed:', e));
+});
+
+// Raw chrome.runtime.onMessage listener for scheduler control messages.
+// (Kept separate from the MessageBus protocol because callers send plain messages.)
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (!msg || typeof msg !== 'object' || typeof (msg as { type?: unknown }).type !== 'string') return false;
+  const m = msg as { type: string; payload?: { id?: string } };
+  const id = m.payload?.id;
+  if (!id) return false;
+
+  if (m.type === 'SCHEDULE_ALARM_SET') {
+    setScheduleAlarm(id).then(() => sendResponse({ ok: true })).catch(e => sendResponse({ ok: false, error: String(e) }));
+    return true;
+  }
+  if (m.type === 'SCHEDULE_ALARM_CLEAR') {
+    clearScheduleAlarm(id).then(() => sendResponse({ ok: true })).catch(e => sendResponse({ ok: false, error: String(e) }));
+    return true;
+  }
+  if (m.type === 'SCHEDULE_RUN_NOW') {
+    runSchedule(id).then(() => sendResponse({ ok: true })).catch(e => sendResponse({ ok: false, error: String(e) }));
+    return true;
+  }
+  return false;
+});
+
+// On service worker startup, re-register alarms for all enabled schedules
+// (Chrome persists alarms across restarts, but this guarantees consistency
+//  after a manifest update or a fresh install.)
+(async () => {
+  try {
+    const schedules = await loadSchedules();
+    for (const s of schedules) {
+      if (s.enabled) await setScheduleAlarm(s.id);
+    }
+  } catch (e) {
+    console.warn('Failed to rehydrate schedule alarms:', e);
+  }
+})();
 
 // Background service worker initialized
