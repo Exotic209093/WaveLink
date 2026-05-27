@@ -1,18 +1,12 @@
 /**
- * Full-page WaveLink App root (runs in `app/app.html`).
+ * Full-page WaveLink App root (v0.2 — Export/Import pivot).
  *
- * What this file does:
- * - Lists open Salesforce tabs and lets the user select which tab/org to operate against.
- * - Resolves Salesforce context for the selected tab (orgId, instanceUrl, username).
- * - Hosts the main navigation and screen routing (query/objects/push/cleanser/settings).
+ * The app's front door is now the Home hub, with Export / Import / Convert /
+ * Templates / Schedules / Diff as primary flows. The 20+ legacy power-user
+ * screens are kept but accessed via the Advanced Lab.
  *
- * Per-tab pinning:
- * - If `?tabId=<salesforceTabId>` is present, this app tab is "pinned" to that Salesforce tab.
- * - Changing the dropdown updates the URL via `history.replaceState` so reload preserves selection.
- *
- * Complexity:
- * - Tab listing is O(T) where T is number of open browser tabs (performed in background).
- * - Most UI state updates here are O(1).
+ * Tab pinning, theme, command palette, undo panel, and shortcuts behave the
+ * same as before.
  */
 
 import type { VNode } from 'preact';
@@ -22,16 +16,32 @@ import { SfApi } from '../api/sf';
 import type { SfContext } from '../api/sf';
 import { AppShell } from '../components/AppShell';
 import type { NavItem, NavGroup } from '../components/AppShell';
+import { Toast } from '../components/Toast';
+import { parseTabIdFromSearch } from '../../core/utils';
+import type { Theme } from '../utils/theme';
+import { resolveTheme, applyTheme, watchSystemTheme, applyAccentColor } from '../utils/theme';
+import { CommandPalette } from '../components/CommandPalette';
+import { UndoHistoryPanel } from '../components/UndoHistoryPanel';
+import { shortcutRegistry } from '../utils/shortcuts';
+import { OnboardingWizard } from '../components/OnboardingWizard';
+
+// ── Primary flows (new in v0.2) ───────────────────────────────────────
+import { HomeScreen } from '../screens/HomeScreen';
+import { ExportScreen } from '../screens/ExportScreen';
+import { ImportScreen } from '../screens/ImportScreen';
+import { ConvertScreen } from '../screens/ConvertScreen';
+import { ExportImportTemplatesScreen } from '../screens/ExportImportTemplatesScreen';
+import { SchedulesScreen } from '../screens/SchedulesScreen';
+import { DiffScreen } from '../screens/DiffScreen';
+import { AdvancedLabScreen } from '../screens/AdvancedLabScreen';
+
+// ── Legacy screens (still reachable via Advanced Lab) ─────────────────
 import { QueryScreen } from '../screens/QueryScreen';
 import { ObjectsScreen } from '../screens/ObjectsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { PushHistoryScreen } from '../screens/PushHistoryScreen';
-import { Toast } from '../components/Toast';
 import { DataCleanserScreen } from '../screens/DataCleanserScreen';
 import { DataPushScreen } from '../screens/DataPushScreen';
-import { parseTabIdFromSearch } from '../../core/utils';
-import type { Theme } from '../utils/theme';
-import { resolveTheme, applyTheme, watchSystemTheme, applyAccentColor } from '../utils/theme';
 import { TestDataGeneratorScreen } from '../screens/TestDataGeneratorScreen';
 import { TemplatesScreen } from '../screens/TemplatesScreen';
 import { SchemaComparisonScreen } from '../screens/SchemaComparisonScreen';
@@ -39,16 +49,12 @@ import { FieldAnalyticsScreen } from '../screens/FieldAnalyticsScreen';
 import { DuplicateDetectionScreen } from '../screens/DuplicateDetectionScreen';
 import { PipelineBuilderScreen } from '../screens/PipelineBuilderScreen';
 import { CloneWizardScreen } from '../screens/CloneWizardScreen';
-import { CommandPalette } from '../components/CommandPalette';
-import { UndoHistoryPanel } from '../components/UndoHistoryPanel';
-import { shortcutRegistry } from '../utils/shortcuts';
 import { DataQualityScorecardScreen } from '../screens/DataQualityScorecardScreen';
 import { ApiUsageDashboardScreen } from '../screens/ApiUsageDashboardScreen';
 import { BulkObjectOpsScreen } from '../screens/BulkObjectOpsScreen';
 import { RelationshipExplorerScreen } from '../screens/RelationshipExplorerScreen';
 import { HelpScreen } from '../screens/HelpScreen';
 import { DataComparisonScreen } from '../screens/DataComparisonScreen';
-import { OnboardingWizard } from '../components/OnboardingWizard';
 import { MigrationProjectsScreen } from '../screens/MigrationProjectsScreen';
 import { MigrationWorkspaceScreen } from '../screens/MigrationWorkspaceScreen';
 import { MigrationValidationScreen } from '../screens/MigrationValidationScreen';
@@ -58,7 +64,7 @@ import { IdMapViewerScreen } from '../screens/IdMapViewerScreen';
 
 export function AppRoot(): VNode {
   const sf = useMemo(() => new SfApi('app'), []);
-  const [route, setRoute] = useState<string>('migrationProjects');
+  const [route, setRoute] = useState<string>('home');
 
   const [tabs, setTabs] = useState<Array<{ tabId: number; title?: string; hostname: string }>>([]);
   const [selectedTabId, setSelectedTabId] = useState<number | null>(null);
@@ -82,16 +88,6 @@ export function AppRoot(): VNode {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   async function refreshTabs(): Promise<void> {
-    /**
-     * Fetch UI settings + open Salesforce tabs, then choose the initial/updated selection.
-     *
-     * Why this approach:
-     * - `?tabId=` pins the app tab to a specific Salesforce tab (per-tab isolation).
-     * - Without `?tabId=`, we fall back to the last tab selected in the app (`ui.lastTabId`),
-     *   and then to the first Salesforce tab found.
-     *
-     * Complexity: O(S) where S is the number of Salesforce tabs returned (mapping + searching).
-     */
     try {
       const [ui, list] = await Promise.all([sf.getUiSettings(), sf.listTabs()]);
       setTabs(list.map(t => ({ tabId: t.tabId, title: t.title, hostname: t.hostname })));
@@ -117,10 +113,8 @@ export function AppRoot(): VNode {
   }
 
   useEffect(() => {
-    // Initial load: populate the tab selector.
     refreshTabs();
 
-    // Load theme and accent color from storage
     sf.getUiSettings().then(settings => {
       const savedTheme = settings.theme ?? 'light';
       setTheme(savedTheme);
@@ -132,7 +126,6 @@ export function AppRoot(): VNode {
       applyTheme('light');
     });
 
-    // Check onboarding status
     sf.getOnboarding().then(progress => {
       if (!progress.dismissedAt && progress.completedSteps.length === 0) {
         setShowOnboarding(true);
@@ -141,11 +134,6 @@ export function AppRoot(): VNode {
   }, []);
 
   useEffect(() => {
-    /**
-     * Resolve Salesforce context for the selected tab.
-     *
-     * Complexity: O(1) JS work (auth may validate session via network).
-     */
     if (!selectedTabId) {
       setContext(null);
       return;
@@ -156,13 +144,8 @@ export function AppRoot(): VNode {
   }, [sf, selectedTabId]);
 
   useEffect(() => {
-    /**
-     * Make each app tab distinguishable in the browser tab strip when working across orgs.
-     *
-     * Complexity: O(1).
-     */
     if (!context) {
-      document.title = 'WaveLink App';
+      document.title = 'WaveLink';
       return;
     }
     const hostname = tabs.find(t => t.tabId === selectedTabId)?.hostname ?? new URL(context.instanceUrl).hostname;
@@ -170,19 +153,10 @@ export function AppRoot(): VNode {
   }, [context, selectedTabId, tabs]);
 
   useEffect(() => {
-    /**
-     * Apply theme whenever it changes and watch for system theme changes in auto mode.
-     *
-     * Complexity: O(1).
-     */
     const resolved = resolveTheme(theme);
     applyTheme(resolved);
-
-    // If theme is auto, watch for system changes
     if (theme === 'auto') {
-      return watchSystemTheme((systemTheme) => {
-        applyTheme(systemTheme);
-      });
+      return watchSystemTheme((systemTheme) => applyTheme(systemTheme));
     }
   }, [theme]);
 
@@ -193,12 +167,16 @@ export function AppRoot(): VNode {
         () => setCommandPaletteOpen(v => !v),
       ),
       shortcutRegistry.register(
-        { id: 'goto-query', defaultKeys: 'ctrl+shift+q', description: 'Go to Query', scope: 'global' },
-        () => setRoute('query'),
+        { id: 'goto-home', defaultKeys: 'ctrl+shift+h', description: 'Go to Home', scope: 'global' },
+        () => setRoute('home'),
       ),
       shortcutRegistry.register(
-        { id: 'goto-push', defaultKeys: 'ctrl+shift+p', description: 'Go to Data Push', scope: 'global' },
-        () => setRoute('push'),
+        { id: 'goto-export', defaultKeys: 'ctrl+shift+e', description: 'Go to Export', scope: 'global' },
+        () => setRoute('export'),
+      ),
+      shortcutRegistry.register(
+        { id: 'goto-import', defaultKeys: 'ctrl+shift+i', description: 'Go to Import', scope: 'global' },
+        () => setRoute('import'),
       ),
       shortcutRegistry.register(
         { id: 'toggle-undo', defaultKeys: 'ctrl+z', description: 'Toggle undo panel', scope: 'global' },
@@ -206,11 +184,8 @@ export function AppRoot(): VNode {
       ),
     ];
 
-    // Load saved bindings
     sf.getUiSettings().then(settings => {
-      if (settings.shortcuts) {
-        shortcutRegistry.loadBindings(settings.shortcuts);
-      }
+      if (settings.shortcuts) shortcutRegistry.loadBindings(settings.shortcuts);
     }).catch(() => {});
 
     const handler = (e: KeyboardEvent) => shortcutRegistry.handleKeydown(e);
@@ -224,10 +199,7 @@ export function AppRoot(): VNode {
 
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
-    // Save to storage
-    sf.setUiSettings({ theme: newTheme }).catch(e => {
-      console.error('Failed to save theme:', e);
-    });
+    sf.setUiSettings({ theme: newTheme }).catch(e => console.error('Failed to save theme:', e));
   };
 
   const titleRight = (
@@ -255,39 +227,50 @@ export function AppRoot(): VNode {
     </>
   );
 
+  // ── Navigation: primary flows + Advanced Lab group ──────────────────
   const navGroups: NavGroup[] = [
-    { key: 'migration', label: 'Migration', items: [
-      { key: 'migrationProjects', label: 'Projects' },
-      { key: 'migrationValidation', label: 'Validation' },
-      { key: 'migrationReports', label: 'Reports' },
-      { key: 'migrationTemplates', label: 'Templates' },
-      { key: 'idMaps', label: 'ID Maps' },
-    ]},
-    { key: 'schema', label: 'Schema', items: [
-      { key: 'objects', label: 'Objects' },
-      { key: 'relationships', label: 'Explorer' },
-      { key: 'schemaCompare', label: 'Gap Analysis' },
-      { key: 'fieldAnalytics', label: 'Analytics' },
-    ]},
-    { key: 'data-ops', label: 'Data Ops', items: [
-      { key: 'query', label: 'Query' },
-      { key: 'push', label: 'Data Push' },
-      { key: 'history', label: 'Audit Trail' },
-      { key: 'clone', label: 'Clone' },
-      { key: 'bulkOps', label: 'Bulk Ops' },
-      { key: 'templates', label: 'Data Templates' },
-      { key: 'testData', label: 'Test Data' },
-    ]},
-    { key: 'quality', label: 'Quality', items: [
-      { key: 'cleanse', label: 'Cleanser' },
-      { key: 'duplicates', label: 'Duplicates' },
-      { key: 'quality', label: 'Scorecards' },
-    ]},
-    { key: 'monitoring', label: 'Monitoring', items: [
-      { key: 'pipeline', label: 'Pipeline' },
-      { key: 'apiUsage', label: 'API Usage' },
-      { key: 'compare', label: 'Compare' },
-    ]},
+    {
+      key: 'core', label: 'Workflow', items: [
+        { key: 'home', label: 'Home' },
+        { key: 'export', label: 'Export' },
+        { key: 'import', label: 'Import' },
+        { key: 'convert', label: 'Convert' },
+      ],
+    },
+    {
+      key: 'extras', label: 'Library', items: [
+        { key: 'templates', label: 'Templates' },
+        { key: 'schedules', label: 'Schedules' },
+        { key: 'diff', label: 'Diff' },
+      ],
+    },
+    {
+      key: 'advanced', label: 'Advanced Lab', items: [
+        { key: 'advanced/index', label: 'Overview' },
+        { key: 'advanced/migrationProjects', label: 'Migration Projects' },
+        { key: 'advanced/migrationValidation', label: 'Migration Validation' },
+        { key: 'advanced/migrationReports', label: 'Migration Reports' },
+        { key: 'advanced/migrationTemplates', label: 'Migration Templates' },
+        { key: 'advanced/idMaps', label: 'ID Maps' },
+        { key: 'advanced/objects', label: 'Objects' },
+        { key: 'advanced/relationships', label: 'Relationships' },
+        { key: 'advanced/schemaCompare', label: 'Schema Compare' },
+        { key: 'advanced/fieldAnalytics', label: 'Field Analytics' },
+        { key: 'advanced/cleanse', label: 'Cleanser' },
+        { key: 'advanced/duplicates', label: 'Duplicates' },
+        { key: 'advanced/quality', label: 'Quality' },
+        { key: 'advanced/pipeline', label: 'Pipeline' },
+        { key: 'advanced/testData', label: 'Test Data' },
+        { key: 'advanced/clone', label: 'Clone' },
+        { key: 'advanced/bulkOps', label: 'Bulk Ops' },
+        { key: 'advanced/compare', label: 'Data Compare' },
+        { key: 'advanced/apiUsage', label: 'API Usage' },
+        { key: 'advanced/history', label: 'Audit Trail' },
+        { key: 'advanced/query', label: 'SOQL Query' },
+        { key: 'advanced/push', label: 'Data Push' },
+        { key: 'advanced/legacyTemplates', label: 'Legacy Templates' },
+      ],
+    },
   ];
 
   const pinnedItems: NavItem[] = [
@@ -295,11 +278,164 @@ export function AppRoot(): VNode {
     { key: 'settings', label: 'Settings' },
   ];
 
-  // Flat list kept for CommandPalette
   const navItems: NavItem[] = [
     ...navGroups.flatMap(g => g.items),
     ...pinnedItems,
   ];
+
+  // Routes that need a Salesforce tab.
+  const requiresTab: Record<string, true> = {
+    export: true,
+    import: true,
+    schedules: true,
+    'advanced/migrationProjects': true,
+    'advanced/migrationValidation': true,
+    'advanced/query': true,
+    'advanced/objects': true,
+    'advanced/push': true,
+    'advanced/cleanse': true,
+    'advanced/testData': true,
+    'advanced/schemaCompare': true,
+    'advanced/fieldAnalytics': true,
+    'advanced/duplicates': true,
+    'advanced/pipeline': true,
+    'advanced/clone': true,
+    'advanced/quality': true,
+    'advanced/apiUsage': true,
+    'advanced/bulkOps': true,
+    'advanced/relationships': true,
+  };
+
+  // Aliases for legacy routes used by HelpScreen / OnboardingWizard / older code paths.
+  const LEGACY_ROUTE_ALIASES: Record<string, string> = {
+    push: 'import',
+    query: 'export',
+    cleanse: 'advanced/cleanse',
+    objects: 'advanced/objects',
+    history: 'advanced/history',
+    clone: 'advanced/clone',
+    duplicates: 'advanced/duplicates',
+    pipeline: 'advanced/pipeline',
+    pipelines: 'advanced/pipeline',
+    quality: 'advanced/quality',
+    apiUsage: 'advanced/apiUsage',
+    bulkOps: 'advanced/bulkOps',
+    relationships: 'advanced/relationships',
+    schemaCompare: 'advanced/schemaCompare',
+    'schema-compare': 'advanced/schemaCompare',
+    fieldAnalytics: 'advanced/fieldAnalytics',
+    'org-health': 'advanced/quality',
+    testData: 'advanced/testData',
+    compare: 'advanced/compare',
+    migrationProjects: 'advanced/migrationProjects',
+    migrationValidation: 'advanced/migrationValidation',
+    migrationReports: 'advanced/migrationReports',
+    migrationTemplates: 'advanced/migrationTemplates',
+    idMaps: 'advanced/idMaps',
+  };
+
+  const effectiveRoute = LEGACY_ROUTE_ALIASES[route] ?? route;
+  const needsTab = !selectedTabId && requiresTab[effectiveRoute];
+
+  function renderScreen(): VNode {
+    const route = effectiveRoute; // shadow outer route inside this fn
+
+    if (needsTab) {
+      return (
+        <div class="wl-card">
+          <div class="wl-cardSection">
+            <div class="wl-emptyState">
+              <div class="wl-emptyState__icon">🌊</div>
+              <p class="wl-emptyState__title">No Salesforce tab detected</p>
+              <p class="wl-emptyState__desc">
+                Open a logged-in Salesforce Lightning tab, then click <strong>Refresh</strong> in the top-right.
+                The Home, Convert, Templates, and Diff screens work without a connected tab.
+              </p>
+              <div style="margin-top:12px">
+                <button class="wl-buttonBrand" onClick={refreshTabs}>Refresh tabs</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Core flows ──
+    if (route === 'home') return <HomeScreen sf={sf} hasOrg={Boolean(selectedTabId && context)} onNavigate={setRoute} />;
+    if (route === 'export') return <ExportScreen sf={sf} tabId={selectedTabId!} context={context ?? undefined} soql={soql} onSoqlChange={setSoql} onNavigate={setRoute} />;
+    if (route === 'import') return (
+      <ImportScreen
+        sf={sf}
+        tabId={selectedTabId!}
+        dataset={dataset}
+        cleanedRecords={cleaned?.records ?? null}
+        cleanedHeaders={cleaned?.headers ?? null}
+        onDataset={setDataset}
+        onRequestCleanser={() => setRoute('advanced/cleanse')}
+        onNavigate={setRoute}
+      />
+    );
+    if (route === 'convert') return <ConvertScreen />;
+    if (route === 'templates') return <ExportImportTemplatesScreen sf={sf} />;
+    if (route === 'schedules') return <SchedulesScreen sf={sf} />;
+    if (route === 'diff') return <DiffScreen />;
+
+    // ── Advanced Lab ──
+    if (route === 'advanced/index') return <AdvancedLabScreen onNavigate={setRoute} />;
+    if (route === 'advanced/migrationProjects' && activeProjectId) return <MigrationWorkspaceScreen sf={sf} tabId={selectedTabId!} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />;
+    if (route === 'advanced/migrationProjects') return <MigrationProjectsScreen sf={sf} onOpenProject={(id) => setActiveProjectId(id)} />;
+    if (route === 'advanced/migrationValidation' && activeProjectId) return <MigrationValidationScreen sf={sf} tabId={selectedTabId!} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />;
+    if (route === 'advanced/migrationValidation') return <MigrationProjectsScreen sf={sf} onOpenProject={(id) => { setActiveProjectId(id); setRoute('advanced/migrationValidation'); }} />;
+    if (route === 'advanced/migrationReports') return <MigrationReportsScreen sf={sf} />;
+    if (route === 'advanced/migrationTemplates') return <MigrationTemplatesScreen sf={sf} />;
+    if (route === 'advanced/idMaps') return <IdMapViewerScreen sf={sf} />;
+    if (route === 'advanced/query') return <QueryScreen sf={sf} tabId={selectedTabId!} context={context ?? undefined} soql={soql} onSoqlChange={setSoql} />;
+    if (route === 'advanced/objects') return (
+      <ObjectsScreen sf={sf} tabId={selectedTabId!} onInsertToken={(token) => setSoql(prev => `${prev}${prev.endsWith(' ') ? '' : ' '}${token}`)} />
+    );
+    if (route === 'advanced/cleanse') return (
+      <DataCleanserScreen
+        sf={sf}
+        tabId={selectedTabId!}
+        dataset={dataset}
+        onDataset={(next) => { setDataset(next); setCleaned(null); }}
+        onCleaned={(result) => setCleaned(result)}
+        onGoToPush={() => setRoute('import')}
+        onClearDataset={() => { setDataset(null); setCleaned(null); }}
+      />
+    );
+    if (route === 'advanced/push') return (
+      <DataPushScreen
+        sf={sf}
+        tabId={selectedTabId!}
+        dataset={dataset}
+        cleanedRecords={cleaned?.records ?? null}
+        cleanedHeaders={cleaned?.headers ?? null}
+        onDataset={setDataset}
+        onRequestCleanser={() => setRoute('advanced/cleanse')}
+      />
+    );
+    if (route === 'advanced/history') return <PushHistoryScreen sf={sf} />;
+    if (route === 'advanced/legacyTemplates') return <TemplatesScreen sf={sf} />;
+    if (route === 'advanced/testData') return <TestDataGeneratorScreen sf={sf} tabId={selectedTabId!} />;
+    if (route === 'advanced/schemaCompare') return <SchemaComparisonScreen sf={sf} tabId={selectedTabId!} />;
+    if (route === 'advanced/fieldAnalytics') return <FieldAnalyticsScreen sf={sf} tabId={selectedTabId!} />;
+    if (route === 'advanced/duplicates') return <DuplicateDetectionScreen sf={sf} tabId={selectedTabId!} />;
+    if (route === 'advanced/pipeline') return <PipelineBuilderScreen sf={sf} tabId={selectedTabId!} dataset={cleaned ? { records: cleaned.records, headers: cleaned.headers } : null} />;
+    if (route === 'advanced/clone') return <CloneWizardScreen sf={sf} tabId={selectedTabId!} />;
+    if (route === 'advanced/quality') return <DataQualityScorecardScreen sf={sf} tabId={selectedTabId!} />;
+    if (route === 'advanced/apiUsage') return <ApiUsageDashboardScreen sf={sf} tabId={selectedTabId!} />;
+    if (route === 'advanced/bulkOps') return <BulkObjectOpsScreen sf={sf} tabId={selectedTabId!} />;
+    if (route === 'advanced/relationships') return <RelationshipExplorerScreen sf={sf} tabId={selectedTabId!} />;
+    if (route === 'advanced/compare') return <DataComparisonScreen sf={sf} />;
+
+    // Pinned
+    if (route === 'help') return <HelpScreen sf={sf} onNavigate={setRoute} />;
+    if (route === 'settings') return <SettingsScreen sf={sf} mode="app" />;
+
+    // Fallback
+    return <HomeScreen sf={sf} hasOrg={Boolean(selectedTabId && context)} onNavigate={setRoute} />;
+  }
 
   return (
     <>
@@ -307,10 +443,7 @@ export function AppRoot(): VNode {
         mode="app"
         context={context ?? undefined}
         sf={sf}
-        onOrgSwitch={(_orgId) => {
-          // Re-resolve context after org switch
-          refreshTabs();
-        }}
+        onOrgSwitch={() => refreshTabs()}
         titleRight={titleRight}
         navItems={navItems}
         navGroups={navGroups}
@@ -320,93 +453,7 @@ export function AppRoot(): VNode {
         theme={theme}
         onThemeChange={handleThemeChange}
       >
-        {!selectedTabId ? (
-          <div class="wl-card">
-            <div class="wl-row">
-              <div style="font-weight:900;font-size:14px">No Salesforce tabs detected</div>
-              <div class="wl-muted">Open a logged-in Salesforce Lightning tab, then click Refresh.</div>
-              <button class="wl-btn wl-btnPrimary" onClick={refreshTabs}>Refresh Tabs</button>
-            </div>
-          </div>
-        ) : route === 'migrationProjects' && activeProjectId ? (
-          <MigrationWorkspaceScreen sf={sf} tabId={selectedTabId} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />
-        ) : route === 'migrationProjects' ? (
-          <MigrationProjectsScreen sf={sf} onOpenProject={(id) => setActiveProjectId(id)} />
-        ) : route === 'migrationValidation' && activeProjectId ? (
-          <MigrationValidationScreen sf={sf} tabId={selectedTabId} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />
-        ) : route === 'migrationValidation' ? (
-          <MigrationProjectsScreen sf={sf} onOpenProject={(id) => { setActiveProjectId(id); setRoute('migrationValidation'); }} />
-        ) : route === 'migrationReports' ? (
-          <MigrationReportsScreen sf={sf} />
-        ) : route === 'migrationTemplates' ? (
-          <MigrationTemplatesScreen sf={sf} />
-        ) : route === 'idMaps' ? (
-          <IdMapViewerScreen sf={sf} />
-        ) : route === 'query' ? (
-          <QueryScreen sf={sf} tabId={selectedTabId} context={context ?? undefined} soql={soql} onSoqlChange={setSoql} />
-        ) : route === 'objects' ? (
-          <ObjectsScreen
-            sf={sf}
-            tabId={selectedTabId}
-            onInsertToken={(token) => setSoql(prev => `${prev}${prev.endsWith(' ') ? '' : ' '}${token}`)}
-          />
-        ) : route === 'cleanse' ? (
-          <DataCleanserScreen
-            sf={sf}
-            tabId={selectedTabId}
-            dataset={dataset}
-            onDataset={(next) => {
-              setDataset(next);
-              setCleaned(null);
-            }}
-            onCleaned={(result) => setCleaned(result)}
-            onGoToPush={() => setRoute('push')}
-            onClearDataset={() => {
-              setDataset(null);
-              setCleaned(null);
-            }}
-          />
-        ) : route === 'push' ? (
-          <DataPushScreen
-            sf={sf}
-            tabId={selectedTabId}
-            dataset={dataset}
-            cleanedRecords={cleaned?.records ?? null}
-            cleanedHeaders={cleaned?.headers ?? null}
-            onDataset={setDataset}
-            onRequestCleanser={() => setRoute('cleanse')}
-          />
-        ) : route === 'history' ? (
-          <PushHistoryScreen sf={sf} />
-        ) : route === 'templates' ? (
-          <TemplatesScreen sf={sf} />
-        ) : route === 'testData' ? (
-          <TestDataGeneratorScreen sf={sf} tabId={selectedTabId} />
-        ) : route === 'schemaCompare' ? (
-          <SchemaComparisonScreen sf={sf} tabId={selectedTabId} />
-        ) : route === 'fieldAnalytics' ? (
-          <FieldAnalyticsScreen sf={sf} tabId={selectedTabId} />
-        ) : route === 'duplicates' ? (
-          <DuplicateDetectionScreen sf={sf} tabId={selectedTabId} />
-        ) : route === 'pipeline' ? (
-          <PipelineBuilderScreen sf={sf} tabId={selectedTabId} dataset={cleaned ? { records: cleaned.records, headers: cleaned.headers } : null} />
-        ) : route === 'clone' ? (
-          <CloneWizardScreen sf={sf} tabId={selectedTabId} />
-        ) : route === 'quality' ? (
-          <DataQualityScorecardScreen sf={sf} tabId={selectedTabId} />
-        ) : route === 'apiUsage' ? (
-          <ApiUsageDashboardScreen sf={sf} tabId={selectedTabId} />
-        ) : route === 'bulkOps' ? (
-          <BulkObjectOpsScreen sf={sf} tabId={selectedTabId} />
-        ) : route === 'relationships' ? (
-          <RelationshipExplorerScreen sf={sf} tabId={selectedTabId} />
-        ) : route === 'compare' ? (
-          <DataComparisonScreen sf={sf} />
-        ) : route === 'help' ? (
-          <HelpScreen sf={sf} onNavigate={setRoute} />
-        ) : (
-          <SettingsScreen sf={sf} mode="app" />
-        )}
+        {renderScreen()}
       </AppShell>
 
       <CommandPalette
