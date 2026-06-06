@@ -184,7 +184,7 @@ export function BulkUpdateModal(props: BulkUpdateModalProps): VNode | null {
           <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--wl-line-2)">
             <button class="wl-btn" onClick={onClose}>Cancel</button>
             <button
-              class="wl-btn wl-btnPrimary"
+              class="wl-buttonBrand"
               onClick={handleApply}
               disabled={mode === 'formula' && !template.trim()}
             >

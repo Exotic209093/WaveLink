@@ -123,7 +123,7 @@ export function PushHistoryDetail(props: PushHistoryDetailProps): VNode {
                 <div style="display:flex;gap:8px">
                   {onRetryFailed && entry.failureCount > 0 ? (
                     <button
-                      class="wl-btn wl-btnPrimary"
+                      class="wl-buttonBrand"
                       disabled={busy}
                       onClick={async () => {
                         setBusy(true);

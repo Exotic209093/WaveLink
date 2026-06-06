@@ -425,7 +425,7 @@ export function DataPushScreen(props: {
                 setToast({ title: 'Saved', body: `Template "${name}" saved.` });
               } catch (e) { setToast({ title: 'Save Failed', body: e instanceof Error ? e.message : 'Unknown error' }); }
             }} disabled={!hasDataset || mappings.length === 0}>Save Template</button>
-            <button class="wl-btn wl-btnDanger" onClick={() => props.onDataset(null)} disabled={!hasDataset}>Clear</button>
+            <button class="wl-buttonDestructive" onClick={() => props.onDataset(null)} disabled={!hasDataset}>Clear</button>
           </div>
         </div>
 
@@ -675,14 +675,14 @@ export function DataPushScreen(props: {
           </div>
           <div class="wl-row" style="gap:10px;flex-wrap:wrap">
             {push.status === 'processing' ? (
-              <button class="wl-btn wl-btnDanger" disabled={busy} onClick={cancelActivePush}>Cancel Push</button>
+              <button class="wl-buttonDestructive" disabled={busy} onClick={cancelActivePush}>Cancel Push</button>
             ) : null}
             {push.status === 'complete' ? (
               <>
                 <button class="wl-btn" disabled={busy} onClick={loadPushIds}>View IDs</button>
-                <button class="wl-btn wl-btnPrimary" disabled={busy} onClick={prepareDeletePushFromIds}>Prepare Delete Push</button>
+                <button class="wl-buttonBrand" disabled={busy} onClick={prepareDeletePushFromIds}>Prepare Delete Push</button>
                 {push.failed > 0 && pushErrors && pushErrors.length > 0 ? (
-                  <button class="wl-btn wl-btnPrimary" disabled={busy} onClick={() => setRetryModalOpen(true)}>Retry Failed Rows</button>
+                  <button class="wl-buttonBrand" disabled={busy} onClick={() => setRetryModalOpen(true)}>Retry Failed Rows</button>
                 ) : null}
               </>
             ) : null}

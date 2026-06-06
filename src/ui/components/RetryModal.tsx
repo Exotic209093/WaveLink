@@ -66,7 +66,7 @@ export function RetryModal(props: RetryModalProps): VNode | null {
 
           <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--wl-line-2)">
             <button class="wl-btn" onClick={onClose}>Cancel</button>
-            <button class="wl-btn wl-btnPrimary" onClick={onRetry}>
+            <button class="wl-buttonBrand" onClick={onRetry}>
               Generate Retry Dataset
             </button>
           </div>

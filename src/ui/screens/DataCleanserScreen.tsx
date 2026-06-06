@@ -519,7 +519,7 @@ export function DataCleanserScreen(props: {
               }}
             />
           ) : null}
-          <button class="wl-btn wl-btnPrimary" onClick={() => setBulkUpdateModalOpen(true)} disabled={!dataset}>Bulk Update</button>
+          <button class="wl-buttonBrand" onClick={() => setBulkUpdateModalOpen(true)} disabled={!dataset}>Bulk Update</button>
 
           {singleSelectedOp ? (
             <ColumnEditor
