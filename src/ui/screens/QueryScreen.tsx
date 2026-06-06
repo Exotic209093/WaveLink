@@ -359,8 +359,8 @@ export function QueryScreen(props: {
             >
               Builder
             </button>
-            <button class="wl-btn wl-btnPrimary" onClick={runQuery} disabled={busy || !context}>
-              {busy ? 'Running...' : 'Run'}
+            <button class="wl-buttonBrand" onClick={runQuery} disabled={busy || !context}>
+              {busy ? 'Running…' : '▶ Run'}
             </button>
             <button class="wl-btn" onClick={loadMore} disabled={busy || !nextUrl}>Load More</button>
             <button class="wl-btn" onClick={saveQuery} disabled={!soql.trim()}>Save</button>
