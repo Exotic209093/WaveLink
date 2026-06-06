@@ -49,9 +49,9 @@ export function SoqlAutocomplete(props: {
         >
           <div class="wl-ac-itemLeft">
             <span class={`wl-ac-kindDot wl-ac-kind-${s.kind}`} />
-            <span>{s.label}</span>
+            <span class="wl-ac-label">{s.label}</span>
           </div>
-          {s.detail && <span class="wl-ac-type">{s.detail}</span>}
+          {s.detail && <span class="wl-ac-type" title={s.detail}>{s.detail}</span>}
         </div>
       ))}
     </div>
