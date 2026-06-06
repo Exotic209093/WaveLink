@@ -1604,6 +1604,13 @@ export const uiCss = `
   background: transparent !important;
   color: transparent;
   caret-color: var(--wl-ink);
+  /* Typography MUST match .wl-soql-highlight exactly so the caret and typed
+     text line up with the colored overlay on every line. A line-height
+     mismatch causes progressive drift on multi-line queries. */
+  font-family: var(--wl-font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px 12px;
 }
 .wl-hl-keyword { color: #0070c0; font-weight: 600; }
 .wl-hl-string { color: #a31515; }

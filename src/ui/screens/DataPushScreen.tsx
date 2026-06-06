@@ -526,14 +526,14 @@ export function DataPushScreen(props: {
         <div class="wl-cardHeader">
           <h2>Mapping</h2>
           <div class="wl-actions">
-            <button class="wl-btn wl-btnPrimary" onClick={applyMapping} disabled={!hasDataset || !describeFields || isBlocked}>Apply Mapping</button>
+            <button class="wl-btn" onClick={applyMapping} disabled={!hasDataset || !describeFields || isBlocked}>Apply Mapping</button>
             <button class="wl-btn" onClick={validate} disabled={!mappedRecords || !describeFields || isBlocked}>Validate</button>
             <button
-              class="wl-btn wl-btnPrimary"
+              class="wl-buttonBrand"
               onClick={() => setConfirmOpen(true)}
               disabled={!mappedRecords || isBlocked || (validationErrors !== null && validationErrors.length > 0) || busy}
             >
-              Review &amp; Push
+              ⬆ Review &amp; Push
             </button>
           </div>
         </div>
