@@ -258,6 +258,7 @@ export function ResultsGrid(props: {
                     style="padding:0 3px;font-size:9px;margin-left:4px;opacity:0;vertical-align:middle"
                     onClick={(e) => { e.stopPropagation(); copyColumn(c); }}
                     title={`Copy all "${c}" values`}
+                    aria-label={`Copy all "${c}" values`}
                   >{'\u2398'}</button>
                 </th>
               ))}
@@ -349,6 +350,7 @@ export function ResultsGrid(props: {
                       style="padding:0 4px;font-size:10px;opacity:0"
                       onClick={() => copyRow(r)}
                       title="Copy row as JSON"
+                      aria-label="Copy row as JSON"
                     >{'\u2398'}</button>
                   </td>
                 </tr>

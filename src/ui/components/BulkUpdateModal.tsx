@@ -81,7 +81,7 @@ export function BulkUpdateModal(props: BulkUpdateModalProps): VNode | null {
   }, [fields, targetField]);
 
   return (
-    <div class="wl-modalOverlay" onClick={onClose}>
+    <div class="wl-modalOverlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Bulk Update">
       <div class="wl-modal wl-card" onClick={(e) => e.stopPropagation()}>
         <div class="wl-cardHeader">
           <h2>Bulk Update</h2>

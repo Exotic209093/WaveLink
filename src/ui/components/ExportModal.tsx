@@ -64,7 +64,7 @@ export function ExportModal(props: ExportModalProps): VNode | null {
   };
 
   return (
-    <div class="wl-modalOverlay" onClick={onClose}>
+    <div class="wl-modalOverlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Export Data">
       <div class="wl-modal wl-card" onClick={(e) => e.stopPropagation()}>
         <div class="wl-cardHeader">
           <h2>Export Data</h2>

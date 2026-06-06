@@ -63,7 +63,7 @@ export function PushHistoryDetail(props: PushHistoryDetailProps): VNode {
   }
 
   return (
-    <div class="wl-modalOverlay" onClick={onClose}>
+    <div class="wl-modalOverlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Push Details">
       <div class="wl-modal wl-card" onClick={(e) => e.stopPropagation()} style="max-width:800px">
         <div class="wl-cardHeader">
           <h2>Push Details</h2>

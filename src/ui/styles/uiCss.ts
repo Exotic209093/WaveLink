@@ -886,6 +886,11 @@ export const uiCss = `
   cursor: pointer;
   color: var(--wl-ink-dim);
   transition: background 120ms ease, color 120ms ease;
+  /* Reset UA button styles so this works identically on <span> and <button>. */
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
 }
 .wl-qb-chipX:hover {
   background: rgba(239, 68, 96, 0.14);
