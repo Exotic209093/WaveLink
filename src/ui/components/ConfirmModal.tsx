@@ -9,6 +9,8 @@ export function ConfirmModal(props: {
   confirmText?: string;
   cancelText?: string;
   confirmDisabled?: boolean;
+  /** Visual tone of the confirm button. 'danger' for destructive actions. */
+  confirmTone?: 'primary' | 'danger';
   busy?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -53,6 +55,7 @@ export function ConfirmModal(props: {
 
   const confirmText = props.confirmText ?? 'Confirm';
   const cancelText = props.cancelText ?? 'Cancel';
+  const confirmClass = props.confirmTone === 'danger' ? 'wl-buttonDestructive' : 'wl-btn wl-btnPrimary';
 
   return (
     <div class="wl-modalOverlay" role="dialog" aria-modal="true" aria-label={props.title}>
@@ -66,8 +69,8 @@ export function ConfirmModal(props: {
             {props.children}
             <div class="wl-actions">
               <button class="wl-btn" onClick={props.onCancel} disabled={props.busy}>{cancelText}</button>
-              <button class="wl-btn wl-btnPrimary" onClick={props.onConfirm} disabled={props.confirmDisabled || props.busy}>
-                {props.busy ? 'Working...' : confirmText}
+              <button class={confirmClass} onClick={props.onConfirm} disabled={props.confirmDisabled || props.busy}>
+                {props.busy ? 'Working…' : confirmText}
               </button>
             </div>
           </div>

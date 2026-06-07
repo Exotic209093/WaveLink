@@ -23,13 +23,14 @@ import type { SfApi } from '../api/sf';
 import { Toast } from '../components/Toast';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { TypedConfirmModal } from '../components/TypedConfirmModal';
+import { PromptModal } from '../components/PromptModal';
 import { DropZone } from '../components/DropZone';
 import { RetryModal } from '../components/RetryModal';
 import { buildRetryDataset } from '../utils/pushRetry';
 import { parseCsvFile, parseJsonFile } from '../utils/fileParse';
 import { DataMapper } from '../../data/mappers';
 import { DataValidator } from '../../data/validators';
-import type { FieldMapping, TransformationType } from '../../core/types/storage';
+import type { FieldMapping, TransformationType, DataTemplate } from '../../core/types/storage';
 import type { SObjectField } from '../../core/types/salesforce';
 import { MessageBus } from '../../services/messaging';
 import { TRANSFORM_OPTIONS } from '../utils/transforms';
@@ -86,6 +87,8 @@ export function DataPushScreen(props: {
   const [threads, setThreads] = useState<number>(1);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [retryModalOpen, setRetryModalOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [loadTemplate, setLoadTemplate] = useState<{ templates: DataTemplate[]; selected: string } | null>(null);
 
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean; updateable: boolean; deletable: boolean }>>([]);
   const [describeFields, setDescribeFields] = useState<SObjectField[] | null>(null);
@@ -280,6 +283,39 @@ export function DataPushScreen(props: {
     }
   }
 
+  async function openLoadTemplate(): Promise<void> {
+    try {
+      const templates = await sf.listTemplates();
+      if (templates.length === 0) {
+        setToast({ title: 'No Templates', body: 'No saved templates to load yet.' });
+        return;
+      }
+      setLoadTemplate({ templates, selected: templates[0].name });
+    } catch (e) {
+      setToast({ title: 'Load Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+    }
+  }
+
+  function confirmLoadTemplate(): void {
+    if (!loadTemplate) return;
+    const tmpl = loadTemplate.templates.find(t => t.name === loadTemplate.selected);
+    setLoadTemplate(null);
+    if (!tmpl) return;
+    if (tmpl.objectName) setObjectName(tmpl.objectName);
+    if (tmpl.fieldMappings) setMappings(tmpl.fieldMappings);
+    setToast({ title: 'Template Loaded', body: tmpl.name });
+  }
+
+  async function confirmSaveTemplate(name: string): Promise<void> {
+    setSaveTemplateOpen(false);
+    try {
+      await sf.upsertTemplate({ id: `tmpl_${Date.now()}`, name, objectName, fieldMappings: mappings });
+      setToast({ title: 'Saved', body: `Template "${name}" saved.` });
+    } catch (e) {
+      setToast({ title: 'Save Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+    }
+  }
+
   async function cancelActivePush(): Promise<void> {
     if (!push || push.status !== 'processing') return;
     try {
@@ -400,31 +436,8 @@ export function DataPushScreen(props: {
               />
             </label>
             <button class="wl-btn" onClick={props.onRequestCleanser} disabled={!hasDataset}>Open Cleanser</button>
-            <button class="wl-btn" onClick={async () => {
-              try {
-                const templates = await sf.listTemplates();
-                const choice = prompt('Enter template name to load:\n' + templates.map(t => t.name).join('\n'));
-                if (!choice) return;
-                const tmpl = templates.find(t => t.name === choice);
-                if (!tmpl) { setToast({ title: 'Not Found', body: `No template named "${choice}"` }); return; }
-                if (tmpl.objectName) setObjectName(tmpl.objectName);
-                if (tmpl.fieldMappings) setMappings(tmpl.fieldMappings);
-                setToast({ title: 'Template Loaded', body: tmpl.name });
-              } catch (e) { setToast({ title: 'Load Failed', body: e instanceof Error ? e.message : 'Unknown error' }); }
-            }} disabled={!hasDataset}>Load Template</button>
-            <button class="wl-btn" onClick={async () => {
-              const name = prompt('Template name?');
-              if (!name) return;
-              try {
-                await sf.upsertTemplate({
-                  id: `tmpl_${Date.now()}`,
-                  name,
-                  objectName,
-                  fieldMappings: mappings,
-                });
-                setToast({ title: 'Saved', body: `Template "${name}" saved.` });
-              } catch (e) { setToast({ title: 'Save Failed', body: e instanceof Error ? e.message : 'Unknown error' }); }
-            }} disabled={!hasDataset || mappings.length === 0}>Save Template</button>
+            <button class="wl-btn" onClick={openLoadTemplate} disabled={!hasDataset}>Load Template</button>
+            <button class="wl-btn" onClick={() => setSaveTemplateOpen(true)} disabled={!hasDataset || mappings.length === 0}>Save Template</button>
             <button class="wl-btn wl-btnDanger" onClick={() => props.onDataset(null)} disabled={!hasDataset}>Clear</button>
           </div>
         </div>
@@ -855,6 +868,39 @@ export function DataPushScreen(props: {
         onRetry={handleRetry}
         onClose={() => setRetryModalOpen(false)}
       />
+
+      <PromptModal
+        open={saveTemplateOpen}
+        title="Save Template"
+        label="Template name"
+        placeholder="e.g. Account upsert mapping"
+        confirmText="Save"
+        onCancel={() => setSaveTemplateOpen(false)}
+        onSubmit={confirmSaveTemplate}
+      />
+
+      <ConfirmModal
+        open={loadTemplate !== null}
+        title="Load Template"
+        confirmText="Load"
+        confirmDisabled={!loadTemplate || loadTemplate.templates.length === 0}
+        onCancel={() => setLoadTemplate(null)}
+        onConfirm={confirmLoadTemplate}
+      >
+        <label style="font-weight:900;font-size:12px">Template</label>
+        <select
+          class="wl-select"
+          value={loadTemplate?.selected ?? ''}
+          onChange={(e) => {
+            const selected = (e.currentTarget as HTMLSelectElement).value;
+            setLoadTemplate(prev => (prev ? { ...prev, selected } : prev));
+          }}
+        >
+          {loadTemplate?.templates.map(t => (
+            <option key={t.id} value={t.name}>{t.name}{t.objectName ? ` (${t.objectName})` : ''}</option>
+          ))}
+        </select>
+      </ConfirmModal>
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </div>

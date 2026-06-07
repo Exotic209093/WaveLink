@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { ScheduledExport, ExportSnapshot, ScheduleInterval, SavedExportFormat } from '../../core/types/storage';
 import type { SalesforceOrg } from '../../core/types/salesforce';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 interface FormState {
   id?: string;
@@ -71,6 +72,7 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
   const [editing, setEditing] = useState<FormState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ScheduledExport | null>(null);
 
   async function reload(): Promise<void> {
     chrome.storage.local.get(['scheduledExports', 'exportSnapshots'], (r) => {
@@ -152,7 +154,7 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
   }
 
   async function remove(s: ScheduledExport): Promise<void> {
-    if (!confirm(`Delete schedule "${s.name}"? Snapshots will be removed too.`)) return;
+    setPendingDelete(null);
     const nextSnapshots = { ...snapshots };
     for (const [snapId, snap] of Object.entries(nextSnapshots)) {
       if (snap.scheduleId === s.id) delete nextSnapshots[snapId];
@@ -360,7 +362,7 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
                                  s.interval.kind === 'hours' ? s.interval.hours : s.interval.days,
                   retention: s.retention,
                 })}>Edit</button>
-                <button class="wl-buttonDestructive" onClick={() => remove(s)}>Delete</button>
+                <button class="wl-buttonDestructive" onClick={() => setPendingDelete(s)}>Delete</button>
               </div>
             </div>
             <div class="wl-cardSection">
@@ -411,6 +413,19 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
           </div>
         );
       })}
+
+      <ConfirmModal
+        open={pendingDelete !== null}
+        title="Delete schedule"
+        confirmText="Delete"
+        confirmTone="danger"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => { if (pendingDelete) void remove(pendingDelete); }}
+      >
+        <div class="wl-muted">
+          Delete the schedule "<strong>{pendingDelete?.name}</strong>"? Its snapshots will be removed too. This cannot be undone.
+        </div>
+      </ConfirmModal>
     </div>
   );
 }
