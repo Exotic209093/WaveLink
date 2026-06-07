@@ -60,19 +60,31 @@ export function ResultsGrid(props: {
   }
 
   async function copyCell(value: string): Promise<void> {
-    await navigator.clipboard.writeText(value);
-    showCopyFeedback('Cell copied');
+    try {
+      await navigator.clipboard.writeText(value);
+      showCopyFeedback('Cell copied');
+    } catch {
+      showCopyFeedback('Copy failed — clipboard unavailable');
+    }
   }
 
   async function copyRow(record: FlatRecord): Promise<void> {
-    await navigator.clipboard.writeText(JSON.stringify(record, null, 2));
-    showCopyFeedback('Row copied as JSON');
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(record, null, 2));
+      showCopyFeedback('Row copied as JSON');
+    } catch {
+      showCopyFeedback('Copy failed — clipboard unavailable');
+    }
   }
 
   async function copyColumn(col: string): Promise<void> {
     const values = sortedRecords.map(r => String(r[col] ?? '')).join('\n');
-    await navigator.clipboard.writeText(values);
-    showCopyFeedback(`Column "${col}" copied (${sortedRecords.length} values)`);
+    try {
+      await navigator.clipboard.writeText(values);
+      showCopyFeedback(`Column "${col}" copied (${sortedRecords.length} values)`);
+    } catch {
+      showCopyFeedback('Copy failed — clipboard unavailable');
+    }
   }
 
   function startEdit(rowIdx: number, col: string, currentValue: string): void {

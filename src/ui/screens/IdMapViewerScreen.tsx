@@ -23,6 +23,9 @@ export function IdMapViewerScreen({ sf }: Props): VNode<any> {
   const [search, setSearch] = useState('');
   const [objectFilter, setObjectFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const errMsg = (e: unknown): string => (e instanceof Error ? e.message : 'Unknown error');
 
   useEffect(() => {
     loadMaps();
@@ -37,8 +40,9 @@ export function IdMapViewerScreen({ sf }: Props): VNode<any> {
       ]);
       setMaps(mapList);
       setOrgs(orgData.orgs);
-    } catch {
-      // silent
+      setError(null);
+    } catch (e) {
+      setError(`Could not load ID maps: ${errMsg(e)}`);
     } finally {
       setLoading(false);
     }
@@ -49,8 +53,9 @@ export function IdMapViewerScreen({ sf }: Props): VNode<any> {
     try {
       const map = await sf.getIdMap(id);
       setSelectedMap(map);
-    } catch {
-      // silent
+      setError(null);
+    } catch (e) {
+      setError(`Could not open ID map: ${errMsg(e)}`);
     }
   }
 
@@ -62,8 +67,9 @@ export function IdMapViewerScreen({ sf }: Props): VNode<any> {
         setSelectedMapId(null);
         setSelectedMap(null);
       }
-    } catch {
-      // silent
+      setError(null);
+    } catch (e) {
+      setError(`Could not delete ID map: ${errMsg(e)}`);
     }
   }
 
@@ -88,6 +94,19 @@ export function IdMapViewerScreen({ sf }: Props): VNode<any> {
     return org ? (org.nickname || org.username) : orgId.slice(0, 12);
   }
 
+  const errorBanner = error
+    ? h('div', {
+        class: 'wl-card',
+        role: 'alert',
+        style: 'border-color:var(--wl-danger);background:rgba(239,68,96,0.08)',
+      },
+      h('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:8px' },
+        h('span', { style: 'color:var(--wl-danger);font-weight:700;font-size:13px' }, error),
+        h('button', { class: 'wl-btn', onClick: () => setError(null), 'aria-label': 'Dismiss error' }, 'Dismiss'),
+      ),
+    )
+    : null;
+
   if (loading) {
     return h('div', { class: 'wl-card' }, h('div', { class: 'wl-muted' }, 'Loading ID maps...'));
   }
@@ -107,6 +126,7 @@ export function IdMapViewerScreen({ sf }: Props): VNode<any> {
     });
 
     return h('div', { class: 'wl-stack' },
+      errorBanner,
       h('div', { style: 'display:flex;justify-content:space-between;align-items:center' },
         h('div', { style: 'display:flex;align-items:center;gap:8px' },
           h('button', { class: 'wl-btn wl-btn--sm', onClick: () => { setSelectedMapId(null); setSelectedMap(null); } }, '\u2190'),
@@ -193,6 +213,7 @@ export function IdMapViewerScreen({ sf }: Props): VNode<any> {
 
   // List view
   return h('div', { class: 'wl-stack' },
+    errorBanner,
     h('div', { class: 'wl-row', style: 'justify-content:space-between;align-items:center' },
       h('div', null,
         h('h2', { style: 'margin:0;font-size:16px' }, 'ID Maps'),
