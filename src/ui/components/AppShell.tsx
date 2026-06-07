@@ -59,6 +59,15 @@ export function AppShell(props: {
     ? `${new URL(context.instanceUrl).hostname}${context.environment === 'sandbox' ? ' (Sandbox)' : ''}`
     : 'No org selected';
 
+  // Short org label for the cramped panel header (drops the my.salesforce.com /
+  // lightning.force.com suffix and the username; full detail stays in the tooltip).
+  const orgShort = context?.instanceUrl
+    ? new URL(context.instanceUrl).hostname
+        .replace(/\.my\.salesforce-setup\.com$/i, '')
+        .replace(/\.my\.salesforce\.com$/i, '')
+        .replace(/\.lightning\.force\.com$/i, '')
+    : '';
+
   // Derive which group contains the current route
   const activeGroup = navGroups?.find(g => g.items.some(item => item.key === route)) ?? null;
 
@@ -70,6 +79,12 @@ export function AppShell(props: {
           <h1>WaveLink</h1>
           {mode !== 'popup' && sf ? (
             <OrgSwitcher sf={sf} onOrgSwitch={onOrgSwitch} />
+          ) : mode === 'panel' ? (
+            context?.instanceUrl ? (
+              <span class="wl-chip" title={`${chipText}${context?.username ? ' · ' + context.username : ''}`}>
+                {orgShort}{context.environment === 'sandbox' ? ' · SB' : ''}
+              </span>
+            ) : null
           ) : mode !== 'popup' ? (
             <span class="wl-chip" title={context?.orgId ?? ''}>
               <span>{chipText}</span>

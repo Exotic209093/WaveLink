@@ -89,7 +89,7 @@ export function PanelRoot(props: { shadowRoot: ShadowRoot }): VNode {
 
   const titleRight = (
     <>
-      <button class="wl-btn" onClick={openFullApp}>Open Full App</button>
+      <button class="wl-btn wl-iconBtn" title="Open full app" aria-label="Open full app" onClick={openFullApp}>⤢</button>
     </>
   );
 

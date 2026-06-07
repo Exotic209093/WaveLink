@@ -265,11 +265,39 @@ export const uiCss = `
   background: linear-gradient(180deg, var(--wl-surface-2), var(--wl-surface));
   border-bottom: 1px solid var(--wl-line-2);
 }
-.wl-app[data-mode="panel"] .wl-brand { gap: 9px; }
+.wl-app[data-mode="panel"] .wl-brand {
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
 .wl-app[data-mode="panel"] .wl-topbar .wl-brand h1 {
   font-size: 14px;
   font-weight: 800;
   letter-spacing: -0.01em;
+  flex-shrink: 0;
+}
+/* Compact, truncating org chip so the long instance host can't blow out the header. */
+.wl-app[data-mode="panel"] .wl-chip {
+  max-width: 150px;
+  padding: 4px 9px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+}
+.wl-app[data-mode="panel"] .wl-actions {
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  gap: 6px;
+}
+/* Square icon button (e.g. "open full app") that won't wrap its glyph. */
+.wl-iconBtn {
+  padding: 6px 9px;
+  font-size: 14px;
+  line-height: 1;
 }
 /* Brand mark — a small gradient tile shown next to the wordmark in the panel. */
 .wl-brandMark { display: none; }
