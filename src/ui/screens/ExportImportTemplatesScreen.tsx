@@ -10,6 +10,11 @@ import type { VNode } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { ExportTemplate, ImportTemplate, SavedExportFormat } from '../../core/types/storage';
+import { ConfirmModal } from '../components/ConfirmModal';
+
+type PendingDelete =
+  | { kind: 'export'; item: ExportTemplate }
+  | { kind: 'import'; item: ImportTemplate };
 
 interface ExportFormState {
   id?: string;
@@ -41,6 +46,7 @@ export function ExportImportTemplatesScreen(props: {
   const [importTemplates, setImportTemplates] = useState<ImportTemplate[]>([]);
   const [editing, setEditing] = useState<ExportFormState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
   function reload(): void {
     chrome.storage.local.get(['exportTemplates', 'importTemplates'], (r) => {
@@ -90,14 +96,15 @@ export function ExportImportTemplatesScreen(props: {
     setEditing(null);
   }
 
-  async function deleteExportTemplate(t: ExportTemplate): Promise<void> {
-    if (!confirm(`Delete export template "${t.name}"?`)) return;
-    await persistExports(exportTemplates.filter(x => x.id !== t.id));
-  }
-
-  async function deleteImportTemplate(t: ImportTemplate): Promise<void> {
-    if (!confirm(`Delete import template "${t.name}"?`)) return;
-    await persistImports(importTemplates.filter(x => x.id !== t.id));
+  async function confirmDelete(): Promise<void> {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    setPendingDelete(null);
+    if (target.kind === 'export') {
+      await persistExports(exportTemplates.filter(x => x.id !== target.item.id));
+    } else {
+      await persistImports(importTemplates.filter(x => x.id !== target.item.id));
+    }
   }
 
   return (
@@ -224,7 +231,7 @@ export function ExportImportTemplatesScreen(props: {
                       format: t.format,
                       filenameBase: t.filenameBase ?? '',
                     })}>Edit</button>
-                    <button class="wl-buttonDestructive" aria-label={`Delete export template ${t.name}`} title="Delete template" onClick={() => deleteExportTemplate(t)}>×</button>
+                    <button class="wl-buttonDestructive" aria-label={`Delete export template ${t.name}`} title="Delete template" onClick={() => setPendingDelete({ kind: 'export', item: t })}>×</button>
                   </div>
                 </div>
               ))}
@@ -262,7 +269,7 @@ export function ExportImportTemplatesScreen(props: {
                     {onUseImport ? (
                       <button class="wl-buttonBrand" onClick={() => onUseImport(t)}>Use</button>
                     ) : null}
-                    <button class="wl-buttonDestructive" aria-label={`Delete import template ${t.name}`} title="Delete template" onClick={() => deleteImportTemplate(t)}>×</button>
+                    <button class="wl-buttonDestructive" aria-label={`Delete import template ${t.name}`} title="Delete template" onClick={() => setPendingDelete({ kind: 'import', item: t })}>×</button>
                   </div>
                 </div>
               ))}
@@ -270,6 +277,19 @@ export function ExportImportTemplatesScreen(props: {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        open={pendingDelete !== null}
+        title={pendingDelete?.kind === 'import' ? 'Delete import template' : 'Delete export template'}
+        confirmText="Delete"
+        confirmTone="danger"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+      >
+        <div class="wl-muted">
+          Delete the template "<strong>{pendingDelete?.item.name}</strong>"? This cannot be undone.
+        </div>
+      </ConfirmModal>
     </div>
   );
 }

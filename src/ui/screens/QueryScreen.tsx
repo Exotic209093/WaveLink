@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { SfApi, SfContext } from '../api/sf';
 import type { SavedQuery, QueryFolder } from '../../core/types/storage';
 import { Toast } from '../components/Toast';
+import { PromptModal } from '../components/PromptModal';
 import { deriveColumns, flattenRecord } from '../utils/records';
 import type { FlatRecord } from '../utils/records';
 import { recordsToCsv } from '../utils/csv';
@@ -65,6 +66,7 @@ export function QueryScreen(props: {
   const [managerVisible, setManagerVisible] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [explainVisible, setExplainVisible] = useState(false);
+  const [saveQueryOpen, setSaveQueryOpen] = useState(false);
   const [queryFolders, setQueryFolders] = useState<QueryFolder[]>([]);
   const [lastExecMs, setLastExecMs] = useState<number | null>(null);
 
@@ -272,9 +274,12 @@ export function QueryScreen(props: {
     downloadTextFile(`wavelink-query-${Date.now()}.json`, JSON.stringify(rawRecords, null, 2), 'application/json');
   }
 
-  async function saveQuery(): Promise<void> {
-    const name = prompt('Saved query name?');
-    if (!name) return;
+  function saveQuery(): void {
+    setSaveQueryOpen(true);
+  }
+
+  async function confirmSaveQuery(name: string): Promise<void> {
+    setSaveQueryOpen(false);
     try {
       const saved = await sf.upsertSavedQuery({ id: `q_${Date.now()}`, name, soql });
       setSavedQueries(prev => [saved, ...prev]);
@@ -490,6 +495,16 @@ export function QueryScreen(props: {
           </div>
         </div>
       )}
+
+      <PromptModal
+        open={saveQueryOpen}
+        title="Save Query"
+        label="Saved query name"
+        placeholder="e.g. Open opportunities this quarter"
+        confirmText="Save"
+        onCancel={() => setSaveQueryOpen(false)}
+        onSubmit={confirmSaveQuery}
+      />
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </div>

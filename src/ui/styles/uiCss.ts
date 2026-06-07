@@ -1210,6 +1210,17 @@ export const uiCss = `
   cursor: not-allowed;
 }
 
+.wl-dropZoneError {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(239, 68, 96, 0.45);
+  background: rgba(239, 68, 96, 0.08);
+  color: var(--wl-danger);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .wl-dropZoneOverlay {
   position: absolute;
   inset: 0;

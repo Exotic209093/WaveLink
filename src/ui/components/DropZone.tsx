@@ -21,6 +21,7 @@ export function DropZone(props: DropZoneProps): VNode {
   const { accept, onDrop, disabled = false, children, className = '' } = props;
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [, setDragCounter] = useState<number>(0);
+  const [error, setError] = useState<string | null>(null);
 
   const handleDragEnter = (e: DragEvent) => {
     e.preventDefault();
@@ -77,9 +78,10 @@ export function DropZone(props: DropZoneProps): VNode {
     // Check file extension
     const fileExtension = file.name.toLowerCase().match(/\.[^.]+$/)?.[0];
     if (fileExtension && accept.includes(fileExtension)) {
+      setError(null);
       onDrop(file);
     } else {
-      alert(`Invalid file type. Please upload one of: ${accept.join(', ')}`);
+      setError(`Invalid file type. Please upload one of: ${accept.join(', ')}`);
     }
   };
 
@@ -93,6 +95,7 @@ export function DropZone(props: DropZoneProps): VNode {
     input.onchange = (e) => {
       const files = (e.target as HTMLInputElement).files;
       if (files && files.length > 0) {
+        setError(null);
         onDrop(files[0]);
       }
     };
@@ -129,6 +132,9 @@ export function DropZone(props: DropZoneProps): VNode {
         </div>
       ) : null}
       {children}
+      {error ? (
+        <div class="wl-dropZoneError" role="alert">{error}</div>
+      ) : null}
     </div>
   );
 }
