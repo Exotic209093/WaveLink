@@ -82,9 +82,16 @@ export function PanelRoot(props: { shadowRoot: ShadowRoot }): VNode {
   };
 
   async function openFullApp(): Promise<void> {
-    // Open the full app in a new tab. (Per-tab pinning is handled by the popup launcher.)
-    const url = chrome.runtime.getURL('app/app.html');
-    window.open(url, '_blank', 'noopener,noreferrer');
+    // Open the full app in a new tab via the background worker (chrome.tabs.create).
+    // A page-context window.open to a chrome-extension:// URL gets blocked by ad/content
+    // blockers (ERR_BLOCKED_BY_CLIENT), so we route through the privileged tabs API.
+    try {
+      await sf.openFullApp();
+    } catch {
+      // Fallback if the background worker is unavailable.
+      const url = chrome.runtime.getURL('app/app.html');
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   }
 
   const titleRight = (

@@ -796,6 +796,36 @@ messageBus.on('PANEL_TOGGLE', async (message): Promise<MessageResponse> => {
   }
 });
 
+messageBus.on('OPEN_FULL_APP', async (message): Promise<MessageResponse> => {
+  try {
+    /**
+     * Open the full-page app in a new browser tab on behalf of the caller.
+     *
+     * Why route through the background worker instead of `window.open`:
+     * - The in-page panel runs in the Salesforce page context (content script). A
+     *   `window.open('chrome-extension://…')` from there is a page-initiated navigation,
+     *   which ad/content blockers intercept (ERR_BLOCKED_BY_CLIENT).
+     * - `chrome.tabs.create` is a privileged extension API and is not subject to that
+     *   client-side blocking.
+     *
+     * Optionally pins the app to a specific Salesforce tab via `?tabId=`.
+     *
+     * Complexity: O(1).
+     */
+    const { tabId } = (message.payload as { tabId?: number } | null) ?? {};
+    const base = chrome.runtime.getURL('app/app.html');
+    const url = tabId ? `${base}?tabId=${tabId}` : base;
+    await chrome.tabs.create({ url });
+    return { success: true, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'OPEN_FULL_APP_ERROR', message: error instanceof Error ? error.message : 'Failed to open full app' },
+      requestId: message.requestId,
+    };
+  }
+});
+
 // ── Org Handlers ─────────────────────────────────────────────────────
 
 messageBus.on('ORG_LIST', async (message): Promise<MessageResponse> => {
