@@ -131,7 +131,7 @@ export const uiCss = `
 
 :root[data-theme="dark"] .wl-qb-objList,
 :root[data-theme="dark"] .wl-ac-dropdown {
-  background: rgba(17, 41, 62, 0.92);
+  background: rgba(17, 41, 62, 0.98);
   backdrop-filter: blur(14px);
 }
 
@@ -886,6 +886,11 @@ export const uiCss = `
   cursor: pointer;
   color: var(--wl-ink-dim);
   transition: background 120ms ease, color 120ms ease;
+  /* Reset UA button styles so this works identically on <span> and <button>. */
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
 }
 .wl-qb-chipX:hover {
   background: rgba(239, 68, 96, 0.14);
@@ -1105,6 +1110,11 @@ export const uiCss = `
   margin: 0;
 }
 
+/* The SOQL card must not clip the autocomplete dropdown, which is
+   absolutely positioned below the textarea and extends past the card edge.
+   (Default .wl-card uses overflow:hidden for its rounded corners.) */
+.wl-card--soql { overflow: visible; }
+
 /* ── Autocomplete ── */
 .wl-ac-dropdown {
   position: absolute;
@@ -1115,10 +1125,10 @@ export const uiCss = `
   max-height: 240px;
   width: min(360px, 100%);
   overflow: auto;
-  border: 1px solid var(--wl-line-2);
+  border: 1px solid var(--wl-line);
   border-radius: var(--wl-radius-sm);
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
   backdrop-filter: blur(14px);
 }
 .wl-ac-item {
@@ -1140,6 +1150,12 @@ export const uiCss = `
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex: 1 1 auto;
+}
+.wl-ac-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .wl-ac-kindDot {
   width: 7px;
@@ -1157,6 +1173,10 @@ export const uiCss = `
   color: var(--wl-ink-dim);
   margin-left: 8px;
   white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Drag and Drop ── */
@@ -1804,6 +1824,10 @@ export const uiCss = `
   transition: background 140ms ease, transform 140ms ease;
 }
 .wl-buttonDestructive:hover { background: rgba(239, 68, 96, 0.18); transform: translateY(-1px); }
+.wl-buttonNeutral:disabled,
+.wl-buttonDestructive:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.wl-buttonNeutral:disabled:hover { border-color: var(--wl-line); background: rgba(255, 255, 255, 0.85); }
+.wl-buttonDestructive:disabled:hover { background: rgba(239, 68, 96, 0.08); }
 
 .wl-buttonText {
   border: none;

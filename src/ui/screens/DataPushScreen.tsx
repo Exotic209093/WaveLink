@@ -26,6 +26,9 @@ import { TypedConfirmModal } from '../components/TypedConfirmModal';
 import { PromptModal } from '../components/PromptModal';
 import { DropZone } from '../components/DropZone';
 import { RetryModal } from '../components/RetryModal';
+import { DryRunPanel } from '../components/DryRunPanel';
+import { simulatePush } from '../utils/pushDryRun';
+import type { DryRunReport } from '../utils/pushDryRun';
 import { buildRetryDataset } from '../utils/pushRetry';
 import { parseCsvFile, parseJsonFile } from '../utils/fileParse';
 import { DataMapper } from '../../data/mappers';
@@ -102,6 +105,7 @@ export function DataPushScreen(props: {
   const [mappingErrors, setMappingErrors] = useState<Array<{ recordIndex: number; field: string; message: string; value?: unknown }> | null>(null);
   const [mappedRecords, setMappedRecords] = useState<Record<string, unknown>[] | null>(null);
   const [validationErrors, setValidationErrors] = useState<Array<{ field: string; message: string; value?: unknown }> | null>(null);
+  const [dryRun, setDryRun] = useState<DryRunReport | null>(null);
 
   const [push, setPush] = useState<{ pushId: string; status: string; processed: number; failed: number; total: number; error?: string } | null>(null);
   const [pushResult, setPushResult] = useState<{ ids: string[]; capturedAt: number } | null>(null);
@@ -268,6 +272,19 @@ export function DataPushScreen(props: {
     setMappedRecords(res.mappedRecords);
     setMappingErrors(res.errors);
     setValidationErrors(null);
+    setDryRun(null);
+  }
+
+  function runDryRun(): void {
+    if (!mappedRecords || !describeFields) return;
+    const report = simulatePush(mappedRecords, describeFields, operation, {
+      externalIdField: operation === 'upsert' ? externalIdField : null,
+    });
+    setDryRun(report);
+    setToast({
+      title: report.failed === 0 ? 'Dry Run Passed' : 'Dry Run Found Issues',
+      body: `${report.ok} of ${report.total} rows would succeed.`,
+    });
   }
 
   function validate(): void {
@@ -438,7 +455,7 @@ export function DataPushScreen(props: {
             <button class="wl-btn" onClick={props.onRequestCleanser} disabled={!hasDataset}>Open Cleanser</button>
             <button class="wl-btn" onClick={openLoadTemplate} disabled={!hasDataset}>Load Template</button>
             <button class="wl-btn" onClick={() => setSaveTemplateOpen(true)} disabled={!hasDataset || mappings.length === 0}>Save Template</button>
-            <button class="wl-btn wl-btnDanger" onClick={() => props.onDataset(null)} disabled={!hasDataset}>Clear</button>
+            <button class="wl-buttonDestructive" onClick={() => props.onDataset(null)} disabled={!hasDataset}>Clear</button>
           </div>
         </div>
 
@@ -541,6 +558,7 @@ export function DataPushScreen(props: {
           <div class="wl-actions">
             <button class="wl-btn" onClick={applyMapping} disabled={!hasDataset || !describeFields || isBlocked}>Apply Mapping</button>
             <button class="wl-btn" onClick={validate} disabled={!mappedRecords || !describeFields || isBlocked}>Validate</button>
+            <button class="wl-btn" onClick={runDryRun} disabled={!mappedRecords || !describeFields || isBlocked} title="Simulate this push against the schema without writing to the org">Dry Run</button>
             <button
               class="wl-buttonBrand"
               onClick={() => setConfirmOpen(true)}
@@ -675,6 +693,15 @@ export function DataPushScreen(props: {
         </div>
       ) : null}
 
+      {dryRun ? (
+        <DryRunPanel
+          report={dryRun}
+          objectName={objectName}
+          operation={operation}
+          onClose={() => setDryRun(null)}
+        />
+      ) : null}
+
       {push ? (
         <div class="wl-card">
           <div class="wl-cardHeader">
@@ -688,14 +715,14 @@ export function DataPushScreen(props: {
           </div>
           <div class="wl-row" style="gap:10px;flex-wrap:wrap">
             {push.status === 'processing' ? (
-              <button class="wl-btn wl-btnDanger" disabled={busy} onClick={cancelActivePush}>Cancel Push</button>
+              <button class="wl-buttonDestructive" disabled={busy} onClick={cancelActivePush}>Cancel Push</button>
             ) : null}
             {push.status === 'complete' ? (
               <>
                 <button class="wl-btn" disabled={busy} onClick={loadPushIds}>View IDs</button>
-                <button class="wl-btn wl-btnPrimary" disabled={busy} onClick={prepareDeletePushFromIds}>Prepare Delete Push</button>
+                <button class="wl-buttonBrand" disabled={busy} onClick={prepareDeletePushFromIds}>Prepare Delete Push</button>
                 {push.failed > 0 && pushErrors && pushErrors.length > 0 ? (
-                  <button class="wl-btn wl-btnPrimary" disabled={busy} onClick={() => setRetryModalOpen(true)}>Retry Failed Rows</button>
+                  <button class="wl-buttonBrand" disabled={busy} onClick={() => setRetryModalOpen(true)}>Retry Failed Rows</button>
                 ) : null}
               </>
             ) : null}

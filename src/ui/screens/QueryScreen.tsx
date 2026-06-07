@@ -353,7 +353,7 @@ export function QueryScreen(props: {
 
   return (
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="wl-card">
+      <div class="wl-card wl-card--soql">
         <div class="wl-cardHeader">
           <h2>SOQL</h2>
           <div class="wl-actions">

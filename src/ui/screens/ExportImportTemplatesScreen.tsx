@@ -231,7 +231,7 @@ export function ExportImportTemplatesScreen(props: {
                       format: t.format,
                       filenameBase: t.filenameBase ?? '',
                     })}>Edit</button>
-                    <button class="wl-buttonDestructive" title="Delete template" onClick={() => setPendingDelete({ kind: 'export', item: t })}>×</button>
+                    <button class="wl-buttonDestructive" aria-label={`Delete export template ${t.name}`} title="Delete template" onClick={() => setPendingDelete({ kind: 'export', item: t })}>×</button>
                   </div>
                 </div>
               ))}
@@ -269,7 +269,7 @@ export function ExportImportTemplatesScreen(props: {
                     {onUseImport ? (
                       <button class="wl-buttonBrand" onClick={() => onUseImport(t)}>Use</button>
                     ) : null}
-                    <button class="wl-buttonDestructive" title="Delete template" onClick={() => setPendingDelete({ kind: 'import', item: t })}>×</button>
+                    <button class="wl-buttonDestructive" aria-label={`Delete import template ${t.name}`} title="Delete template" onClick={() => setPendingDelete({ kind: 'import', item: t })}>×</button>
                   </div>
                 </div>
               ))}

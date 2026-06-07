@@ -36,6 +36,9 @@ import { OrgHealthScreen } from './OrgHealthScreen';
 import { CoverageScreen } from './CoverageScreen';
 import { useDragList } from '../utils/dragDrop';
 import { BulkUpdateModal } from '../components/BulkUpdateModal';
+import { QualityScorecard } from '../components/QualityScorecard';
+import { inferQualityRules, scoreDataset } from '../utils/dataQuality';
+import type { ScorecardResult } from '../utils/dataQuality';
 
 type Operation = 'insert' | 'update' | 'upsert' | 'delete';
 
@@ -102,6 +105,7 @@ export function DataCleanserScreen(props: {
   const [objects, setObjects] = useState<Array<{ name: string; label: string }>>([]);
   const [showOnlyErrorFields, setShowOnlyErrorFields] = useState(false);
   const [bulkUpdateModalOpen, setBulkUpdateModalOpen] = useState(false);
+  const [scorecard, setScorecard] = useState<ScorecardResult | null>(null);
 
   useDragList({
     items: ops,
@@ -119,6 +123,7 @@ export function DataCleanserScreen(props: {
     setOps([]);
     setSnapshot(null);
     setValidationErrors(null);
+    setScorecard(null);
     setSelected(new Set());
     lastClickedIndexRef.current = null;
     props.onCleaned(null);
@@ -421,6 +426,19 @@ export function DataCleanserScreen(props: {
     }
   }
 
+  function runQualityScore(): void {
+    if (!dataset) return;
+    const { cleanedRecords, cleanedHeaders } = cleanseRecords(dataset.sourceRecords, ops);
+    if (cleanedHeaders.length === 0) {
+      setToast({ title: 'Nothing to Score', body: 'All columns are dropped.' });
+      return;
+    }
+    const rules = inferQualityRules(cleanedHeaders);
+    const result = scoreDataset(cleanedRecords, rules);
+    setScorecard(result);
+    setToast({ title: 'Quality Scored', body: `Score ${result.score}/100 across ${result.totalRecords} records.` });
+  }
+
   const datasetHeaderModel = dataset ? {
     filename: dataset.filename,
     rows: dataset.sourceRecords.length,
@@ -519,7 +537,7 @@ export function DataCleanserScreen(props: {
               }}
             />
           ) : null}
-          <button class="wl-btn wl-btnPrimary" onClick={() => setBulkUpdateModalOpen(true)} disabled={!dataset}>Bulk Update</button>
+          <button class="wl-buttonBrand" onClick={() => setBulkUpdateModalOpen(true)} disabled={!dataset}>Bulk Update</button>
 
           {singleSelectedOp ? (
             <ColumnEditor
@@ -564,6 +582,28 @@ export function DataCleanserScreen(props: {
         showOnlyErrorFields={showOnlyErrorFields}
         onShowOnlyErrorFields={setShowOnlyErrorFields}
       />
+
+      <div class="wl-card">
+        <div class="wl-cardHeader">
+          <h2>Data Quality</h2>
+          <div class="wl-actions">
+            <button class="wl-buttonBrand" onClick={runQualityScore} disabled={!dataset || !!blockingMessage}>
+              Score data quality
+            </button>
+            {scorecard ? (
+              <button class="wl-btn" onClick={() => setScorecard(null)}>Clear</button>
+            ) : null}
+          </div>
+        </div>
+        <div class="wl-row">
+          <div class="wl-muted">
+            Scores the current cleaned dataset for completeness and basic formatting (email / URL / phone),
+            inferred from your column names. Run it again after edits to see the score change.
+          </div>
+        </div>
+      </div>
+
+      {scorecard ? <QualityScorecard result={scorecard} /> : null}
         </>
       )}
 

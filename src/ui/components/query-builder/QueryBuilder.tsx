@@ -208,7 +208,7 @@ export function QueryBuilder(props: {
               {groupBy.map(name => (
                 <span key={name} class="wl-qb-fieldChip">
                   <span class="wl-mono">{name}</span>
-                  <span class="wl-qb-chipX" onClick={() => toggleGroupBy(name)}>&times;</span>
+                  <button type="button" class="wl-qb-chipX" aria-label={`Remove group by ${name}`} onClick={() => toggleGroupBy(name)}>&times;</button>
                 </span>
               ))}
             </div>

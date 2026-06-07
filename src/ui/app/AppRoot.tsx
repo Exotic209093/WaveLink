@@ -43,7 +43,6 @@ import { PushHistoryScreen } from '../screens/PushHistoryScreen';
 import { DataCleanserScreen } from '../screens/DataCleanserScreen';
 import { DataPushScreen } from '../screens/DataPushScreen';
 import { TestDataGeneratorScreen } from '../screens/TestDataGeneratorScreen';
-import { TemplatesScreen } from '../screens/TemplatesScreen';
 import { SchemaComparisonScreen } from '../screens/SchemaComparisonScreen';
 import { FieldAnalyticsScreen } from '../screens/FieldAnalyticsScreen';
 import { DuplicateDetectionScreen } from '../screens/DuplicateDetectionScreen';
@@ -238,6 +237,15 @@ export function AppRoot(): VNode {
       ],
     },
     {
+      key: 'migration', label: 'Migration', items: [
+        { key: 'migration/projects', label: 'Migration Projects' },
+        { key: 'migration/validation', label: 'Migration Validation' },
+        { key: 'migration/reports', label: 'Migration Reports' },
+        { key: 'migration/templates', label: 'Migration Templates' },
+        { key: 'migration/idMaps', label: 'ID Maps' },
+      ],
+    },
+    {
       key: 'extras', label: 'Library', items: [
         { key: 'templates', label: 'Templates' },
         { key: 'schedules', label: 'Schedules' },
@@ -245,30 +253,8 @@ export function AppRoot(): VNode {
       ],
     },
     {
-      key: 'advanced', label: 'Advanced Lab', items: [
-        { key: 'advanced/index', label: 'Overview' },
-        { key: 'advanced/migrationProjects', label: 'Migration Projects' },
-        { key: 'advanced/migrationValidation', label: 'Migration Validation' },
-        { key: 'advanced/migrationReports', label: 'Migration Reports' },
-        { key: 'advanced/migrationTemplates', label: 'Migration Templates' },
-        { key: 'advanced/idMaps', label: 'ID Maps' },
-        { key: 'advanced/objects', label: 'Objects' },
-        { key: 'advanced/relationships', label: 'Relationships' },
-        { key: 'advanced/schemaCompare', label: 'Schema Compare' },
-        { key: 'advanced/fieldAnalytics', label: 'Field Analytics' },
-        { key: 'advanced/cleanse', label: 'Cleanser' },
-        { key: 'advanced/duplicates', label: 'Duplicates' },
-        { key: 'advanced/quality', label: 'Quality' },
-        { key: 'advanced/pipeline', label: 'Pipeline' },
-        { key: 'advanced/testData', label: 'Test Data' },
-        { key: 'advanced/clone', label: 'Clone' },
-        { key: 'advanced/bulkOps', label: 'Bulk Ops' },
-        { key: 'advanced/compare', label: 'Data Compare' },
-        { key: 'advanced/apiUsage', label: 'API Usage' },
-        { key: 'advanced/history', label: 'Audit Trail' },
-        { key: 'advanced/query', label: 'SOQL Query' },
-        { key: 'advanced/push', label: 'Data Push' },
-        { key: 'advanced/legacyTemplates', label: 'Legacy Templates' },
+      key: 'advanced', label: 'Advanced', items: [
+        { key: 'advanced/index', label: 'Advanced Tools' },
       ],
     },
   ];
@@ -283,16 +269,33 @@ export function AppRoot(): VNode {
     ...pinnedItems,
   ];
 
+  // Advanced tools live behind the hub (not in the sidebar) but stay reachable
+  // from the command palette so power users can jump straight to them.
+  const advancedToolItems: NavItem[] = [
+    { key: 'advanced/objects', label: 'Objects' },
+    { key: 'advanced/relationships', label: 'Relationship Explorer' },
+    { key: 'advanced/schemaCompare', label: 'Schema Gap Analysis' },
+    { key: 'advanced/fieldAnalytics', label: 'Field Analytics' },
+    { key: 'advanced/cleanse', label: 'Cleanser' },
+    { key: 'advanced/duplicates', label: 'Duplicate Detection' },
+    { key: 'advanced/quality', label: 'Quality Scorecards' },
+    { key: 'advanced/bulkOps', label: 'Bulk Object Ops' },
+    { key: 'advanced/compare', label: 'Data Comparison' },
+    { key: 'advanced/apiUsage', label: 'API Usage' },
+    { key: 'advanced/history', label: 'Audit Trail' },
+    { key: 'advanced/pipeline', label: 'Pipeline Builder' },
+    { key: 'advanced/testData', label: 'Test Data Generator' },
+    { key: 'advanced/clone', label: 'Clone Wizard' },
+  ];
+
   // Routes that need a Salesforce tab.
   const requiresTab: Record<string, true> = {
     export: true,
     import: true,
     schedules: true,
-    'advanced/migrationProjects': true,
-    'advanced/migrationValidation': true,
-    'advanced/query': true,
+    'migration/projects': true,
+    'migration/validation': true,
     'advanced/objects': true,
-    'advanced/push': true,
     'advanced/cleanse': true,
     'advanced/testData': true,
     'advanced/schemaCompare': true,
@@ -327,11 +330,11 @@ export function AppRoot(): VNode {
     'org-health': 'advanced/quality',
     testData: 'advanced/testData',
     compare: 'advanced/compare',
-    migrationProjects: 'advanced/migrationProjects',
-    migrationValidation: 'advanced/migrationValidation',
-    migrationReports: 'advanced/migrationReports',
-    migrationTemplates: 'advanced/migrationTemplates',
-    idMaps: 'advanced/idMaps',
+    migrationProjects: 'migration/projects',
+    migrationValidation: 'migration/validation',
+    migrationReports: 'migration/reports',
+    migrationTemplates: 'migration/templates',
+    idMaps: 'migration/idMaps',
   };
 
   const effectiveRoute = LEGACY_ROUTE_ALIASES[route] ?? route;
@@ -380,15 +383,17 @@ export function AppRoot(): VNode {
     if (route === 'schedules') return <SchedulesScreen sf={sf} />;
     if (route === 'diff') return <DiffScreen />;
 
-    // ── Advanced Lab ──
+    // ── Migration suite (top-level) ──
+    if (route === 'migration/projects' && activeProjectId) return <MigrationWorkspaceScreen sf={sf} tabId={selectedTabId!} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />;
+    if (route === 'migration/projects') return <MigrationProjectsScreen sf={sf} onOpenProject={(id) => setActiveProjectId(id)} />;
+    if (route === 'migration/validation' && activeProjectId) return <MigrationValidationScreen sf={sf} tabId={selectedTabId!} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />;
+    if (route === 'migration/validation') return <MigrationProjectsScreen sf={sf} onOpenProject={(id) => { setActiveProjectId(id); setRoute('migration/validation'); }} />;
+    if (route === 'migration/reports') return <MigrationReportsScreen sf={sf} />;
+    if (route === 'migration/templates') return <MigrationTemplatesScreen sf={sf} />;
+    if (route === 'migration/idMaps') return <IdMapViewerScreen sf={sf} />;
+
+    // ── Advanced hub + tools ──
     if (route === 'advanced/index') return <AdvancedLabScreen onNavigate={setRoute} />;
-    if (route === 'advanced/migrationProjects' && activeProjectId) return <MigrationWorkspaceScreen sf={sf} tabId={selectedTabId!} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />;
-    if (route === 'advanced/migrationProjects') return <MigrationProjectsScreen sf={sf} onOpenProject={(id) => setActiveProjectId(id)} />;
-    if (route === 'advanced/migrationValidation' && activeProjectId) return <MigrationValidationScreen sf={sf} tabId={selectedTabId!} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />;
-    if (route === 'advanced/migrationValidation') return <MigrationProjectsScreen sf={sf} onOpenProject={(id) => { setActiveProjectId(id); setRoute('advanced/migrationValidation'); }} />;
-    if (route === 'advanced/migrationReports') return <MigrationReportsScreen sf={sf} />;
-    if (route === 'advanced/migrationTemplates') return <MigrationTemplatesScreen sf={sf} />;
-    if (route === 'advanced/idMaps') return <IdMapViewerScreen sf={sf} />;
     if (route === 'advanced/query') return <QueryScreen sf={sf} tabId={selectedTabId!} context={context ?? undefined} soql={soql} onSoqlChange={setSoql} />;
     if (route === 'advanced/objects') return (
       <ObjectsScreen sf={sf} tabId={selectedTabId!} onInsertToken={(token) => setSoql(prev => `${prev}${prev.endsWith(' ') ? '' : ' '}${token}`)} />
@@ -416,7 +421,6 @@ export function AppRoot(): VNode {
       />
     );
     if (route === 'advanced/history') return <PushHistoryScreen sf={sf} />;
-    if (route === 'advanced/legacyTemplates') return <TemplatesScreen sf={sf} />;
     if (route === 'advanced/testData') return <TestDataGeneratorScreen sf={sf} tabId={selectedTabId!} />;
     if (route === 'advanced/schemaCompare') return <SchemaComparisonScreen sf={sf} tabId={selectedTabId!} />;
     if (route === 'advanced/fieldAnalytics') return <FieldAnalyticsScreen sf={sf} tabId={selectedTabId!} />;
@@ -453,12 +457,21 @@ export function AppRoot(): VNode {
         theme={theme}
         onThemeChange={handleThemeChange}
       >
+        {effectiveRoute.startsWith('advanced/') && effectiveRoute !== 'advanced/index' ? (
+          <button
+            class="wl-btn"
+            style="margin-bottom:12px"
+            onClick={() => setRoute('advanced/index')}
+          >
+            ← Back to Advanced
+          </button>
+        ) : null}
         {renderScreen()}
       </AppShell>
 
       <CommandPalette
         open={commandPaletteOpen}
-        commands={navItems.map(n => ({
+        commands={[...navItems, ...advancedToolItems].map(n => ({
           id: n.key,
           label: n.label,
           description: `Navigate to ${n.label}`,
