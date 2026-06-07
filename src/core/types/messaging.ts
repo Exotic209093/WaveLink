@@ -51,6 +51,7 @@ export type MessageType =
   | 'SF_QUERY_EXPLAIN'
   // UI control
   | 'PANEL_TOGGLE'
+  | 'OPEN_FULL_APP'
   | 'UI_SETTINGS_GET'
   | 'UI_SETTINGS_SET'
   | 'SAVED_QUERIES_LIST'

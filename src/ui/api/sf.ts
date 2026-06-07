@@ -122,6 +122,14 @@ export class SfApi {
     return res.data;
   }
 
+  async openFullApp(tabId?: number): Promise<void> {
+    // Routed through the background worker (chrome.tabs.create) so the navigation
+    // isn't intercepted by ad/content blockers (ERR_BLOCKED_BY_CLIENT) the way a
+    // page-context window.open to a chrome-extension:// URL would be.
+    const res = await this.bus.send<{ tabId?: number }, object>('OPEN_FULL_APP', { tabId });
+    if (!res.success) throw new Error(res.error?.message ?? 'Failed to open full app');
+  }
+
   async getUiSettings(): Promise<UiSettings> {
     const res = await this.bus.send<object, UiSettings>('UI_SETTINGS_GET', {});
     if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to read UI settings');
