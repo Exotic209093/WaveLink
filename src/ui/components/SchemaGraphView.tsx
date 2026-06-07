@@ -370,9 +370,9 @@ function SchemaGraphViewInner(props: {
 
       {/* ── Toolbar ── */}
       <div style={`position:absolute;top:10px;right:10px;z-index:10;display:flex;align-items:center;gap:4px;${TOOLBAR_PILL}padding:4px 8px`}>
-        <button class="wl-btn" style={`${btnBase};font-size:13px;font-weight:900`} onClick={() => zoomBy(1.25)} title="Zoom in">+</button>
+        <button class="wl-btn" style={`${btnBase};font-size:13px;font-weight:900`} onClick={() => zoomBy(1.25)} title="Zoom in" aria-label="Zoom in">+</button>
         <span style="font-size:11px;color:var(--wl-ink-dim);min-width:36px;text-align:center;font-weight:700">{zoomPct}%</span>
-        <button class="wl-btn" style={`${btnBase};font-size:13px;font-weight:900`} onClick={() => zoomBy(0.8)} title="Zoom out">−</button>
+        <button class="wl-btn" style={`${btnBase};font-size:13px;font-weight:900`} onClick={() => zoomBy(0.8)} title="Zoom out" aria-label="Zoom out">−</button>
         <div style="width:1px;height:14px;background:var(--wl-line-2);margin:0 2px" />
         <button class="wl-btn" style={btnBase} onClick={fitAll} title="Zoom to fit all nodes">⊡ Fit</button>
         <button class="wl-btn" style={btnBase} onClick={resetView} title="Reset view">⌂ Reset</button>

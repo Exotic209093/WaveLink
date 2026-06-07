@@ -32,10 +32,12 @@ export function ObjectSelector(props: {
         <div class="wl-qb-objSelected">
           <span class="wl-qb-objChip">
             <span class="wl-mono">{value}</span>
-            <span
+            <button
+              type="button"
               class="wl-qb-chipX"
+              aria-label={`Clear selected object ${value}`}
               onClick={() => { onChange(''); setOpen(true); }}
-            >&times;</span>
+            >&times;</button>
           </span>
         </div>
       ) : (
