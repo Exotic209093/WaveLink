@@ -116,11 +116,11 @@ export function TypedConfirmModal(props: TypedConfirmModalProps): VNode | null {
               Cancel
             </button>
             <button
-              class="wl-btn wl-btnDanger"
+              class="wl-buttonDestructive"
               onClick={onConfirm}
               disabled={!isMatch || busy}
             >
-              {busy ? 'Processing...' : 'Confirm'}
+              {busy ? 'Processing…' : 'Confirm'}
             </button>
           </div>
         </div>
