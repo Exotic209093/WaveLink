@@ -385,3 +385,65 @@ export function getDefaultRulesForField(
 
   return rules;
 }
+
+/**
+ * Infer heuristic quality rules from column headers alone, for scoring an
+ * in-memory dataset without describe metadata (e.g. inside the Cleanser).
+ *
+ * Every column gets a completeness (`required`, warning) rule, and columns
+ * whose name hints at a known type (email / url / phone) also get a format
+ * rule. The resulting score is dominated by completeness, which is the most
+ * useful signal when shaping a raw file before a push.
+ *
+ * Complexity: O(H) in the number of headers.
+ */
+export function inferQualityRules(headers: string[]): QualityRule[] {
+  const rules: QualityRule[] = [];
+
+  for (const header of headers) {
+    const name = header.trim();
+    if (name === '') continue;
+    const lower = name.toLowerCase();
+
+    // Completeness — non-empty value expected for every column.
+    rules.push({
+      id: `infer-required-${name}`,
+      field: name,
+      type: 'required',
+      config: {},
+      severity: 'warning',
+      message: `${name} is empty`,
+    });
+
+    if (lower.includes('email')) {
+      rules.push({
+        id: `infer-email-${name}`,
+        field: name,
+        type: 'format',
+        config: { pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$' },
+        severity: 'error',
+        message: `${name} must be a valid email address`,
+      });
+    } else if (lower.includes('website') || lower.includes('url')) {
+      rules.push({
+        id: `infer-url-${name}`,
+        field: name,
+        type: 'format',
+        config: { pattern: '^https?://' },
+        severity: 'warning',
+        message: `${name} should be a valid URL`,
+      });
+    } else if (lower.includes('phone') || lower.includes('mobile') || lower.includes('fax')) {
+      rules.push({
+        id: `infer-phone-${name}`,
+        field: name,
+        type: 'format',
+        config: { pattern: '^[\\d\\s\\(\\)\\+\\-\\.]+$' },
+        severity: 'warning',
+        message: `${name} should contain only valid phone characters`,
+      });
+    }
+  }
+
+  return rules;
+}
