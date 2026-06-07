@@ -25,6 +25,8 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { TypedConfirmModal } from '../components/TypedConfirmModal';
 import { DropZone } from '../components/DropZone';
 import { RetryModal } from '../components/RetryModal';
+import { MigrationProgressDashboard } from '../components/MigrationProgressDashboard';
+import { computePushProgress } from '../utils/pushMetrics';
 import { buildRetryDataset } from '../utils/pushRetry';
 import { parseCsvFile, parseJsonFile } from '../utils/fileParse';
 import { DataMapper } from '../../data/mappers';
@@ -100,7 +102,8 @@ export function DataPushScreen(props: {
   const [mappedRecords, setMappedRecords] = useState<Record<string, unknown>[] | null>(null);
   const [validationErrors, setValidationErrors] = useState<Array<{ field: string; message: string; value?: unknown }> | null>(null);
 
-  const [push, setPush] = useState<{ pushId: string; status: string; processed: number; failed: number; total: number; error?: string } | null>(null);
+  const [push, setPush] = useState<{ pushId: string; status: string; processed: number; failed: number; total: number; error?: string; startedAt: number; completedAt?: number } | null>(null);
+  const [nowTs, setNowTs] = useState<number>(() => Date.now());
   const [pushResult, setPushResult] = useState<{ ids: string[]; capturedAt: number } | null>(null);
   const [pushErrors, setPushErrors] = useState<Array<{ recordIndex: number; message: string }> | null>(null);
   const [lastPushConfig, setLastPushConfig] = useState<{
@@ -132,6 +135,7 @@ export function DataPushScreen(props: {
           processed: data.processedRecords,
           failed: data.failedRecords,
           total: data.totalRecords,
+          completedAt: Date.now(),
         };
       });
       if (data.errors && data.errors.length > 0) {
@@ -145,7 +149,7 @@ export function DataPushScreen(props: {
       setPush(prev => {
         if (!prev) return prev;
         if (data.pushId && prev.pushId !== data.pushId) return prev;
-        return { ...prev, status: 'error', error: data.error ?? 'Push failed' };
+        return { ...prev, status: 'error', error: data.error ?? 'Push failed', completedAt: Date.now() };
       });
       return { success: true, requestId: message.requestId };
     });
@@ -155,6 +159,14 @@ export function DataPushScreen(props: {
       busRef.current = null;
     };
   }, []);
+
+  // Tick once a second while a push is in flight so elapsed/throughput/ETA stay live.
+  useEffect(() => {
+    if (push?.status !== 'processing') return;
+    setNowTs(Date.now());
+    const id = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [push?.status]);
 
   useEffect(() => {
     sf.describeGlobal(tabId)
@@ -663,42 +675,53 @@ export function DataPushScreen(props: {
       ) : null}
 
       {push ? (
+        <MigrationProgressDashboard
+          progress={computePushProgress({
+            status: push.status,
+            processed: push.processed,
+            failed: push.failed,
+            total: push.total,
+            startedAt: push.startedAt,
+            completedAt: push.completedAt,
+            now: nowTs,
+          })}
+          pushId={push.pushId}
+          status={push.status}
+          error={push.error}
+          actions={
+            <>
+              {push.status === 'processing' ? (
+                <button class="wl-buttonDestructive" disabled={busy} onClick={cancelActivePush}>Cancel Push</button>
+              ) : null}
+              {push.status === 'complete' ? (
+                <>
+                  <button class="wl-btn" disabled={busy} onClick={loadPushIds}>View IDs</button>
+                  <button class="wl-buttonBrand" disabled={busy} onClick={prepareDeletePushFromIds}>Prepare Delete Push</button>
+                  {push.failed > 0 && pushErrors && pushErrors.length > 0 ? (
+                    <button class="wl-buttonBrand" disabled={busy} onClick={() => setRetryModalOpen(true)}>Retry Failed Rows</button>
+                  ) : null}
+                </>
+              ) : null}
+            </>
+          }
+        />
+      ) : null}
+
+      {pushResult ? (
         <div class="wl-card">
           <div class="wl-cardHeader">
-            <h2>Push Progress</h2>
-            <div class="wl-muted">{push.pushId}</div>
+            <h2>Stored Record IDs</h2>
+            <div class="wl-muted">{pushResult.ids.length} IDs</div>
           </div>
-          <div class="wl-row">
-            <div style="font-weight:900">{push.status}</div>
-            <div class="wl-muted">{push.processed} / {push.total} processed - {push.failed} failed</div>
-            {push.error ? <div class="wl-muted" style="color:var(--wl-danger)">{push.error}</div> : null}
-          </div>
-          <div class="wl-row" style="gap:10px;flex-wrap:wrap">
-            {push.status === 'processing' ? (
-              <button class="wl-btn wl-btnDanger" disabled={busy} onClick={cancelActivePush}>Cancel Push</button>
+          <div class="wl-row" style="flex-direction:column;gap:6px;align-items:flex-start">
+            {pushResult.ids.length > 0 ? (
+              <div class="wl-mono" style="max-width:100%;overflow:auto">
+                {pushResult.ids.slice(0, 10).join('\n')}
+                {pushResult.ids.length > 10 ? `\n... (${pushResult.ids.length - 10} more)` : ''}
+              </div>
             ) : null}
-            {push.status === 'complete' ? (
-              <>
-                <button class="wl-btn" disabled={busy} onClick={loadPushIds}>View IDs</button>
-                <button class="wl-btn wl-btnPrimary" disabled={busy} onClick={prepareDeletePushFromIds}>Prepare Delete Push</button>
-                {push.failed > 0 && pushErrors && pushErrors.length > 0 ? (
-                  <button class="wl-btn wl-btnPrimary" disabled={busy} onClick={() => setRetryModalOpen(true)}>Retry Failed Rows</button>
-                ) : null}
-              </>
-            ) : null}
+            <div class="wl-muted">Session-only: IDs are cleared when the browser closes.</div>
           </div>
-          {pushResult ? (
-            <div class="wl-row" style="flex-direction:column;gap:6px;align-items:flex-start">
-              <div class="wl-muted">Stored IDs: {pushResult.ids.length}</div>
-              {pushResult.ids.length > 0 ? (
-                <div class="wl-mono" style="max-width:100%;overflow:auto">
-                  {pushResult.ids.slice(0, 10).join('\n')}
-                  {pushResult.ids.length > 10 ? `\n... (${pushResult.ids.length - 10} more)` : ''}
-                </div>
-              ) : null}
-              <div class="wl-muted">Session-only: IDs are cleared when the browser closes.</div>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
@@ -734,7 +757,7 @@ export function DataPushScreen(props: {
                 useBulkApi,
               });
               setConfirmOpen(false);
-              setPush({ pushId: res.pushId, status: 'processing', processed: 0, failed: 0, total: mappedRecords.length });
+              setPush({ pushId: res.pushId, status: 'processing', processed: 0, failed: 0, total: mappedRecords.length, startedAt: Date.now() });
               setPushResult(null);
               setPushErrors(null);
               // Save push config for retry
@@ -809,7 +832,7 @@ export function DataPushScreen(props: {
                 useBulkApi,
               });
               setConfirmOpen(false);
-              setPush({ pushId: res.pushId, status: 'processing', processed: 0, failed: 0, total: mappedRecords.length });
+              setPush({ pushId: res.pushId, status: 'processing', processed: 0, failed: 0, total: mappedRecords.length, startedAt: Date.now() });
               setPushResult(null);
               setPushErrors(null);
               // Save push config for retry
