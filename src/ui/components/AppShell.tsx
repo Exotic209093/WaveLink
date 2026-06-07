@@ -66,6 +66,7 @@ export function AppShell(props: {
     <div class="wl-app" data-mode={mode}>
       <div class="wl-topbar">
         <div class="wl-brand">
+          <span class="wl-brandMark" aria-hidden="true">〜</span>
           <h1>WaveLink</h1>
           {mode !== 'popup' && sf ? (
             <OrgSwitcher sf={sf} onOrgSwitch={onOrgSwitch} />
