@@ -55,7 +55,7 @@ export function ConfirmModal(props: {
 
   const confirmText = props.confirmText ?? 'Confirm';
   const cancelText = props.cancelText ?? 'Cancel';
-  const confirmClass = props.confirmTone === 'danger' ? 'wl-buttonDestructive' : 'wl-btn wl-btnPrimary';
+  const confirmClass = props.confirmTone === 'danger' ? 'wl-buttonDestructive' : 'wl-buttonBrand';
 
   return (
     <div class="wl-modalOverlay" role="dialog" aria-modal="true" aria-label={props.title}>
