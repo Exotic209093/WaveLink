@@ -28,7 +28,7 @@ interface FieldOption {
 
 const SYSTEM_FIELDS = new Set(['Id', 'CreatedDate', 'CreatedById', 'LastModifiedDate', 'LastModifiedById', 'SystemModstamp', 'IsDeleted']);
 
-export function DataComparisonScreen(props: { sf: SfApi }): VNode {
+export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean }): VNode {
   const { sf } = props;
 
   const [sourceOrgId, setSourceOrgId] = useState<string | null>(null);
@@ -191,9 +191,11 @@ export function DataComparisonScreen(props: { sf: SfApi }): VNode {
   return (
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="wl-card">
-        <div class="wl-cardHeader">
-          <h2>Data Comparison</h2>
-        </div>
+        {props.hideHeader ? null : (
+          <div class="wl-cardHeader">
+            <h2>Data Comparison</h2>
+          </div>
+        )}
 
         <OrgPicker
           sf={sf}

@@ -43,7 +43,6 @@ const GROUPS: Group[] = [
     title: 'Operations',
     entries: [
       { route: 'advanced/bulkOps', label: 'Bulk Object Ops', description: 'Cross-object bulk delete and update.', icon: '⚡' },
-      { route: 'advanced/compare', label: 'Data Comparison', description: 'Side-by-side data diff across two orgs.', icon: '⇔' },
       { route: 'advanced/apiUsage', label: 'API Usage', description: 'Daily API request limits and trend tracking.', icon: '📡' },
       { route: 'advanced/history', label: 'Audit Trail', description: 'Full history of every push/upsert operation.', icon: '📜' },
     ],
