@@ -1813,6 +1813,10 @@ export const uiCss = `
   transition: background 140ms ease, transform 140ms ease;
 }
 .wl-buttonDestructive:hover { background: rgba(239, 68, 96, 0.18); transform: translateY(-1px); }
+.wl-buttonNeutral:disabled,
+.wl-buttonDestructive:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.wl-buttonNeutral:disabled:hover { border-color: var(--wl-line); background: rgba(255, 255, 255, 0.85); }
+.wl-buttonDestructive:disabled:hover { background: rgba(239, 68, 96, 0.08); }
 
 .wl-buttonText {
   border: none;
