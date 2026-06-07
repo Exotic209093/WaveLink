@@ -16,6 +16,7 @@ import { h } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { SfApi } from '../api/sf';
 import type { SfContext } from '../api/sf';
+import { isExtensionContextValid } from '../../services/messaging';
 import { AppShell } from '../components/AppShell';
 import type { NavItem } from '../components/AppShell';
 import { QueryScreen } from '../screens/QueryScreen';
@@ -32,6 +33,31 @@ export function PanelRoot(props: { shadowRoot: ShadowRoot }): VNode {
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
   const [soql, setSoql] = useState<string>('SELECT Id, Name FROM Account LIMIT 10');
   const [theme, setTheme] = useState<Theme>('light');
+  const [reconnectNeeded, setReconnectNeeded] = useState<boolean>(false);
+
+  useEffect(() => {
+    /**
+     * Watch for a severed extension runtime.
+     *
+     * The panel is a content script living in the Salesforce page. If WaveLink is
+     * reloaded/updated/disabled while this tab stays open, chrome.runtime is detached
+     * and every message throws "Extension context invalidated." We poll the definitive
+     * signal (chrome.runtime.id) and prompt a single, clear reload rather than letting
+     * each screen surface a cryptic failure toast. Reload is the only resolution, so we
+     * stop polling once detected.
+     */
+    let stopped = false;
+    const check = (): void => {
+      if (stopped) return;
+      if (!isExtensionContextValid()) {
+        stopped = true;
+        setReconnectNeeded(true);
+      }
+    };
+    check();
+    const interval = window.setInterval(check, 3000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     // Resolve Salesforce context for the current tab (no explicit tabId needed from content script).
@@ -108,6 +134,15 @@ export function PanelRoot(props: { shadowRoot: ShadowRoot }): VNode {
 
   return (
     <>
+      {reconnectNeeded ? (
+        <div class="wl-reconnectBanner" role="alert">
+          <div class="wl-reconnectBannerText">
+            <strong>Disconnected from WaveLink</strong>
+            <span>The extension was updated or reloaded. Reload this tab to reconnect.</span>
+          </div>
+          <button class="wl-btn wl-btnPrimary" onClick={() => window.location.reload()}>Reload</button>
+        </div>
+      ) : null}
       <AppShell
         mode="panel"
         context={context ?? undefined}

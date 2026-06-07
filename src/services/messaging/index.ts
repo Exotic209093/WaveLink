@@ -26,6 +26,46 @@ import { generateRequestId } from '../../core/utils';
 const MESSAGE_TIMEOUT = 30_000;
 
 /**
+ * User-facing message shown when the extension runtime has been severed from a
+ * still-running content script (e.g. the panel injected into a Salesforce page).
+ */
+export const EXTENSION_RELOADED_MESSAGE =
+  'WaveLink was updated or reloaded. Refresh this Salesforce tab to reconnect.';
+
+/**
+ * Whether the extension runtime is still attached to this JS context.
+ *
+ * `chrome.runtime.id` becomes `undefined` once the extension is reloaded,
+ * updated, or disabled while an injected content script keeps running — the
+ * "Extension context invalidated." condition. Reading it is a cheap, synchronous,
+ * and definitive signal.
+ */
+export function isExtensionContextValid(): boolean {
+  try {
+    return Boolean(chrome.runtime?.id);
+  } catch {
+    return false;
+  }
+}
+
+/** Whether a raw error string is the "extension context invalidated" family. */
+export function isContextInvalidatedMessage(raw: string | undefined | null): boolean {
+  return /context invalidated/i.test(raw ?? '');
+}
+
+/**
+ * Map a low-level messaging error to a user-facing message, collapsing the
+ * "extension context invalidated" family into a single actionable reconnect prompt.
+ */
+function normalizeMessagingError(raw: string | undefined): string {
+  const message = raw ?? 'Messaging failed';
+  if (!isExtensionContextValid() || isContextInvalidatedMessage(message)) {
+    return EXTENSION_RELOADED_MESSAGE;
+  }
+  return message;
+}
+
+/**
  * MessageBus provides typed messaging between extension contexts.
  */
 export class MessageBus {
@@ -67,18 +107,30 @@ export class MessageBus {
     };
 
     return new Promise<MessageResponse<R>>((resolve, reject) => {
+      if (!isExtensionContextValid()) {
+        reject(new Error(EXTENSION_RELOADED_MESSAGE));
+        return;
+      }
+
       const timer = setTimeout(() => {
         reject(new Error(`Message timeout: ${type} (${message.requestId})`));
       }, MESSAGE_TIMEOUT);
 
-      chrome.runtime.sendMessage(message, (response: MessageResponse<R>) => {
+      try {
+        chrome.runtime.sendMessage(message, (response: MessageResponse<R>) => {
+          clearTimeout(timer);
+          if (chrome.runtime.lastError) {
+            reject(new Error(normalizeMessagingError(chrome.runtime.lastError.message)));
+            return;
+          }
+          resolve(response);
+        });
+      } catch (error) {
+        // chrome.runtime.sendMessage throws synchronously ("Extension context
+        // invalidated.") when the extension is reloaded while this content script keeps running.
         clearTimeout(timer);
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        resolve(response);
-      });
+        reject(new Error(normalizeMessagingError(error instanceof Error ? error.message : String(error))));
+      }
     });
   }
 
@@ -99,18 +151,28 @@ export class MessageBus {
     };
 
     return new Promise<MessageResponse<R>>((resolve, reject) => {
+      if (!isExtensionContextValid()) {
+        reject(new Error(EXTENSION_RELOADED_MESSAGE));
+        return;
+      }
+
       const timer = setTimeout(() => {
         reject(new Error(`Tab message timeout: ${type}`));
       }, MESSAGE_TIMEOUT);
 
-      chrome.tabs.sendMessage(tabId, message, (response: MessageResponse<R>) => {
+      try {
+        chrome.tabs.sendMessage(tabId, message, (response: MessageResponse<R>) => {
+          clearTimeout(timer);
+          if (chrome.runtime.lastError) {
+            reject(new Error(normalizeMessagingError(chrome.runtime.lastError.message)));
+            return;
+          }
+          resolve(response);
+        });
+      } catch (error) {
         clearTimeout(timer);
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        resolve(response);
-      });
+        reject(new Error(normalizeMessagingError(error instanceof Error ? error.message : String(error))));
+      }
     });
   }
 

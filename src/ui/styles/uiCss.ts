@@ -552,6 +552,23 @@ export const uiCss = `
 .wl-toastDetailsToggle:hover { color: var(--wl-ink); }
 .wl-toastDetailsPre { font-family: var(--wl-font-mono); font-size: 11px; background: rgba(7, 32, 51, 0.04); border: 1px solid var(--wl-line-2); border-radius: 8px; padding: 8px; margin: 6px 0 0 0; max-height: 160px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
 
+.wl-reconnectBanner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(239, 68, 96, 0.1);
+  border-bottom: 1px solid rgba(239, 68, 96, 0.35);
+  backdrop-filter: blur(8px);
+}
+.wl-reconnectBannerText { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.wl-reconnectBannerText strong { color: var(--wl-danger); font-size: 13px; }
+.wl-reconnectBannerText span { color: var(--wl-ink-dim); }
+
 :root[data-theme="dark"] .wl-toastBadge--warning { color: #ffa726; }
 :root[data-theme="dark"] .wl-toastBadge--success { color: #66bb6a; }
 :root[data-theme="dark"] .wl-toastHint { background: rgba(86, 200, 232, 0.06); }
