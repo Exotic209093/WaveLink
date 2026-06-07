@@ -87,7 +87,7 @@ function PickerCard(props: {
   );
 }
 
-export function DiffScreen(): VNode {
+export function DiffScreen(props: { hideHeader?: boolean } = {}): VNode {
   const [left, setLeft] = useState<Source | null>(null);
   const [right, setRight] = useState<Source | null>(null);
   const [keyField, setKeyField] = useState<string>('Id');
@@ -146,15 +146,17 @@ export function DiffScreen(): VNode {
 
   return (
     <div>
-      <div class="wl-pageHeader">
-        <div class="wl-pageHeader__main">
-          <span class="wl-pageHeader__eyebrow">Diff</span>
-          <h1 class="wl-pageHeader__title">Compare two exports</h1>
-          <p class="wl-pageHeader__sub">
-            Pick two snapshots or files, choose a key field, and see what's been added, removed, or changed.
-          </p>
+      {props.hideHeader ? null : (
+        <div class="wl-pageHeader">
+          <div class="wl-pageHeader__main">
+            <span class="wl-pageHeader__eyebrow">Diff</span>
+            <h1 class="wl-pageHeader__title">Compare two exports</h1>
+            <p class="wl-pageHeader__sub">
+              Pick two snapshots or files, choose a key field, and see what's been added, removed, or changed.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div class="wl-twoCol" style="margin-bottom:16px">
         <PickerCard

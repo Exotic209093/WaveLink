@@ -32,7 +32,7 @@ import { ImportScreen } from '../screens/ImportScreen';
 import { ConvertScreen } from '../screens/ConvertScreen';
 import { ExportImportTemplatesScreen } from '../screens/ExportImportTemplatesScreen';
 import { SchedulesScreen } from '../screens/SchedulesScreen';
-import { DiffScreen } from '../screens/DiffScreen';
+import { CompareScreen } from '../screens/CompareScreen';
 import { AdvancedLabScreen } from '../screens/AdvancedLabScreen';
 
 // ── Legacy screens (still reachable via Advanced Lab) ─────────────────
@@ -53,7 +53,6 @@ import { ApiUsageDashboardScreen } from '../screens/ApiUsageDashboardScreen';
 import { BulkObjectOpsScreen } from '../screens/BulkObjectOpsScreen';
 import { RelationshipExplorerScreen } from '../screens/RelationshipExplorerScreen';
 import { HelpScreen } from '../screens/HelpScreen';
-import { DataComparisonScreen } from '../screens/DataComparisonScreen';
 import { MigrationProjectsScreen } from '../screens/MigrationProjectsScreen';
 import { MigrationWorkspaceScreen } from '../screens/MigrationWorkspaceScreen';
 import { MigrationValidationScreen } from '../screens/MigrationValidationScreen';
@@ -249,7 +248,7 @@ export function AppRoot(): VNode {
       key: 'extras', label: 'Library', items: [
         { key: 'templates', label: 'Templates' },
         { key: 'schedules', label: 'Schedules' },
-        { key: 'diff', label: 'Diff' },
+        { key: 'diff', label: 'Compare' },
       ],
     },
     {
@@ -280,7 +279,6 @@ export function AppRoot(): VNode {
     { key: 'advanced/duplicates', label: 'Duplicate Detection' },
     { key: 'advanced/quality', label: 'Quality Scorecards' },
     { key: 'advanced/bulkOps', label: 'Bulk Object Ops' },
-    { key: 'advanced/compare', label: 'Data Comparison' },
     { key: 'advanced/apiUsage', label: 'API Usage' },
     { key: 'advanced/history', label: 'Audit Trail' },
     { key: 'advanced/pipeline', label: 'Pipeline Builder' },
@@ -329,7 +327,7 @@ export function AppRoot(): VNode {
     fieldAnalytics: 'advanced/fieldAnalytics',
     'org-health': 'advanced/quality',
     testData: 'advanced/testData',
-    compare: 'advanced/compare',
+    compare: 'diff',
     migrationProjects: 'migration/projects',
     migrationValidation: 'migration/validation',
     migrationReports: 'migration/reports',
@@ -381,7 +379,7 @@ export function AppRoot(): VNode {
     if (route === 'convert') return <ConvertScreen />;
     if (route === 'templates') return <ExportImportTemplatesScreen sf={sf} />;
     if (route === 'schedules') return <SchedulesScreen sf={sf} />;
-    if (route === 'diff') return <DiffScreen />;
+    if (route === 'diff') return <CompareScreen sf={sf} />;
 
     // ── Migration suite (top-level) ──
     if (route === 'migration/projects' && activeProjectId) return <MigrationWorkspaceScreen sf={sf} tabId={selectedTabId!} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />;
@@ -431,7 +429,6 @@ export function AppRoot(): VNode {
     if (route === 'advanced/apiUsage') return <ApiUsageDashboardScreen sf={sf} tabId={selectedTabId!} />;
     if (route === 'advanced/bulkOps') return <BulkObjectOpsScreen sf={sf} tabId={selectedTabId!} />;
     if (route === 'advanced/relationships') return <RelationshipExplorerScreen sf={sf} tabId={selectedTabId!} />;
-    if (route === 'advanced/compare') return <DataComparisonScreen sf={sf} />;
 
     // Pinned
     if (route === 'help') return <HelpScreen sf={sf} onNavigate={setRoute} />;
