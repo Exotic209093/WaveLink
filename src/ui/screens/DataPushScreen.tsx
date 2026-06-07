@@ -23,15 +23,19 @@ import type { SfApi } from '../api/sf';
 import { Toast } from '../components/Toast';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { TypedConfirmModal } from '../components/TypedConfirmModal';
+import { PromptModal } from '../components/PromptModal';
 import { DropZone } from '../components/DropZone';
 import { RetryModal } from '../components/RetryModal';
 import { MigrationProgressDashboard } from '../components/MigrationProgressDashboard';
 import { computePushProgress } from '../utils/pushMetrics';
+import { DryRunPanel } from '../components/DryRunPanel';
+import { simulatePush } from '../utils/pushDryRun';
+import type { DryRunReport } from '../utils/pushDryRun';
 import { buildRetryDataset } from '../utils/pushRetry';
 import { parseCsvFile, parseJsonFile } from '../utils/fileParse';
 import { DataMapper } from '../../data/mappers';
 import { DataValidator } from '../../data/validators';
-import type { FieldMapping, TransformationType } from '../../core/types/storage';
+import type { FieldMapping, TransformationType, DataTemplate } from '../../core/types/storage';
 import type { SObjectField } from '../../core/types/salesforce';
 import { MessageBus } from '../../services/messaging';
 import { TRANSFORM_OPTIONS } from '../utils/transforms';
@@ -88,6 +92,8 @@ export function DataPushScreen(props: {
   const [threads, setThreads] = useState<number>(1);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [retryModalOpen, setRetryModalOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [loadTemplate, setLoadTemplate] = useState<{ templates: DataTemplate[]; selected: string } | null>(null);
 
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean; updateable: boolean; deletable: boolean }>>([]);
   const [describeFields, setDescribeFields] = useState<SObjectField[] | null>(null);
@@ -101,6 +107,7 @@ export function DataPushScreen(props: {
   const [mappingErrors, setMappingErrors] = useState<Array<{ recordIndex: number; field: string; message: string; value?: unknown }> | null>(null);
   const [mappedRecords, setMappedRecords] = useState<Record<string, unknown>[] | null>(null);
   const [validationErrors, setValidationErrors] = useState<Array<{ field: string; message: string; value?: unknown }> | null>(null);
+  const [dryRun, setDryRun] = useState<DryRunReport | null>(null);
 
   const [push, setPush] = useState<{ pushId: string; status: string; processed: number; failed: number; total: number; error?: string; startedAt: number; completedAt?: number } | null>(null);
   const [nowTs, setNowTs] = useState<number>(() => Date.now());
@@ -277,6 +284,19 @@ export function DataPushScreen(props: {
     setMappedRecords(res.mappedRecords);
     setMappingErrors(res.errors);
     setValidationErrors(null);
+    setDryRun(null);
+  }
+
+  function runDryRun(): void {
+    if (!mappedRecords || !describeFields) return;
+    const report = simulatePush(mappedRecords, describeFields, operation, {
+      externalIdField: operation === 'upsert' ? externalIdField : null,
+    });
+    setDryRun(report);
+    setToast({
+      title: report.failed === 0 ? 'Dry Run Passed' : 'Dry Run Found Issues',
+      body: `${report.ok} of ${report.total} rows would succeed.`,
+    });
   }
 
   function validate(): void {
@@ -289,6 +309,39 @@ export function DataPushScreen(props: {
     } else {
       setValidationErrors(res.errors.map(e => ({ field: e.field, message: e.message, value: e.value })));
       setToast({ title: 'Validation Failed', body: `${res.errors.length} errors.` });
+    }
+  }
+
+  async function openLoadTemplate(): Promise<void> {
+    try {
+      const templates = await sf.listTemplates();
+      if (templates.length === 0) {
+        setToast({ title: 'No Templates', body: 'No saved templates to load yet.' });
+        return;
+      }
+      setLoadTemplate({ templates, selected: templates[0].name });
+    } catch (e) {
+      setToast({ title: 'Load Failed', body: e instanceof Error ? e.message : 'Unknown error' });
+    }
+  }
+
+  function confirmLoadTemplate(): void {
+    if (!loadTemplate) return;
+    const tmpl = loadTemplate.templates.find(t => t.name === loadTemplate.selected);
+    setLoadTemplate(null);
+    if (!tmpl) return;
+    if (tmpl.objectName) setObjectName(tmpl.objectName);
+    if (tmpl.fieldMappings) setMappings(tmpl.fieldMappings);
+    setToast({ title: 'Template Loaded', body: tmpl.name });
+  }
+
+  async function confirmSaveTemplate(name: string): Promise<void> {
+    setSaveTemplateOpen(false);
+    try {
+      await sf.upsertTemplate({ id: `tmpl_${Date.now()}`, name, objectName, fieldMappings: mappings });
+      setToast({ title: 'Saved', body: `Template "${name}" saved.` });
+    } catch (e) {
+      setToast({ title: 'Save Failed', body: e instanceof Error ? e.message : 'Unknown error' });
     }
   }
 
@@ -412,32 +465,9 @@ export function DataPushScreen(props: {
               />
             </label>
             <button class="wl-btn" onClick={props.onRequestCleanser} disabled={!hasDataset}>Open Cleanser</button>
-            <button class="wl-btn" onClick={async () => {
-              try {
-                const templates = await sf.listTemplates();
-                const choice = prompt('Enter template name to load:\n' + templates.map(t => t.name).join('\n'));
-                if (!choice) return;
-                const tmpl = templates.find(t => t.name === choice);
-                if (!tmpl) { setToast({ title: 'Not Found', body: `No template named "${choice}"` }); return; }
-                if (tmpl.objectName) setObjectName(tmpl.objectName);
-                if (tmpl.fieldMappings) setMappings(tmpl.fieldMappings);
-                setToast({ title: 'Template Loaded', body: tmpl.name });
-              } catch (e) { setToast({ title: 'Load Failed', body: e instanceof Error ? e.message : 'Unknown error' }); }
-            }} disabled={!hasDataset}>Load Template</button>
-            <button class="wl-btn" onClick={async () => {
-              const name = prompt('Template name?');
-              if (!name) return;
-              try {
-                await sf.upsertTemplate({
-                  id: `tmpl_${Date.now()}`,
-                  name,
-                  objectName,
-                  fieldMappings: mappings,
-                });
-                setToast({ title: 'Saved', body: `Template "${name}" saved.` });
-              } catch (e) { setToast({ title: 'Save Failed', body: e instanceof Error ? e.message : 'Unknown error' }); }
-            }} disabled={!hasDataset || mappings.length === 0}>Save Template</button>
-            <button class="wl-btn wl-btnDanger" onClick={() => props.onDataset(null)} disabled={!hasDataset}>Clear</button>
+            <button class="wl-btn" onClick={openLoadTemplate} disabled={!hasDataset}>Load Template</button>
+            <button class="wl-btn" onClick={() => setSaveTemplateOpen(true)} disabled={!hasDataset || mappings.length === 0}>Save Template</button>
+            <button class="wl-buttonDestructive" onClick={() => props.onDataset(null)} disabled={!hasDataset}>Clear</button>
           </div>
         </div>
 
@@ -540,6 +570,7 @@ export function DataPushScreen(props: {
           <div class="wl-actions">
             <button class="wl-btn" onClick={applyMapping} disabled={!hasDataset || !describeFields || isBlocked}>Apply Mapping</button>
             <button class="wl-btn" onClick={validate} disabled={!mappedRecords || !describeFields || isBlocked}>Validate</button>
+            <button class="wl-btn" onClick={runDryRun} disabled={!mappedRecords || !describeFields || isBlocked} title="Simulate this push against the schema without writing to the org">Dry Run</button>
             <button
               class="wl-buttonBrand"
               onClick={() => setConfirmOpen(true)}
@@ -672,6 +703,15 @@ export function DataPushScreen(props: {
             <div class="wl-muted">Showing first 500 errors.</div>
           </div>
         </div>
+      ) : null}
+
+      {dryRun ? (
+        <DryRunPanel
+          report={dryRun}
+          objectName={objectName}
+          operation={operation}
+          onClose={() => setDryRun(null)}
+        />
       ) : null}
 
       {push ? (
@@ -878,6 +918,39 @@ export function DataPushScreen(props: {
         onRetry={handleRetry}
         onClose={() => setRetryModalOpen(false)}
       />
+
+      <PromptModal
+        open={saveTemplateOpen}
+        title="Save Template"
+        label="Template name"
+        placeholder="e.g. Account upsert mapping"
+        confirmText="Save"
+        onCancel={() => setSaveTemplateOpen(false)}
+        onSubmit={confirmSaveTemplate}
+      />
+
+      <ConfirmModal
+        open={loadTemplate !== null}
+        title="Load Template"
+        confirmText="Load"
+        confirmDisabled={!loadTemplate || loadTemplate.templates.length === 0}
+        onCancel={() => setLoadTemplate(null)}
+        onConfirm={confirmLoadTemplate}
+      >
+        <label style="font-weight:900;font-size:12px">Template</label>
+        <select
+          class="wl-select"
+          value={loadTemplate?.selected ?? ''}
+          onChange={(e) => {
+            const selected = (e.currentTarget as HTMLSelectElement).value;
+            setLoadTemplate(prev => (prev ? { ...prev, selected } : prev));
+          }}
+        >
+          {loadTemplate?.templates.map(t => (
+            <option key={t.id} value={t.name}>{t.name}{t.objectName ? ` (${t.objectName})` : ''}</option>
+          ))}
+        </select>
+      </ConfirmModal>
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
     </div>

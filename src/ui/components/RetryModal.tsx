@@ -25,7 +25,7 @@ export function RetryModal(props: RetryModalProps): VNode | null {
   const topErrors = getTopErrors(errors, 3);
 
   return (
-    <div class="wl-modalOverlay" onClick={onClose}>
+    <div class="wl-modalOverlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Retry Failed Records">
       <div class="wl-modal wl-card" onClick={(e) => e.stopPropagation()}>
         <div class="wl-cardHeader">
           <h2>Retry Failed Records</h2>
@@ -66,7 +66,7 @@ export function RetryModal(props: RetryModalProps): VNode | null {
 
           <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--wl-line-2)">
             <button class="wl-btn" onClick={onClose}>Cancel</button>
-            <button class="wl-btn wl-btnPrimary" onClick={onRetry}>
+            <button class="wl-buttonBrand" onClick={onRetry}>
               Generate Retry Dataset
             </button>
           </div>

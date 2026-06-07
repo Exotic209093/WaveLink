@@ -1,9 +1,9 @@
 /**
- * Advanced Lab hub (v0.2 pivot).
+ * Advanced hub.
  *
- * Single entry point to all legacy power-user screens that aren't part of the
- * primary export/import flow. No screens are deleted — this just provides an
- * organized way to find them.
+ * Single entry point to the power-user tools that aren't part of the primary
+ * export/import flow or the top-level Migration suite. Tools are grouped by
+ * purpose, with the most experimental ones on a dedicated "Lab" shelf.
  */
 
 import { h } from 'preact';
@@ -22,16 +22,6 @@ interface Group {
 }
 
 const GROUPS: Group[] = [
-  {
-    title: 'Migration',
-    entries: [
-      { route: 'advanced/migrationProjects', label: 'Migration Projects', description: 'Multi-object org-to-org migration with dependency ordering and ID remapping.', icon: '🌊' },
-      { route: 'advanced/migrationValidation', label: 'Validation', description: 'Pre-flight validation against target org schema and constraints.', icon: '✓' },
-      { route: 'advanced/migrationReports', label: 'Reports', description: 'Per-project success/failure summaries and stats.', icon: '📊' },
-      { route: 'advanced/migrationTemplates', label: 'Migration Templates', description: 'Reusable migration blueprints for common org pairs.', icon: '📋' },
-      { route: 'advanced/idMaps', label: 'ID Maps', description: 'Inspect source → target ID mappings persisted between runs.', icon: '🔗' },
-    ],
-  },
   {
     title: 'Schema & analysis',
     entries: [
@@ -52,14 +42,18 @@ const GROUPS: Group[] = [
   {
     title: 'Operations',
     entries: [
-      { route: 'advanced/pipeline', label: 'Pipeline Builder', description: 'Chain filter / transform / lookup steps into reusable pipelines.', icon: '⚙' },
-      { route: 'advanced/testData', label: 'Test Data Generator', description: 'Generate realistic test records against your schema.', icon: '🧪' },
-      { route: 'advanced/clone', label: 'Clone Wizard', description: 'Deep-clone records and their related children.', icon: '👥' },
       { route: 'advanced/bulkOps', label: 'Bulk Object Ops', description: 'Cross-object bulk delete and update.', icon: '⚡' },
       { route: 'advanced/compare', label: 'Data Comparison', description: 'Side-by-side data diff across two orgs.', icon: '⇔' },
       { route: 'advanced/apiUsage', label: 'API Usage', description: 'Daily API request limits and trend tracking.', icon: '📡' },
       { route: 'advanced/history', label: 'Audit Trail', description: 'Full history of every push/upsert operation.', icon: '📜' },
-      { route: 'advanced/legacyTemplates', label: 'Legacy Data Templates', description: 'Original (pre-v0.2) data templates browser.', icon: '📁' },
+    ],
+  },
+  {
+    title: 'Lab · experimental',
+    entries: [
+      { route: 'advanced/pipeline', label: 'Pipeline Builder', description: 'Chain filter / transform / lookup steps into reusable pipelines.', icon: '⚙' },
+      { route: 'advanced/testData', label: 'Test Data Generator', description: 'Generate realistic test records against your schema.', icon: '🧪' },
+      { route: 'advanced/clone', label: 'Clone Wizard', description: 'Deep-clone records and their related children.', icon: '👥' },
     ],
   },
 ];
@@ -71,11 +65,12 @@ export function AdvancedLabScreen(props: { onNavigate: (route: string) => void }
     <div>
       <div class="wl-pageHeader">
         <div class="wl-pageHeader__main">
-          <span class="wl-pageHeader__eyebrow">Advanced Lab</span>
-          <h1 class="wl-pageHeader__title">Power-user tools</h1>
+          <span class="wl-pageHeader__eyebrow">Advanced</span>
+          <h1 class="wl-pageHeader__title">Advanced tools</h1>
           <p class="wl-pageHeader__sub">
-            Migrations, schema analysis, data quality, pipelines, and more. These tools complement the
-            export/import flow — start there for everyday work.
+            Schema analysis, data quality, and bulk operations that complement the export/import flow.
+            The <strong>Lab</strong> shelf holds more experimental tools. For org-to-org moves, see
+            the <strong>Migration</strong> section.
           </p>
         </div>
       </div>

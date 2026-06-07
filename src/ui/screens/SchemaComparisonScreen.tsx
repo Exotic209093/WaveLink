@@ -170,8 +170,8 @@ export function SchemaComparisonScreen(props: { sf: SfApi; tabId: number }): VNo
         <div class="wl-cardHeader">
           <h2>Schema Comparison</h2>
           <div class="wl-actions">
-            <button class="wl-btn wl-btnPrimary" onClick={compare} disabled={busy || !leftObject || !rightObject}>
-              {busy ? 'Comparing...' : 'Compare'}
+            <button class="wl-buttonBrand" onClick={compare} disabled={busy || !leftObject || !rightObject}>
+              {busy ? 'Comparing…' : 'Compare'}
             </button>
           </div>
         </div>

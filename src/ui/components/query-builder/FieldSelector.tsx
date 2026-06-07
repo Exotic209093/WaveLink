@@ -69,7 +69,7 @@ export function FieldSelector(props: {
           {selectedFields.slice(0, MAX_CHIPS).map(name => (
             <span key={name} class="wl-qb-fieldChip">
               <span class="wl-mono">{name}</span>
-              <span class="wl-qb-chipX" onClick={() => toggle(name)}>&times;</span>
+              <button type="button" class="wl-qb-chipX" aria-label={`Remove field ${name}`} onClick={() => toggle(name)}>&times;</button>
             </span>
           ))}
           {selectedFields.length > MAX_CHIPS && (
