@@ -9,16 +9,16 @@ const config: Configuration = {
     popup: path.resolve(__dirname, 'src/popup/index.tsx'),
     content: path.resolve(__dirname, 'src/content/index.ts'),
     app: path.resolve(__dirname, 'src/app/index.tsx'),
+    offscreen: path.resolve(__dirname, 'src/offscreen/index.ts'),
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name]/index.js',
-    // Async chunks (from dynamic import() in the full-page app) are emitted
-    // under dist/app/. publicPath '/' anchors chunk URLs to the extension root
-    // (chrome-extension://<id>/app/...) so they resolve from any app page,
-    // regardless of ?tabId query strings. Content/background/popup have no
-    // dynamic imports, so this only affects the app entry.
-    chunkFilename: 'app/[name].chunk.js',
+    // Async chunks (from dynamic import() in the app and popup) emit under
+    // dist/chunks/. publicPath '/' anchors chunk URLs to the extension root
+    // (chrome-extension://<id>/chunks/...) so they resolve from any extension
+    // page regardless of its directory or query string.
+    chunkFilename: 'chunks/[name].chunk.js',
     publicPath: '/',
     clean: true,
   },
@@ -61,6 +61,11 @@ const config: Configuration = {
       template: path.resolve(__dirname, 'src/app/app.html'),
       filename: 'app/app.html',
       chunks: ['app'],
+    }),
+    new HtmlWebpackPlugin({
+      template: path.resolve(__dirname, 'src/offscreen/offscreen.html'),
+      filename: 'offscreen/offscreen.html',
+      chunks: ['offscreen'],
     }),
   ],
   optimization: {

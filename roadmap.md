@@ -72,9 +72,9 @@ scope.
 
 | # | Item | Why | Effort |
 |---|------|-----|--------|
-| N.1 | **Code-split the bundle.** Lazy-load the Advanced + Migration screens out of the main `app/index.js` chunk via dynamic `import()`. Target the popup chunk under control too. | `app` is 949 KiB / `popup` 478 KiB vs a 244 KiB budget — the single largest perf debt, and it grows every release. Most weight is screens a typical export/import user never opens. | M |
-| N.2 | **Clear the 14 `any` warnings** (Migration screens, `QueryScreen.tsx:486`, `theme.ts:76`) and wire `npm run lint` + `typecheck` + `test` as required CI gates. | Lint is at zero errors today; lock it in before it regresses. | S |
-| N.3 | **Tests for the new 0.2 flows** — scheduled-snapshot scheduling/retention, Convert round-trips, Compare (local + org modes), import dry-run. The legacy product is well covered; the new headline flows are thin. | These are the features users actually touch now. | M |
+| N.1 | ~~**Code-split the bundle.**~~ ✅ Done — app `949→738 KiB` (#26), popup `478→190 KiB`. Advanced/Migration screens (app) and the non-default popup tabs lazy-load from `dist/chunks/`. | `app` was 949 KiB / `popup` 478 KiB vs a 244 KiB budget. | M |
+| N.2 | ~~**Clear the `any` warnings + CI gates.**~~ ✅ Done (#26) — 0 lint warnings; `typecheck`/`lint --max-warnings=0`/`test`/`build` run in CI. | Locked in before it regresses. | S |
+| N.3 | **Tests for the new 0.2 flows** — Convert round-trips, Compare, export multi-format, file parsing ✅ (#26); streaming capture ✅; still want scheduled-snapshot scheduling/retention + import dry-run. | These are the features users actually touch now. | M |
 | N.4 | **Decide the migration suite's fate.** Either (a) test it to a trustable bar, or (b) gate it behind an explicit "experimental" flag in Settings so the demoted-but-present state isn't a silent liability. | Shipping barely-tested complex code is the biggest correctness risk in the repo. | S–L |
 
 ---
@@ -85,8 +85,8 @@ The features that deepen the new positioning.
 
 | # | Feature | Notes | Priority |
 |---|---------|-------|----------|
-| E.1 | **Streaming large exports/imports** | Chunked reads/writes; raise the 25,000-record ceiling; keep memory flat for big datasets. | High |
-| E.2 | **Offscreen Document for long-running jobs** | Keep scheduled snapshots and large pushes alive across MV3 service-worker eviction. Blocking for reliable scheduled exports. | High |
+| E.1 | **Streaming large exports/imports** | ◐ Scheduled capture now pages through the full result set (`queryAllRecords`) instead of keeping only the first ~2000 rows. Still want chunked file reads/writes and to raise the 25,000-record import ceiling. | High |
+| E.2 | **Offscreen Document for long-running jobs** | ◐ Implemented for scheduled capture (worker delegates the query to an offscreen document, falls back to the worker if unavailable). Pending a browser smoke-test; extend to large pushes next. | High |
 | E.3 | **Saved/parameterised export queries** | Named queries with `:bind` parameters reusable across Export, Schedules, and Templates. | Medium |
 | E.4 | **Snapshot management UX** | Browse, restore, re-download, and diff historical snapshots from one place; storage-quota awareness. | Medium |
 | E.5 | **Import field-mapping polish** | Name-similarity auto-suggest, unmapped-required warnings, and reusable mapping profiles. | Medium |
