@@ -72,8 +72,12 @@ export function watchSystemTheme(callback: (theme: ResolvedTheme) => void): () =
     return () => mediaQuery.removeEventListener('change', handler);
   }
 
-  // Fallback for older browsers (type cast to avoid TypeScript errors)
-  const legacyMediaQuery = mediaQuery as any;
+  // Fallback for older browsers: the deprecated addListener/removeListener pair
+  // isn't in the modern MediaQueryList type, so describe just what we use.
+  const legacyMediaQuery = mediaQuery as MediaQueryList & {
+    addListener?: (listener: (e: MediaQueryListEvent) => void) => void;
+    removeListener?: (listener: (e: MediaQueryListEvent) => void) => void;
+  };
   if (typeof legacyMediaQuery.addListener === 'function') {
     legacyMediaQuery.addListener(handler);
     return () => legacyMediaQuery.removeListener(handler);

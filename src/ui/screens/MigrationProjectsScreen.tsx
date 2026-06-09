@@ -5,7 +5,7 @@
  * Phase 1, Feature 1.1: Migration Project Workspace.
  */
 
-import type { VNode } from 'preact';
+import type { JSX } from 'preact';
 import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
@@ -40,7 +40,7 @@ function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : 'Unknown error';
 }
 
-export function MigrationProjectsScreen({ sf, onOpenProject }: Props): VNode<any> {
+export function MigrationProjectsScreen({ sf, onOpenProject }: Props): JSX.Element {
   const [projects, setProjects] = useState<MigrationProject[]>([]);
   const [orgs, setOrgs] = useState<SalesforceOrg[]>([]);
   const [loading, setLoading] = useState(true);
