@@ -13,6 +13,13 @@ const config: Configuration = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name]/index.js',
+    // Async chunks (from dynamic import() in the full-page app) are emitted
+    // under dist/app/. publicPath '/' anchors chunk URLs to the extension root
+    // (chrome-extension://<id>/app/...) so they resolve from any app page,
+    // regardless of ?tabId query strings. Content/background/popup have no
+    // dynamic imports, so this only affects the app entry.
+    chunkFilename: 'app/[name].chunk.js',
+    publicPath: '/',
     clean: true,
   },
   module: {

@@ -4,7 +4,7 @@
  * Phase 3, Feature 3.1: Migration Templates.
  */
 
-import type { VNode } from 'preact';
+import type { JSX } from 'preact';
 import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
@@ -20,7 +20,7 @@ interface Props {
   onApplyTemplate?: (template: MigrationTemplate) => void;
 }
 
-export function MigrationTemplatesScreen({ sf, onApplyTemplate }: Props): VNode<any> {
+export function MigrationTemplatesScreen({ sf, onApplyTemplate }: Props): JSX.Element {
   const [templates, setTemplates] = useState<MigrationTemplate[]>([]);
   const [projects, setProjects] = useState<MigrationProject[]>([]);
   const [loading, setLoading] = useState(true);

@@ -4,7 +4,7 @@
  * Phase 2, Feature 2.4: Migration Summary Report.
  */
 
-import type { VNode } from 'preact';
+import type { JSX } from 'preact';
 import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
@@ -20,7 +20,7 @@ interface Props {
   sf: SfApi;
 }
 
-export function MigrationReportsScreen({ sf }: Props): VNode<any> {
+export function MigrationReportsScreen({ sf }: Props): JSX.Element {
   const [reports, setReports] = useState<MigrationSummaryReport[]>([]);
   const [orgs, setOrgs] = useState<SalesforceOrg[]>([]);
   const [selectedReport, setSelectedReport] = useState<MigrationSummaryReport | null>(null);

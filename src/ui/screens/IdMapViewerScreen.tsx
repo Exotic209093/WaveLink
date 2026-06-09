@@ -4,7 +4,7 @@
  * Phase 1, Feature 1.4: Persistent ID Map.
  */
 
-import type { VNode } from 'preact';
+import type { JSX } from 'preact';
 import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
@@ -15,7 +15,7 @@ interface Props {
   sf: SfApi;
 }
 
-export function IdMapViewerScreen({ sf }: Props): VNode<any> {
+export function IdMapViewerScreen({ sf }: Props): JSX.Element {
   const [maps, setMaps] = useState<IdMap[]>([]);
   const [orgs, setOrgs] = useState<SalesforceOrg[]>([]);
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);

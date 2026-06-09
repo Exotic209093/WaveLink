@@ -7,7 +7,7 @@
  * and provides post-migration record count comparison with spot-check verification.
  */
 
-import type { VNode } from 'preact';
+import type { JSX } from 'preact';
 import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
@@ -28,7 +28,7 @@ interface Props {
 
 type Tab = 'pre' | 'post';
 
-export function MigrationValidationScreen({ sf, tabId, projectId, onBack }: Props): VNode<any> {
+export function MigrationValidationScreen({ sf, tabId, projectId, onBack }: Props): JSX.Element {
   const [project, setProject] = useState<MigrationProject | null>(null);
   const [tab, setTab] = useState<Tab>('pre');
   const [loading, setLoading] = useState(true);
@@ -223,7 +223,7 @@ export function MigrationValidationScreen({ sf, tabId, projectId, onBack }: Prop
     toast ? h(Toast, { title: toast.title, severity: 'error', onClose: () => setToast(null) }, toast.body) : null,
   );
 
-  function renderPreValidation(): VNode<any> {
+  function renderPreValidation(): JSX.Element {
     return h('div', { class: 'wl-card' },
       h('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px' },
         h('div', null,
@@ -300,7 +300,7 @@ export function MigrationValidationScreen({ sf, tabId, projectId, onBack }: Prop
     );
   }
 
-  function renderPostValidation(): VNode<any> {
+  function renderPostValidation(): JSX.Element {
     return h('div', { class: 'wl-card' },
       h('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px' },
         h('div', null,

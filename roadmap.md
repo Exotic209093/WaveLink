@@ -1,123 +1,109 @@
 # WaveLink Roadmap
 
-> Last updated: 2026-04-27
-> See [WAVELINK_AUDIT_2026-04-27.md](WAVELINK_AUDIT_2026-04-27.md) for the audit that informed this update.
+> Last updated: 2026-06-08
+> Status: **Live on the Chrome Web Store** (v0.2.0)
+> See [WAVELINK_AUDIT_2026-06-08.md](WAVELINK_AUDIT_2026-06-08.md) for the audit that informed this update.
 
 ---
 
-## Completed (v0.1.0)
+## Where we are
+
+WaveLink shipped **v0.2.0** and is **published on the Chrome Web Store**. The
+product repositioned from a broad "Salesforce data migration" tool to a focused
+**fast Salesforce data export & import** tool. The front door is now a Home hub
+with **Export / Import / Convert / Compare / Templates / Schedules** as the
+primary flows; the 20+ power-user screens and the full migration suite are still
+shipped but live behind the **Advanced** hub and the **Migration** section.
+
+Everything runs locally — the only network calls are to the user's own
+Salesforce orgs. No telemetry, no backend.
+
+### Health snapshot (re-run 2026-06-08)
+
+| Check | Result |
+|-------|--------|
+| `npm run typecheck` | ✅ PASS (0 errors) |
+| `npm run lint` | ✅ 0 errors, 14 `any` warnings |
+| `npm test` | ✅ 397 tests, 31 suites, all green |
+| `npm run build` | ⚠️ builds, but `app/index.js` is **949 KiB** and `popup/index.js` **478 KiB** (limit 244 KiB) — no code-splitting |
+
+The April "Phase 0" stabilisation work largely landed: single ESLint config,
+corrected manifest `homepage_url`, removed the committed build zip, cleared the
+7 lint errors, and the Clone Wizard `pending_*` placeholder bug is gone.
+
+---
+
+## Completed
+
+### v0.2.0 — Export / Import pivot *(2026-06-08, on the Web Store)*
 
 | Area | Features |
 |------|----------|
-| **Data Push** | Insert/Update/Upsert/Delete via REST + Bulk API 2.0; auto-strategy; retry failed rows; type-to-confirm deletes; push history with error grouping and export |
-| **Import / Export** | CSV/JSON/Excel import; multi-format export with column selector |
-| **Data Cleanser** | Column rename/drop/reorder; bulk field updates with formula interpolation and conditional rules |
-| **SOQL Query** | Builder with aggregates (COUNT/SUM/AVG/MIN/MAX), GROUP BY, date literals, subqueries, syntax highlighting, autocomplete, history, explain plans |
-| **Schema & Analytics** | Schema comparison with diff export; field usage analytics; relationship explorer; API usage dashboard |
-| **Data Generation** | Test data generator (faker.js); template library |
-| **Advanced Ops** | Duplicate detection (exact / Levenshtein / Soundex) with merge wizard; cross-object cloning *(see open bug — placeholders still in code)*; bulk object operations; data quality scorecards; undo/redo |
-| **Pipelines** | Visual transformation pipeline builder (filter, transform, lookup, aggregate, join) |
-| **Cross-Org** | Multi-org support with org switcher; cross-org data comparison with selective sync; schema comparison across orgs |
-| **UX** | Dark mode; command palette; customizable keyboard shortcuts; onboarding wizard; contextual help tooltips |
+| **Export** | SOQL export with preview; multi-format download (CSV / JSON / Excel / XML); query builder with aggregates, GROUP BY, subqueries, highlighting, autocomplete, history, explain plans |
+| **Scheduled snapshots** | Recurring exports via `chrome.alarms`, configurable interval + retention, captured in the background worker |
+| **Import** | Push CSV / JSON / Excel via REST Collections or Bulk API 2.0; field mapping; transforms; retry; type-to-confirm deletes; **import dry-run pre-flight**; **live push-progress dashboard** with cancel / retry / stored-ID views |
+| **Convert** | Offline CSV ↔ JSON ↔ Excel ↔ XML converter (no org connection needed) |
+| **Compare** | Unified diff screen — local files / snapshots offline, or two live orgs field-by-field with selective sync |
+| **Cleanser** | Column rename / drop / reorder; bulk updates with formula interpolation + conditional rules; data-quality scoring |
+| **UX** | Home hub; Advanced hub; refreshed in-page panel; consistent button system; in-app dialogs replacing native prompts; accessibility pass (labelled icon controls, dialog roles) |
+
+### v0.1.0 — Foundation
+
+Data push (REST + Bulk 2.0); CSV/JSON/Excel import & multi-format export;
+cleanser; SOQL builder; schema comparison & field analytics; relationship
+explorer; API usage dashboard; test data generator; template library;
+duplicate detection + merge wizard; cross-object cloning; bulk object ops;
+data-quality scorecards; undo/redo; visual pipeline builder; multi-org support;
+dark mode; command palette; customizable shortcuts; onboarding; help tooltips.
+
+### Migration suite — present, demoted to Advanced
+
+Migration Projects, persistent ID maps, migration templates, schema gap
+analysis, and a validation/reports surface all ship today but sit behind the
+Advanced/Migration navigation. They are **lightly tested** (see Audit §
+Test gaps) and not part of the headline narrative.
 
 ---
 
-## Phase 1 — Migration Core   *(shipped: 2026-03-22 → 2026-04-27, partial)*
+## Now — Stabilise the shipped product
 
-| # | Feature | Status |
-|---|---------|--------|
-| 1.1 | Migration Project Workspace | ✅ Done |
-| 1.2 | Multi-Object Orchestration | ⚠️ UI ready; per-object execution driver still partial |
-| 1.3 | Generalised Dependency Graph | ⚠️ Types defined; no tests; cycle-break behaviour unverified |
-| 1.4 | Persistent ID Map | ✅ Done (viewer + storage round-trip) |
-| 1.5 | Navigation Restructure | ✅ Done (Migration is default landing) |
+These harden what's already in users' hands. Nothing below requires new product
+scope.
 
----
-
-## Phase 0 — Stabilise Before Pushing Forward   *(NEW — must clear before Phase 2 work)*
-
-These are the regressions and gaps surfaced by the 2026-04-27 audit. None of the Phase 2+ work should start until this is done.
-
-| # | Item | Severity |
-|---|------|----------|
-| 0.1 | Cleanser Bulk Update applies to full dataset, not first 100 rows. `DataCleanserScreen.tsx:573` passes `previewSourceRows` — should be `dataset.sourceRecords`. | High |
-| 0.2 | Data Push object dropdown filters by operation, not hard-coded `createable`. `DataPushScreen.tsx:437`. | High |
-| 0.3 | DataPushScreen MessageBus cleanup. `useEffect` at `DataPushScreen.tsx:112` must return a function that calls `bus.off(...)` for the three handlers. | High |
-| 0.4 | Clone Wizard: select all configured fields in source SOQL (currently `SELECT Id` only); use real inserted IDs instead of `pending_*` placeholders; finish cross-org tab selection in step 4. | High |
-| 0.5 | Delete `.eslintrc.cjs` (keep `.eslintrc.js`); fix 7 lint errors; wire `npm run lint` into CI as a required gate. | High |
-| 0.6 | Replace 13 silent `} catch {}` blocks in `Migration*Screen.tsx` with toast surfacing. | Medium |
-| 0.7 | Migration test suite — minimum: dependency graph cycle break, ID-map round-trip, project CRUD, template apply. Target: 30+ tests. | High |
-| 0.8 | Repo hygiene — remove committed `wavelink-0.1.0.zip`, fix `manifest.json` `homepage_url` (currently `jc-wave/wave-link`, should be `exotic209093/wavelink`), extend `.gitignore` (`*.zip`, `*.crx`, `.idea/`). | Low |
-| 0.9 | `tsconfig.json` `baseUrl` deprecation — add `ignoreDeprecations: "6.0"` or restructure paths. | Low |
+| # | Item | Why | Effort |
+|---|------|-----|--------|
+| N.1 | **Code-split the bundle.** Lazy-load the Advanced + Migration screens out of the main `app/index.js` chunk via dynamic `import()`. Target the popup chunk under control too. | `app` is 949 KiB / `popup` 478 KiB vs a 244 KiB budget — the single largest perf debt, and it grows every release. Most weight is screens a typical export/import user never opens. | M |
+| N.2 | **Clear the 14 `any` warnings** (Migration screens, `QueryScreen.tsx:486`, `theme.ts:76`) and wire `npm run lint` + `typecheck` + `test` as required CI gates. | Lint is at zero errors today; lock it in before it regresses. | S |
+| N.3 | **Tests for the new 0.2 flows** — scheduled-snapshot scheduling/retention, Convert round-trips, Compare (local + org modes), import dry-run. The legacy product is well covered; the new headline flows are thin. | These are the features users actually touch now. | M |
+| N.4 | **Decide the migration suite's fate.** Either (a) test it to a trustable bar, or (b) gate it behind an explicit "experimental" flag in Settings so the demoted-but-present state isn't a silent liability. | Shipping barely-tested complex code is the biggest correctness risk in the repo. | S–L |
 
 ---
 
-## Phase 2 — Migration Validation & Reporting
+## Next — Sharpen the export/import core
 
-| # | Feature | Status | Priority |
-|---|---------|--------|----------|
-| 2.1 | Pre-Migration Validation Flow (schema gap + data quality scoring in one screen, run before execution) | ⚠️ Schema gap done; data quality scoring not wired | High |
-| 2.2 | Post-Migration Validation (record counts source vs target; field-level spot check) | ❌ Tab stub only | High |
-| 2.3 | Migration Progress Dashboard (real-time per-object progress bars, ETA, per-object status) | ❌ Type defined, no UI | **Highest** |
-| 2.4 | Migration Summary Report (records per object, success rates, error summary, ID-map stats; HTML/CSV export) | ⚠️ Screen exists; population unverified | Medium |
-| 2.5 | Migration-Level Rollback (delete all inserted records in reverse topological order) | ❌ | **Highest** |
+The features that deepen the new positioning.
 
----
-
-## Phase 3 — Migration Templates & Field Mapping
-
-| # | Feature | Status | Priority |
-|---|---------|--------|----------|
-| 3.1 | Migration Templates (save / list / apply) | ✅ Done | — |
-| 3.2 | Cross-Org Field Mapping UI (visual source→target pairing, drag-and-drop, name-similarity auto-suggest, unmapped-required warnings) | ❌ | **Highest** |
-| 3.3 | Selective Migration Filters (per-object WHERE clause, date-based incremental filter, record-set preview) | ❌ | High |
-| 3.4 | Migration-Specific Transformations (`id_remap`, `picklist_map`, `org_specific_default` pipeline steps) | ❌ | Medium |
+| # | Feature | Notes | Priority |
+|---|---------|-------|----------|
+| E.1 | **Streaming large exports/imports** | Chunked reads/writes; raise the 25,000-record ceiling; keep memory flat for big datasets. | High |
+| E.2 | **Offscreen Document for long-running jobs** | Keep scheduled snapshots and large pushes alive across MV3 service-worker eviction. Blocking for reliable scheduled exports. | High |
+| E.3 | **Saved/parameterised export queries** | Named queries with `:bind` parameters reusable across Export, Schedules, and Templates. | Medium |
+| E.4 | **Snapshot management UX** | Browse, restore, re-download, and diff historical snapshots from one place; storage-quota awareness. | Medium |
+| E.5 | **Import field-mapping polish** | Name-similarity auto-suggest, unmapped-required warnings, and reusable mapping profiles. | Medium |
+| E.6 | **API Explorer** | REST / Tooling endpoint runner (headers / body / history) bolted onto `src/ui/api/sf.ts` — cheap and genuinely useful for debugging exports/imports. | Low |
 
 ---
 
-## Phase 4 — Advanced Migration
+## Later — Platform & reach
 
-| # | Feature | Priority |
-|---|---------|----------|
-| 4.1 | Incremental / Delta Migration (cutoff date, last-migration timestamp per object) | Medium |
-| 4.2 | Parallel Object Migration (independent objects run concurrently) | Medium |
-| 4.3 | Advanced Rollback (capture pre-update field values, true restore not just delete) | Medium |
-| 4.4 | Push Dry Run (simulate without committing; report would-succeed vs would-fail) | High |
-
----
-
-## Phase 5 — Enterprise & Integrations
-
-| # | Feature | Priority |
-|---|---------|----------|
-| 5.1 | CLI / Headless Mode for CI/CD (`npx wavelink migrate --project … --source … --target …`) | Medium |
-| 5.2 | Webhook Notifications (Slack / Teams / custom on complete/fail) | Medium |
-| 5.3 | Comprehensive Audit Trail (every migration / push / delete / rollback with user, timestamp, org, count; exportable) | Medium |
-| 5.4 | Push Approval Workflow (require confirmation for pushes to PROD above record threshold) | Low |
-| 5.5 | Sensitive Field Masking (PII detection + masking on export and in UI) | Low |
-
----
-
-## Phase 6 — Performance & Scale
-
-| # | Feature | Priority |
-|---|---------|----------|
-| 6.1 | Streaming Large Files (chunked reads, raise 25,000-record limit) | High |
-| 6.2 | Parallel Bulk Jobs (split large datasets across multiple Bulk API 2.0 jobs) | Medium |
-| 6.3 | **Offscreen Document** — keep migrations alive across service-worker eviction. Now blocking for credible multi-hour migrations. | **Highest** |
-| 6.4 | Incremental Schema Cache (re-describe only changed objects) | Low |
-| 6.5 | Code-split Migration screens out of the main `app/index.js` bundle (currently 747 KiB, limit 244 KiB) | Medium |
-| 6.6 | Refactor `src/background/index.ts` (1,825 lines) into `auth/`, `push/`, `cache/`, `router.ts` modules | Medium |
-
----
-
-## Phase 7 — Targeted Inspector Parity
-
-The 2026-03-02 audit listed broad Salesforce Inspector parity gaps. With WaveLink's pivot to data-migration positioning (df1291b), most are out of scope. The single item worth keeping:
-
-| # | Feature | Priority |
-|---|---------|----------|
-| 7.1 | API Explorer (REST / Tooling endpoint runner with headers / body / history) — cheap to bolt onto `src/ui/api/sf.ts`, genuinely useful during migration debugging | Medium |
+| # | Item | Notes |
+|---|------|-------|
+| P.1 | **Refactor `src/background/index.ts`** (~1,825 lines) into `auth/`, `push/`, `cache/`, `schedules/`, `router.ts`. | Hard to test/reason about as one worker; growing. |
+| P.2 | **Incremental schema cache** | Re-describe only changed objects. |
+| P.3 | **Firefox / Edge port** | WebExtension manifest. |
+| P.4 | **Chrome Sync for settings + templates** | Sync across devices via `chrome.storage.sync`. |
+| P.5 | **Google Sheets import** | OAuth + sheet/range picker, one-time or live. |
+| P.6 | **Sensitive-field masking** | PII detection + masking on export and in the UI. |
 
 ---
 
@@ -125,23 +111,18 @@ The 2026-03-02 audit listed broad Salesforce Inspector parity gaps. With WaveLin
 
 | Idea | Notes |
 |------|-------|
-| Firefox / Edge Extension | Port to WebExtension manifest |
-| Google Sheets Import | OAuth, sheet+range picker, live sync or one-time import |
-| AI-Assisted Field Mapping | Use field names, types, sample data to auto-suggest source→target mappings |
-| Git Integration for Data Versioning | Version-control datasets alongside code |
-| Sandbox Seeding Profiles | Pre-built profiles (dev / QA / UAT) with object sets and record counts |
-| Salesforce Flow Trigger on Migration Complete | |
-| GraphQL API Support | Use Salesforce GraphQL for read operations |
-| Apex Log Viewer | View / search debug logs in-extension |
-| Permission Set Viewer | Browse and compare permission sets and profiles |
-| Chrome Sync for Settings + Templates | Sync across devices via `chrome.storage.sync` |
+| AI-assisted field mapping | Use field names, types, and sample data to auto-suggest source→target mappings on import. |
+| Git integration for data versioning | Version-control exported snapshots alongside code. |
+| Sandbox seeding profiles | Pre-built dev / QA / UAT object sets + record counts. |
+| GraphQL read support | Use Salesforce GraphQL for export reads. |
+| Apex log viewer | View / search debug logs in-extension. |
+| Permission set / profile viewer | Browse and compare. |
 
 ---
 
-## Suggested Sequencing for the Next Cycle
+## Suggested sequencing for the next cycle
 
-1. **Phase 0** end-to-end (one focused PR per item, all behind regression tests).
-2. **2.3 Progress Dashboard + 2.5 Migration-Level Rollback** — together these turn the migration UI from "demo" into "trustable".
-3. **3.2 Cross-Org Field Mapping UI** — visible win for the migration narrative.
-4. **6.3 Offscreen Document** in parallel with the above (no UI overlap).
-5. Then re-evaluate against actual user feedback before opening Phase 4.
+1. **N.1 Code-split** + **N.2 CI gates** — ship a measurably lighter, regression-protected build first.
+2. **N.3 Tests for the 0.2 flows** + **N.4 migration decision** — make what we shipped trustable.
+3. **E.2 Offscreen Document** + **E.1 Streaming** — the two that make scheduled snapshots and large jobs actually reliable.
+4. **E.3–E.5** export/import depth, then re-evaluate against Web Store reviews and real user feedback before opening the "Later" tier.

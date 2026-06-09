@@ -1,22 +1,35 @@
-# WaveLink — Salesforce Data Migration & Management Tool
+# WaveLink — Fast Salesforce Data Export & Import
 
-Migrate data between Salesforce orgs, compare schemas and records across environments, transform and validate data, and manage multi-object migrations with dependency ordering and ID remapping — all from your browser.
+Get data in and out of Salesforce right from your browser — query records out to CSV/JSON/Excel/XML, push files in via REST or Bulk API, schedule recurring snapshots, and diff exports side by side. Everything runs locally; nothing leaves your device except calls to your own Salesforce orgs.
+
+> **Available now on the Chrome Web Store** — search for **WaveLink** and click **Add to Chrome**.
 
 ---
 
 ## Features
 
-### Migration
-- **Migration Projects** — Plan, configure, and execute multi-object data migrations between Salesforce orgs. Automatic dependency graph detection, topological ordering, and ID remapping for lookups and master-detail relationships.
-- **Schema Gap Analysis** — Diff fields across objects or orgs side-by-side before migration. Detect field type mismatches, missing fields, and configuration differences. Export to CSV, JSON, or HTML.
-- **Pre/Post Migration Validation** — Data quality scorecards with rule sets (required fields, regex, range, picklist, uniqueness). Record count verification and field-level data comparison after migration.
-- **Migration Templates** — Save and reuse complete migration configurations: object lists, field mappings, transformation rules, and filters. Replay across different org pairs.
+### Export
+- **SOQL Export** — Run a SOQL query, preview the results, and download as CSV, JSON, Excel, or XML. Visual query builder with aggregate functions (COUNT, SUM, AVG, MIN, MAX), GROUP BY, date literals, subqueries, syntax highlighting, autocomplete, query history, and explain plans.
+- **Scheduled Snapshots** — Schedule recurring exports (backed by `chrome.alarms`) so you always have a fresh copy of key objects, with configurable interval and retention.
+- **Multi-format Output** — Export query results to CSV, JSON, Excel, or XML with a column selector.
 
-### Data Operations
-- **Data Push** — Upload CSV, JSON, or Excel files and push records into any Salesforce object using the REST Collections API or Bulk API 2.0. Supports field mapping, data transformation, retry on failure, and type-to-confirm deletes.
-- **SOQL Query Editor** — Visual query builder with aggregate functions (COUNT, SUM, AVG, MIN, MAX), GROUP BY, date literals, subqueries, syntax highlighting, autocomplete, query history, and explain plans.
-- **Data Cleanser** — Rename, drop, and reorder columns. Apply bulk field updates with formula interpolation and conditional rules. Preview changes before applying.
-- **Pipeline Builder** — Visual step-chain builder for data transformation (filter, transform, lookup, aggregate, join steps) with intermediate result preview.
+### Import
+- **Data Push** — Upload CSV, JSON, or Excel files and push records into any Salesforce object using the REST Collections API or Bulk API 2.0. Supports field mapping, data transformation, retry on failure, type-to-confirm deletes, and an **import dry-run pre-flight** that simulates a push before it commits.
+- **Live Push Progress** — Real-time progress dashboard with cancel, retry, and stored-ID views.
+- **Data Cleanser** — Rename, drop, and reorder columns. Apply bulk field updates with formula interpolation and conditional rules, plus data-quality scoring. Preview changes before applying.
+
+### Convert & Compare
+- **Convert** — Offline converter between CSV, JSON, Excel, and XML. No Salesforce connection required.
+- **Compare** — One screen, two sources: diff two exported files or scheduled-export snapshots offline, or query two connected orgs and diff records field-by-field with optional selective sync to the target.
+
+### Migration (Advanced)
+- **Migration Projects** — Plan, configure, and execute multi-object data migrations between Salesforce orgs. Dependency graph detection, topological ordering, and ID remapping for lookups and master-detail relationships.
+- **Schema Gap Analysis** — Diff fields across objects or orgs side-by-side. Detect field type mismatches, missing fields, and configuration differences. Export to CSV, JSON, or HTML.
+- **Pre/Post Migration Validation** — Data quality scorecards with rule sets (required fields, regex, range, picklist, uniqueness). Record count verification and field-level data comparison.
+- **Migration Templates** — Save and reuse complete migration configurations and replay them across different org pairs.
+
+### Power Tools (Advanced)
+- **Pipeline Builder** — Visual step-chain builder for data transformation (filter, transform, lookup, aggregate, join) with intermediate result preview.
 - **Test Data Generator** — Auto-generate test data using faker.js. Configure null rates, static values, formulas, and relationship ID injection per field.
 
 ### Schema & Analytics

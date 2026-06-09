@@ -477,13 +477,16 @@ export function QueryScreen(props: {
       ) : null}
 
       {flatRecords.length > 0 ? (
+        // ResultsGrid inline cell-editing needs a record-update API that SfApi
+        // does not expose yet, so `sf` is intentionally not passed — wiring it
+        // through would call an undefined updateRecord and crash on commit.
+        // Re-enable once a verified single-record update path lands.
         <ResultsGrid
           instanceUrl={context?.instanceUrl}
           records={flatRecords}
           columns={columns}
           selectedColumns={selectedColumns.length ? selectedColumns : columns}
           onSelectedColumnsChange={setSelectedColumns}
-          sf={sf as any}
           objectName={acCtx.fromObject ?? undefined}
         />
       ) : (

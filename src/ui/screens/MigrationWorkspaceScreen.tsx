@@ -10,7 +10,7 @@
  * 4. Execute migration with progress tracking
  */
 
-import type { VNode } from 'preact';
+import type { JSX } from 'preact';
 import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
@@ -27,7 +27,7 @@ interface Props {
 
 type Step = 'objects' | 'dependencies' | 'mappings' | 'execute';
 
-export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props): VNode<any> {
+export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props): JSX.Element {
   const [project, setProject] = useState<MigrationProject | null>(null);
   const [step, setStep] = useState<Step>('objects');
   const [loading, setLoading] = useState(true);
@@ -316,7 +316,7 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
     step === 'execute' ? renderExecution() : null,
   );
 
-  function renderObjectSelection(): VNode<any> {
+  function renderObjectSelection(): JSX.Element {
     return h('div', { class: 'wl-card' },
       h('div', { style: 'margin-bottom:8px' },
         h('input', {
@@ -350,7 +350,7 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
     );
   }
 
-  function renderDependencies(): VNode<any> {
+  function renderDependencies(): JSX.Element {
     if (!graph) return h('div', { class: 'wl-card wl-muted' }, 'No dependency data. Go back and analyze objects.');
     return h('div', { class: 'wl-card' },
       h('h3', { style: 'margin:0 0 8px 0;font-size:14px' }, 'Insertion Order'),
@@ -396,7 +396,7 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
     );
   }
 
-  function renderMappings(): VNode<any> {
+  function renderMappings(): JSX.Element {
     return h('div', { class: 'wl-card' },
       h('h3', { style: 'margin:0 0 8px 0;font-size:14px' }, 'Field Mappings'),
       h('div', { class: 'wl-muted', style: 'font-size:12px;margin-bottom:12px' },
@@ -445,7 +445,7 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
     );
   }
 
-  function renderExecution(): VNode<any> {
+  function renderExecution(): JSX.Element {
     return h('div', { class: 'wl-card' },
       h('h3', { style: 'margin:0 0 8px 0;font-size:14px' }, 'Execute Migration'),
       h('div', { style: 'margin-bottom:12px' },
