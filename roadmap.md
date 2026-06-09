@@ -75,7 +75,7 @@ scope.
 | N.1 | ~~**Code-split the bundle.**~~ ✅ Done — app `949→738 KiB` (#26), popup `478→190 KiB`. Advanced/Migration screens (app) and the non-default popup tabs lazy-load from `dist/chunks/`. | `app` was 949 KiB / `popup` 478 KiB vs a 244 KiB budget. | M |
 | N.2 | ~~**Clear the `any` warnings + CI gates.**~~ ✅ Done (#26) — 0 lint warnings; `typecheck`/`lint --max-warnings=0`/`test`/`build` run in CI. | Locked in before it regresses. | S |
 | N.3 | **Tests for the new 0.2 flows** — Convert round-trips, Compare, export multi-format, file parsing ✅ (#26); streaming capture ✅; still want scheduled-snapshot scheduling/retention + import dry-run. | These are the features users actually touch now. | M |
-| N.4 | **Decide the migration suite's fate.** Either (a) test it to a trustable bar, or (b) gate it behind an explicit "experimental" flag in Settings so the demoted-but-present state isn't a silent liability. | Shipping barely-tested complex code is the biggest correctness risk in the repo. | S–L |
+| N.4 | ~~**Decide the migration suite's fate.**~~ ✅ Done — gated behind an **experimental** flag in Settings (default off). The Migration nav hides unless opted in, and direct navigation shows an opt-in notice. Testing it to a trustable bar remains optional future work if it graduates. | Shipping barely-tested complex code was the biggest correctness risk. | S |
 
 ---
 

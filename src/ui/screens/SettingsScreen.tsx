@@ -90,6 +90,15 @@ export function SettingsScreen(props: { sf: SfApi; mode: 'app' | 'panel' | 'popu
               <span>Panel pinned</span>
             </label>
 
+            <label class="wl-chip" style="width:fit-content;cursor:pointer" title="Surfaces the cross-org Migration suite, which is still being hardened.">
+              <input
+                type="checkbox"
+                checked={settings.experimentalMigration ?? false}
+                onChange={(e) => update({ experimentalMigration: (e.currentTarget as HTMLInputElement).checked })}
+              />
+              <span>Experimental: cross-org Migration tools</span>
+            </label>
+
             <div style="margin-top:12px">
               <div style="font-weight:900;margin-bottom:8px">Theme</div>
               <div class="wl-muted" style="margin-bottom:8px">Accent Color</div>
