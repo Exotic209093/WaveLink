@@ -9,7 +9,8 @@
     "cookies",
     "activeTab",
     "tabs",
-    "alarms"
+    "alarms",
+    "offscreen"
   ],
   "host_permissions": [
     "https://*.salesforce.com/*",

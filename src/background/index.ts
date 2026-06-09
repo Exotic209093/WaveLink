@@ -23,6 +23,8 @@ import { StorageService } from '../services/storage';
 import { SalesforceAuth } from '../services/salesforce/auth';
 import { SalesforceApiClient } from '../services/salesforce/api-client';
 import { BulkApiService } from '../services/salesforce/bulk-api';
+import { queryAllRecords, deriveColumns } from '../services/salesforce/queryAll';
+import { captureViaOffscreen } from './offscreen';
 import { buildUpsertSubrequests, parseUpsertCompositeResponse } from '../services/salesforce/composite-upsert';
 import { DEFAULT_API_VERSION, DEFAULT_BATCH_SIZE, BULK_API_THRESHOLD, MAX_COMPOSITE_BATCH_SIZE, SCHEMA_CACHE_TTL, UNDO_TTL_MS } from '../core/constants';
 import { generateId } from '../core/utils';
@@ -1924,21 +1926,28 @@ async function runSchedule(id: string): Promise<void> {
     const fresh = await auth.ensureValidToken(org);
     if (fresh !== org) await storage.saveOrg(fresh);
 
-    const client = new SalesforceApiClient({
+    const capturePayload = {
       instanceUrl: fresh.instanceUrl,
       accessToken: fresh.accessToken,
       apiVersion: fresh.apiVersion ?? DEFAULT_API_VERSION,
-    });
-    const result = await client.query(s.soql);
-    records = (result.records ?? []) as Record<string, unknown>[];
-    // Derive columns from the first record (excluding `attributes`)
-    const colSet = new Set<string>();
-    for (const r of records.slice(0, 50)) {
-      for (const k of Object.keys(r)) {
-        if (k !== 'attributes') colSet.add(k);
-      }
+      soql: s.soql,
+    };
+
+    // Prefer the offscreen document so a long export survives service-worker
+    // eviction; fall back to a worker-side paginated capture if offscreen is
+    // unavailable (e.g. older Chrome) or errors. Both page through the full
+    // result set rather than keeping only the first ~2000 records.
+    try {
+      records = await captureViaOffscreen(capturePayload);
+    } catch {
+      const client = new SalesforceApiClient({
+        instanceUrl: capturePayload.instanceUrl,
+        accessToken: capturePayload.accessToken,
+        apiVersion: capturePayload.apiVersion,
+      });
+      records = await queryAllRecords(client, s.soql);
     }
-    columns = Array.from(colSet);
+    columns = deriveColumns(records);
   } catch (e) {
     status = 'error';
     errorMsg = e instanceof Error ? e.message : String(e);

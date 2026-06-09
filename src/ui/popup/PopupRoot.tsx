@@ -16,14 +16,17 @@
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { lazy, Suspense } from 'preact/compat';
 import { SfApi } from '../api/sf';
 import type { SfContext } from '../api/sf';
 import { AppShell } from '../components/AppShell';
 import type { NavItem } from '../components/AppShell';
+// DataPushScreen is the popup's default view, so it stays eager. The other
+// three tabs are code-split into their own chunks (loaded on first open).
 import { DataPushScreen } from '../screens/DataPushScreen';
-import { TemplatesScreen } from '../screens/TemplatesScreen';
-import { PushHistoryScreen } from '../screens/PushHistoryScreen';
-import { SettingsScreen } from '../screens/SettingsScreen';
+const TemplatesScreen = lazy(() => import(/* webpackChunkName: "popup-templates" */ '../screens/TemplatesScreen').then(m => ({ default: m.TemplatesScreen })));
+const PushHistoryScreen = lazy(() => import(/* webpackChunkName: "popup-history" */ '../screens/PushHistoryScreen').then(m => ({ default: m.PushHistoryScreen })));
+const SettingsScreen = lazy(() => import(/* webpackChunkName: "popup-settings" */ '../screens/SettingsScreen').then(m => ({ default: m.SettingsScreen })));
 import { Toast } from '../components/Toast';
 import type { Theme } from '../utils/theme';
 import { resolveTheme, applyTheme, watchSystemTheme, applyAccentColor } from '../utils/theme';
@@ -187,26 +190,28 @@ export function PopupRoot(): VNode {
         ) : (
           <>
             {orgInfoBar}
-            {route === 'push' ? (
-              <DataPushScreen
-                sf={sf}
-                tabId={tabId}
-                dataset={dataset}
-                cleanedRecords={null}
-                cleanedHeaders={null}
-                onDataset={setDataset}
-                onRequestCleanser={() => {
-                  // In popup, redirect to full app for cleanser
-                  openFullApp();
-                }}
-              />
-            ) : route === 'templates' ? (
-              <TemplatesScreen sf={sf} />
-            ) : route === 'history' ? (
-              <PushHistoryScreen sf={sf} />
-            ) : (
-              <SettingsScreen sf={sf} mode="popup" />
-            )}
+            <Suspense fallback={<div class="wl-popupDisconnected"><p>Loading…</p></div>}>
+              {route === 'push' ? (
+                <DataPushScreen
+                  sf={sf}
+                  tabId={tabId}
+                  dataset={dataset}
+                  cleanedRecords={null}
+                  cleanedHeaders={null}
+                  onDataset={setDataset}
+                  onRequestCleanser={() => {
+                    // In popup, redirect to full app for cleanser
+                    openFullApp();
+                  }}
+                />
+              ) : route === 'templates' ? (
+                <TemplatesScreen sf={sf} />
+              ) : route === 'history' ? (
+                <PushHistoryScreen sf={sf} />
+              ) : (
+                <SettingsScreen sf={sf} mode="popup" />
+              )}
+            </Suspense>
           </>
         )}
       </AppShell>
