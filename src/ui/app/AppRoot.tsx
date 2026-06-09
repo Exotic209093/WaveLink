@@ -12,6 +12,7 @@
 import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { lazy, Suspense } from 'preact/compat';
 import { SfApi } from '../api/sf';
 import type { SfContext } from '../api/sf';
 import { AppShell } from '../components/AppShell';
@@ -35,30 +36,39 @@ import { SchedulesScreen } from '../screens/SchedulesScreen';
 import { CompareScreen } from '../screens/CompareScreen';
 import { AdvancedLabScreen } from '../screens/AdvancedLabScreen';
 
-// ── Legacy screens (still reachable via Advanced Lab) ─────────────────
+// ── Eager screens reachable from primary flows ────────────────────────
+// QueryScreen and DataPushScreen are already pulled into the main chunk by
+// ExportScreen / ImportScreen, so importing them statically here is free.
+// SettingsScreen is small and frequently opened, so it stays eager too.
 import { QueryScreen } from '../screens/QueryScreen';
-import { ObjectsScreen } from '../screens/ObjectsScreen';
-import { SettingsScreen } from '../screens/SettingsScreen';
-import { PushHistoryScreen } from '../screens/PushHistoryScreen';
-import { DataCleanserScreen } from '../screens/DataCleanserScreen';
 import { DataPushScreen } from '../screens/DataPushScreen';
-import { TestDataGeneratorScreen } from '../screens/TestDataGeneratorScreen';
-import { SchemaComparisonScreen } from '../screens/SchemaComparisonScreen';
-import { FieldAnalyticsScreen } from '../screens/FieldAnalyticsScreen';
-import { DuplicateDetectionScreen } from '../screens/DuplicateDetectionScreen';
-import { PipelineBuilderScreen } from '../screens/PipelineBuilderScreen';
-import { CloneWizardScreen } from '../screens/CloneWizardScreen';
-import { DataQualityScorecardScreen } from '../screens/DataQualityScorecardScreen';
-import { ApiUsageDashboardScreen } from '../screens/ApiUsageDashboardScreen';
-import { BulkObjectOpsScreen } from '../screens/BulkObjectOpsScreen';
-import { RelationshipExplorerScreen } from '../screens/RelationshipExplorerScreen';
-import { HelpScreen } from '../screens/HelpScreen';
-import { MigrationProjectsScreen } from '../screens/MigrationProjectsScreen';
-import { MigrationWorkspaceScreen } from '../screens/MigrationWorkspaceScreen';
-import { MigrationValidationScreen } from '../screens/MigrationValidationScreen';
-import { MigrationReportsScreen } from '../screens/MigrationReportsScreen';
-import { MigrationTemplatesScreen } from '../screens/MigrationTemplatesScreen';
-import { IdMapViewerScreen } from '../screens/IdMapViewerScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
+
+// ── Lazily-loaded Advanced + Migration screens ────────────────────────
+// These are demoted, rarely-opened screens. Code-splitting them out of the
+// main app chunk keeps the initial load small; each loads on first navigation.
+// Named exports are mapped to the { default } shape lazy() expects, and the
+// webpackChunkName comments give the emitted chunks readable filenames.
+const ObjectsScreen = lazy(() => import(/* webpackChunkName: "adv-objects" */ '../screens/ObjectsScreen').then(m => ({ default: m.ObjectsScreen })));
+const PushHistoryScreen = lazy(() => import(/* webpackChunkName: "adv-history" */ '../screens/PushHistoryScreen').then(m => ({ default: m.PushHistoryScreen })));
+const DataCleanserScreen = lazy(() => import(/* webpackChunkName: "adv-cleanser" */ '../screens/DataCleanserScreen').then(m => ({ default: m.DataCleanserScreen })));
+const TestDataGeneratorScreen = lazy(() => import(/* webpackChunkName: "adv-test-data" */ '../screens/TestDataGeneratorScreen').then(m => ({ default: m.TestDataGeneratorScreen })));
+const SchemaComparisonScreen = lazy(() => import(/* webpackChunkName: "adv-schema-compare" */ '../screens/SchemaComparisonScreen').then(m => ({ default: m.SchemaComparisonScreen })));
+const FieldAnalyticsScreen = lazy(() => import(/* webpackChunkName: "adv-field-analytics" */ '../screens/FieldAnalyticsScreen').then(m => ({ default: m.FieldAnalyticsScreen })));
+const DuplicateDetectionScreen = lazy(() => import(/* webpackChunkName: "adv-duplicates" */ '../screens/DuplicateDetectionScreen').then(m => ({ default: m.DuplicateDetectionScreen })));
+const PipelineBuilderScreen = lazy(() => import(/* webpackChunkName: "adv-pipeline" */ '../screens/PipelineBuilderScreen').then(m => ({ default: m.PipelineBuilderScreen })));
+const CloneWizardScreen = lazy(() => import(/* webpackChunkName: "adv-clone" */ '../screens/CloneWizardScreen').then(m => ({ default: m.CloneWizardScreen })));
+const DataQualityScorecardScreen = lazy(() => import(/* webpackChunkName: "adv-quality" */ '../screens/DataQualityScorecardScreen').then(m => ({ default: m.DataQualityScorecardScreen })));
+const ApiUsageDashboardScreen = lazy(() => import(/* webpackChunkName: "adv-api-usage" */ '../screens/ApiUsageDashboardScreen').then(m => ({ default: m.ApiUsageDashboardScreen })));
+const BulkObjectOpsScreen = lazy(() => import(/* webpackChunkName: "adv-bulk-ops" */ '../screens/BulkObjectOpsScreen').then(m => ({ default: m.BulkObjectOpsScreen })));
+const RelationshipExplorerScreen = lazy(() => import(/* webpackChunkName: "adv-relationships" */ '../screens/RelationshipExplorerScreen').then(m => ({ default: m.RelationshipExplorerScreen })));
+const HelpScreen = lazy(() => import(/* webpackChunkName: "help" */ '../screens/HelpScreen').then(m => ({ default: m.HelpScreen })));
+const MigrationProjectsScreen = lazy(() => import(/* webpackChunkName: "migration-projects" */ '../screens/MigrationProjectsScreen').then(m => ({ default: m.MigrationProjectsScreen })));
+const MigrationWorkspaceScreen = lazy(() => import(/* webpackChunkName: "migration-workspace" */ '../screens/MigrationWorkspaceScreen').then(m => ({ default: m.MigrationWorkspaceScreen })));
+const MigrationValidationScreen = lazy(() => import(/* webpackChunkName: "migration-validation" */ '../screens/MigrationValidationScreen').then(m => ({ default: m.MigrationValidationScreen })));
+const MigrationReportsScreen = lazy(() => import(/* webpackChunkName: "migration-reports" */ '../screens/MigrationReportsScreen').then(m => ({ default: m.MigrationReportsScreen })));
+const MigrationTemplatesScreen = lazy(() => import(/* webpackChunkName: "migration-templates" */ '../screens/MigrationTemplatesScreen').then(m => ({ default: m.MigrationTemplatesScreen })));
+const IdMapViewerScreen = lazy(() => import(/* webpackChunkName: "migration-idmaps" */ '../screens/IdMapViewerScreen').then(m => ({ default: m.IdMapViewerScreen })));
 
 export function AppRoot(): VNode {
   const sf = useMemo(() => new SfApi('app'), []);
@@ -463,7 +473,17 @@ export function AppRoot(): VNode {
             ← Back to Advanced
           </button>
         ) : null}
-        {renderScreen()}
+        <Suspense
+          fallback={
+            <div class="wl-card">
+              <div class="wl-cardSection">
+                <div class="wl-muted">Loading…</div>
+              </div>
+            </div>
+          }
+        >
+          {renderScreen()}
+        </Suspense>
       </AppShell>
 
       <CommandPalette
