@@ -50,6 +50,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 // Named exports are mapped to the { default } shape lazy() expects, and the
 // webpackChunkName comments give the emitted chunks readable filenames.
 const ObjectsScreen = lazy(() => import(/* webpackChunkName: "adv-objects" */ '../screens/ObjectsScreen').then(m => ({ default: m.ObjectsScreen })));
+const RecordInspectorScreen = lazy(() => import(/* webpackChunkName: "adv-inspector" */ '../screens/RecordInspectorScreen').then(m => ({ default: m.RecordInspectorScreen })));
 const PushHistoryScreen = lazy(() => import(/* webpackChunkName: "adv-history" */ '../screens/PushHistoryScreen').then(m => ({ default: m.PushHistoryScreen })));
 const DataCleanserScreen = lazy(() => import(/* webpackChunkName: "adv-cleanser" */ '../screens/DataCleanserScreen').then(m => ({ default: m.DataCleanserScreen })));
 const TestDataGeneratorScreen = lazy(() => import(/* webpackChunkName: "adv-test-data" */ '../screens/TestDataGeneratorScreen').then(m => ({ default: m.TestDataGeneratorScreen })));
@@ -282,6 +283,7 @@ export function AppRoot(): VNode {
   // from the command palette so power users can jump straight to them.
   const advancedToolItems: NavItem[] = [
     { key: 'advanced/objects', label: 'Objects' },
+    { key: 'advanced/inspector', label: 'Record Inspector' },
     { key: 'advanced/relationships', label: 'Relationship Explorer' },
     { key: 'advanced/schemaCompare', label: 'Schema Gap Analysis' },
     { key: 'advanced/fieldAnalytics', label: 'Field Analytics' },
@@ -304,6 +306,7 @@ export function AppRoot(): VNode {
     'migration/projects': true,
     'migration/validation': true,
     'advanced/objects': true,
+    'advanced/inspector': true,
     'advanced/cleanse': true,
     'advanced/testData': true,
     'advanced/schemaCompare': true,
@@ -406,6 +409,7 @@ export function AppRoot(): VNode {
     if (route === 'advanced/objects') return (
       <ObjectsScreen sf={sf} tabId={selectedTabId!} onInsertToken={(token) => setSoql(prev => `${prev}${prev.endsWith(' ') ? '' : ' '}${token}`)} />
     );
+    if (route === 'advanced/inspector') return <RecordInspectorScreen sf={sf} tabId={selectedTabId!} />;
     if (route === 'advanced/cleanse') return (
       <DataCleanserScreen
         sf={sf}

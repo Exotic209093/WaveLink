@@ -26,6 +26,7 @@ const GROUPS: Group[] = [
     title: 'Schema & analysis',
     entries: [
       { route: 'advanced/objects', label: 'Objects', description: 'Browse SObjects, fields, and metadata in your org.', icon: '🗂' },
+      { route: 'advanced/inspector', label: 'Record Inspector', description: 'Show all data for any record by ID — every field, value, and API name.', icon: '🔍' },
       { route: 'advanced/relationships', label: 'Relationship Explorer', description: 'Visualize lookups and master-detail relationships.', icon: '🕸' },
       { route: 'advanced/schemaCompare', label: 'Schema Gap Analysis', description: 'Compare two orgs to surface schema differences.', icon: '🆚' },
       { route: 'advanced/fieldAnalytics', label: 'Field Analytics', description: 'Field-level fill rate, distinct values, and recommendations.', icon: '📈' },
