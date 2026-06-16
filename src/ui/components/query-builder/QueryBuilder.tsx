@@ -12,6 +12,7 @@ import type { SalesforceFieldType } from '../../../core/types/salesforce';
 import type { SchemaLoaderResult } from '../../hooks/useSchemaLoader';
 import type { WhereCondition, OrderByClause, AggregateField } from '../../utils/soqlBuilder';
 import { buildSoql, AGGREGATE_FUNCTIONS } from '../../utils/soqlBuilder';
+import { fieldDisplay } from '../../utils/fieldDisplay';
 import { ObjectSelector } from './ObjectSelector';
 import { FieldSelector } from './FieldSelector';
 import { WhereBuilder } from './WhereBuilder';
@@ -163,7 +164,7 @@ export function QueryBuilder(props: {
                   onChange={(e) => updateAggregate(i, { field: (e.currentTarget as HTMLSelectElement).value })}
                 >
                   <option value="">Field...</option>
-                  {schema.fields.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
+                  {schema.fields.map(f => <option key={f.name} value={f.name}>{fieldDisplay(f)}</option>)}
                 </select>
               )}
               <input

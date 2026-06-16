@@ -4,6 +4,7 @@ import { useMemo } from 'preact/hooks';
 import type { SObjectField } from '../../../core/types/salesforce';
 import type { WhereCondition, SoqlOperator } from '../../utils/soqlBuilder';
 import { getOperatorsForFieldType, SOQL_DATE_LITERALS } from '../../utils/soqlBuilder';
+import { fieldDisplay } from '../../utils/fieldDisplay';
 
 /** Operators that take no value input. */
 const NULL_OPERATORS = new Set<SoqlOperator>(['IS NULL', 'IS NOT NULL']);
@@ -77,7 +78,7 @@ export function WhereBuilder(props: {
                   onChange={(e) => update(i, { field: (e.currentTarget as HTMLSelectElement).value })}
                 >
                   <option value="">Field...</option>
-                  {fields.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
+                  {fields.map(f => <option key={f.name} value={f.name}>{fieldDisplay(f)}</option>)}
                 </select>
 
                 <select
