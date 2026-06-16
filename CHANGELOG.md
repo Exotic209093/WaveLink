@@ -5,6 +5,12 @@ All notable changes to WaveLink are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Smarter import field mapping** — auto-mapping now matches source headers against Salesforce field **labels** as well as API names (so a column like "Account Name" maps to the `Name` field), with a confidence-scored engine (`suggestFieldMappings`) that also surfaces fuzzy near-misses for review.
+- **Unmapped-required warning** — the Import/Push screen now flags required, createable fields that have no mapping *before* you push, so rows no longer fail in the org with `REQUIRED_FIELD_MISSING`.
+
 ## [0.2.0] — 2026-06-08
 
 WaveLink is now focused on **fast Salesforce data export & import** — get data

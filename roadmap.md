@@ -89,7 +89,7 @@ The features that deepen the new positioning.
 | E.2 | **Offscreen Document for long-running jobs** | ◐ Implemented for scheduled capture (worker delegates the query to an offscreen document, falls back to the worker if unavailable). Pending a browser smoke-test; extend to large pushes next. | High |
 | E.3 | **Saved/parameterised export queries** | Named queries with `:bind` parameters reusable across Export, Schedules, and Templates. | Medium |
 | E.4 | **Snapshot management UX** | Browse, restore, re-download, and diff historical snapshots from one place; storage-quota awareness. | Medium |
-| E.5 | **Import field-mapping polish** | Name-similarity auto-suggest, unmapped-required warnings, and reusable mapping profiles. | Medium |
+| E.5 | **Import field-mapping polish** | ◐ Name-similarity auto-suggest (label-aware + confidence-scored `suggestFieldMappings`) ✅ and unmapped-required warnings ✅ shipped. Still want reusable, named mapping profiles. | Medium |
 | E.6 | **API Explorer** | REST / Tooling endpoint runner (headers / body / history) bolted onto `src/ui/api/sf.ts` — cheap and genuinely useful for debugging exports/imports. | Low |
 
 ---

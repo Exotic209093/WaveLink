@@ -601,6 +601,14 @@ export const uiCss = `
   font-weight: 700;
 }
 
+.wl-bannerWarning {
+  border: 1px solid rgba(255, 167, 38, 0.45);
+  background: var(--wl-warning-soft);
+  color: var(--wl-warning-2);
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
 .wl-split {
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);

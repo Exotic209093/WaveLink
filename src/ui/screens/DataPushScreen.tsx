@@ -239,6 +239,13 @@ export function DataPushScreen(props: {
     return describeFields.filter(f => f.externalId);
   }, [describeFields]);
 
+  // Required, createable fields with no mapping — surfaces REQUIRED_FIELD_MISSING
+  // before the push rather than after it fails. Only meaningful for insert/upsert.
+  const unmappedRequired = useMemo(() => {
+    if (!describeFields || (operation !== 'insert' && operation !== 'upsert')) return [];
+    return new DataMapper().findUnmappedRequiredFields(describeFields, mappings);
+  }, [describeFields, mappings, operation]);
+
   async function onFileSelected(file: File): Promise<void> {
     try {
       setBusy(true);
@@ -580,6 +587,14 @@ export function DataPushScreen(props: {
             </button>
           </div>
         </div>
+
+        {hasDataset && unmappedRequired.length > 0 ? (
+          <div class="wl-bannerWarning" style="margin-bottom:10px">
+            <strong>{unmappedRequired.length} required field{unmappedRequired.length === 1 ? '' : 's'} not mapped.</strong>{' '}
+            Salesforce will reject rows with <span class="wl-mono">REQUIRED_FIELD_MISSING</span> unless these are mapped or given a default:{' '}
+            {unmappedRequired.map(f => `${f.label} (${f.name})`).join(', ')}.
+          </div>
+        ) : null}
 
         {hasDataset ? (
           <div class="wl-tableWrap" style="max-height:360px">
