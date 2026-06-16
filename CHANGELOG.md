@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smarter import field mapping** — auto-mapping now matches source headers against Salesforce field **labels** as well as API names (so a column like "Account Name" maps to the `Name` field), with a confidence-scored engine (`suggestFieldMappings`) that also surfaces fuzzy near-misses for review.
 - **Unmapped-required warning** — the Import/Push screen now flags required, createable fields that have no mapping *before* you push, so rows no longer fail in the org with `REQUIRED_FIELD_MISSING`.
 - **Searchable object & field pickers** — long object and field lists are now type-to-filter across the app. A new reusable combobox replaces the native dropdowns on Import/Push (object + per-row target-field), Compare/Data Comparison (object + match field), Bulk Object Ops, Duplicate Detection, Data Quality Scorecard, Clone Wizard, and the Cleanser validation panel — no more scrolling 500+ options. The Objects screen also gained a field search box.
+- **Record Inspector** — a new Advanced tool: paste any 15/18-character record ID and see every field on that record with its value, API name, and label in one searchable table. Copy any value to the clipboard.
+- **Mapping match badges & suggestions** — mapping rows show how each field was auto-matched (`auto` / `via label`), and weaker fuzzy matches appear as one-click `Suggest: <field>` chips instead of being applied silently.
+- **Reusable mapping profiles** — when you load a file for an object that has saved mapping templates, the Push screen surfaces one-click `Apply: <name>` chips so saved mappings actually get reused.
+- **Proactive low-storage warning** — an app-wide banner warns at ≥80% of the local storage quota with a shortcut to the Settings purge tools.
+- **Field labels in the SOQL builder** — the field checklist, WHERE, ORDER BY, and aggregate pickers now show the field label alongside the API name.
+
+### Changed
+- **Lazy-load Excel support** — the SheetJS library (~875 KiB) now loads on demand only when an Excel file is imported or exported, cutting the main app bundle from ~745 KiB to ~344 KiB for the CSV/JSON/XML majority.
 
 ## [0.2.0] — 2026-06-08
 
