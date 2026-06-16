@@ -110,6 +110,8 @@ export function DataPushScreen(props: {
   const [retryModalOpen, setRetryModalOpen] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [loadTemplate, setLoadTemplate] = useState<{ templates: DataTemplate[]; selected: string } | null>(null);
+  // All saved templates, used to auto-surface a reusable mapping for the current object.
+  const [allTemplates, setAllTemplates] = useState<DataTemplate[]>([]);
 
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean; updateable: boolean; deletable: boolean }>>([]);
   const [describeFields, setDescribeFields] = useState<SObjectField[] | null>(null);
@@ -186,6 +188,17 @@ export function DataPushScreen(props: {
       busRef.current = null;
     };
   }, []);
+
+  function refreshTemplates(): void {
+    sf.listTemplates().then(setAllTemplates).catch(() => undefined);
+  }
+  useEffect(() => { refreshTemplates(); }, [sf]);
+
+  // Saved mappings that target the currently selected object.
+  const objectProfiles = useMemo(
+    () => allTemplates.filter(t => t.objectName === objectName && t.fieldMappings && t.fieldMappings.length > 0),
+    [allTemplates, objectName],
+  );
 
   // Tick once a second while a push is in flight so elapsed/throughput/ETA stay live.
   useEffect(() => {
@@ -380,6 +393,7 @@ export function DataPushScreen(props: {
     setSaveTemplateOpen(false);
     try {
       await sf.upsertTemplate({ id: `tmpl_${Date.now()}`, name, objectName, fieldMappings: mappings });
+      refreshTemplates();
       setToast({ title: 'Saved', body: `Template "${name}" saved.` });
     } catch (e) {
       setToast({ title: 'Save Failed', body: e instanceof Error ? e.message : 'Unknown error' });
@@ -620,6 +634,28 @@ export function DataPushScreen(props: {
             </button>
           </div>
         </div>
+
+        {hasDataset && objectProfiles.length > 0 ? (
+          <div class="wl-row" style="margin-bottom:10px;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="wl-muted">Saved mapping{objectProfiles.length === 1 ? '' : 's'} for {objectName}:</span>
+            {objectProfiles.map(t => (
+              <button
+                key={t.id}
+                class="wl-pill wl-pill--brand"
+                style="padding:2px 10px;font-size:12px;cursor:pointer;border:none"
+                title={`Apply the saved field mapping "${t.name}"`}
+                onClick={() => {
+                  if (t.fieldMappings) setMappings(t.fieldMappings);
+                  setMatchInfo({});
+                  setSuggestions({});
+                  setToast({ title: 'Mapping Applied', body: `Applied saved mapping "${t.name}".` });
+                }}
+              >
+                Apply: {t.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {hasDataset && unmappedRequired.length > 0 ? (
           <div class="wl-bannerWarning" style="margin-bottom:10px">
