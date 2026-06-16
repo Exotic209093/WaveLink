@@ -31,11 +31,11 @@ export function ExportModal(props: ExportModalProps): VNode | null {
 
   if (!open) return null;
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const finalFilename = ensureCorrectExtension(filename, format);
     const columnsToExport = Array.from(selectedColumns);
 
-    exportRecords(records, columnsToExport, {
+    await exportRecords(records, columnsToExport, {
       format,
       filename: finalFilename,
       sheetName: format === 'excel' ? sheetName : undefined,

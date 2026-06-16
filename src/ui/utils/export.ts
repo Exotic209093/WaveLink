@@ -28,11 +28,11 @@ export interface ExportOptions {
  * @param columns - Column names to include in export
  * @param options - Export configuration
  */
-export function exportRecords(
+export async function exportRecords(
   records: Record<string, unknown>[],
   columns: string[],
   options: ExportOptions
-): void {
+): Promise<void> {
   const { format, filename, sheetName, includeMetadata } = options;
 
   switch (format) {
@@ -49,7 +49,7 @@ export function exportRecords(
     }
 
     case 'excel': {
-      recordsToExcel(records, columns, filename, sheetName);
+      await recordsToExcel(records, columns, filename, sheetName);
       break;
     }
 

@@ -40,7 +40,7 @@ export function PushHistoryDetail(props: PushHistoryDetailProps): VNode {
   const duration = entry.completedAt - entry.startedAt;
   const durationSec = (duration / 1000).toFixed(1);
 
-  function exportErrors(format: 'csv' | 'json'): void {
+  async function exportErrors(format: 'csv' | 'json'): Promise<void> {
     if (!entry.errors || entry.errors.length === 0) return;
 
     setBusy(true);
@@ -52,7 +52,7 @@ export function PushHistoryDetail(props: PushHistoryDetailProps): VNode {
 
       const filename = ensureCorrectExtension(`errors-${entry.id}`, format);
 
-      exportRecords(records, ['recordIndex', 'message'], {
+      await exportRecords(records, ['recordIndex', 'message'], {
         format,
         filename,
         includeMetadata: format === 'json',

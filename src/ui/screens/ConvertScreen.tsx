@@ -53,7 +53,7 @@ export function ConvertScreen(): VNode {
     }
   }
 
-  function handleDownload(): void {
+  async function handleDownload(): Promise<void> {
     if (!records) return;
     const cols = headers.filter(h => columnFilter.has(h));
     if (cols.length === 0) {
@@ -62,7 +62,7 @@ export function ConvertScreen(): VNode {
     }
     const filename = ensureCorrectExtension(baseName(sourceName) + '-converted', outputFormat);
     try {
-      exportRecords(records, cols, { format: outputFormat, filename });
+      await exportRecords(records, cols, { format: outputFormat, filename });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to export');
     }
