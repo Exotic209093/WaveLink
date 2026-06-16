@@ -79,6 +79,9 @@ export function AppRoot(): VNode {
   const [selectedTabId, setSelectedTabId] = useState<number | null>(null);
   const [context, setContext] = useState<SfContext | null>(null);
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
+  // Proactive low-storage awareness: warn app-wide before users hit the quota.
+  const [storagePct, setStoragePct] = useState<number | null>(null);
+  const [storageDismissed, setStorageDismissed] = useState(false);
   const [soql, setSoql] = useState<string>('SELECT Id, Name FROM Account LIMIT 10');
 
   const [dataset, setDataset] = useState<{
@@ -205,6 +208,14 @@ export function AppRoot(): VNode {
       document.removeEventListener('keydown', handler);
     };
   }, []);
+
+  // Sample storage usage on load (and when returning to Home) so the warning
+  // reflects recent pushes/snapshots without polling constantly.
+  useEffect(() => {
+    sf.getStorageUsage()
+      .then(u => setStoragePct(u.quota > 0 ? Math.round((u.bytesInUse / u.quota) * 100) : null))
+      .catch(() => undefined);
+  }, [sf, route === 'home']);
 
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
@@ -468,6 +479,15 @@ export function AppRoot(): VNode {
         theme={theme}
         onThemeChange={handleThemeChange}
       >
+        {storagePct !== null && storagePct >= 80 && !storageDismissed && route !== 'settings' ? (
+          <div class="wl-bannerWarning" style="margin-bottom:12px;display:flex;align-items:center;gap:10px">
+            <span style="flex:1">
+              <strong>Local storage is {storagePct}% full.</strong> WaveLink may fail to save history, snapshots, or undo data soon.
+            </span>
+            <button class="wl-btn" style="padding:4px 10px;font-size:12px" onClick={() => setRoute('settings')}>Manage storage</button>
+            <button class="wl-btn" style="padding:4px 8px;font-size:12px" aria-label="Dismiss storage warning" onClick={() => setStorageDismissed(true)}>✕</button>
+          </div>
+        ) : null}
         {effectiveRoute.startsWith('advanced/') && effectiveRoute !== 'advanced/index' ? (
           <button
             class="wl-btn"
