@@ -25,6 +25,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { TypedConfirmModal } from '../components/TypedConfirmModal';
 import { PromptModal } from '../components/PromptModal';
 import { DropZone } from '../components/DropZone';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { RetryModal } from '../components/RetryModal';
 import { MigrationProgressDashboard } from '../components/MigrationProgressDashboard';
 import { computePushProgress } from '../utils/pushMetrics';
@@ -486,21 +487,20 @@ export function DataPushScreen(props: {
           ) : null}
 
           <div class="wl-row2">
-            <select class="wl-select" value={objectName} onChange={(e) => setObjectName((e.currentTarget as HTMLSelectElement).value)}>
-              {availableObjects
+            <SearchableSelect
+              ariaLabel="Target object"
+              placeholder="Search objects..."
+              value={objectName}
+              onChange={setObjectName}
+              options={availableObjects
                 .filter(o => {
                   if (operation === 'insert') return o.createable;
                   if (operation === 'update' || operation === 'upsert') return o.updateable;
                   if (operation === 'delete') return o.deletable;
                   return o.createable;
                 })
-                .slice(0, 2000)
-                .map(o => (
-                  <option key={o.name} value={o.name}>
-                    {o.label} ({o.name})
-                  </option>
-                ))}
-            </select>
+                .map(o => ({ value: o.name, label: o.label, sublabel: o.name }))}
+            />
             <select class="wl-select" value={operation} onChange={(e) => setOperation((e.currentTarget as HTMLSelectElement).value as never)}>
               <option value="insert">insert</option>
               <option value="update">update</option>
@@ -612,20 +612,19 @@ export function DataPushScreen(props: {
                   <tr key={m.sourceField}>
                     <td class="wl-mono">{m.sourceField}</td>
                     <td>
-                      <select
-                        class="wl-select"
+                      <SearchableSelect
+                        ariaLabel={`Target field for ${m.sourceField}`}
+                        placeholder="(skip)"
                         value={m.targetField}
-                        onChange={(e) => {
-                          const v = (e.currentTarget as HTMLSelectElement).value;
+                        onChange={(v) => {
                           const field = targetableFields.find(f => f.name === v);
                           setMappings(prev => prev.map((p, i) => i === idx ? { ...p, targetField: v, required: field?.required ?? false } : p));
                         }}
-                      >
-                        <option value="">(skip)</option>
-                        {targetableFields.map(f => (
-                          <option key={f.name} value={f.name}>{f.label} ({f.name})</option>
-                        ))}
-                      </select>
+                        options={[
+                          { value: '', label: '(skip)' },
+                          ...targetableFields.map(f => ({ value: f.name, label: f.label, sublabel: f.name })),
+                        ]}
+                      />
                     </td>
                     <td>
                       <select

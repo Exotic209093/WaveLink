@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { SObjectDescribe } from '../../core/types/salesforce';
 import { Toast } from '../components/Toast';
+import { fuzzyFilter } from '../utils/fuzzyMatch';
 
 async function copyText(text: string): Promise<void> {
   /**
@@ -44,6 +45,7 @@ export function ObjectsScreen(props: {
 }): VNode {
   const { sf, tabId } = props;
   const [search, setSearch] = useState('');
+  const [fieldSearch, setFieldSearch] = useState('');
   const [objects, setObjects] = useState<Array<{ name: string; label: string; queryable: boolean }>>([]);
   const [selected, setSelected] = useState<string>('');
   const [describe, setDescribe] = useState<SObjectDescribe | null>(null);
@@ -65,10 +67,16 @@ export function ObjectsScreen(props: {
       setDescribe(null);
       return;
     }
+    setFieldSearch('');
     sf.describeSObject(selected, tabId)
       .then(d => setDescribe(d))
       .catch(e => setToast({ title: 'Describe SObject Failed', body: e instanceof Error ? e.message : 'Unknown error' }));
   }, [sf, tabId, selected]);
+
+  const filteredFields = useMemo(
+    () => (describe ? fuzzyFilter(describe.fields, fieldSearch, f => `${f.label} ${f.name}`) : []),
+    [describe, fieldSearch],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -137,6 +145,9 @@ export function ObjectsScreen(props: {
         <div class="wl-cardHeader">
           <h2>{selected ? `Fields: ${selected}` : 'Select an object'}</h2>
           <div class="wl-actions">
+            {describe ? (
+              <div class="wl-muted">{filteredFields.length} / {describe.fields.length}</div>
+            ) : null}
             {selected ? (
               <button
                 class="wl-btn"
@@ -154,6 +165,17 @@ export function ObjectsScreen(props: {
         </div>
 
         {describe ? (
+          <div class="wl-row">
+            <input
+              class="wl-input"
+              value={fieldSearch}
+              placeholder="Search fields..."
+              onInput={(e) => setFieldSearch((e.currentTarget as HTMLInputElement).value)}
+            />
+          </div>
+        ) : null}
+
+        {describe ? (
           <div class="wl-tableWrap">
             <table class="wl-table">
               <thead>
@@ -165,7 +187,7 @@ export function ObjectsScreen(props: {
                 </tr>
               </thead>
               <tbody>
-                {describe.fields.map(f => (
+                {filteredFields.map(f => (
                   <tr
                     key={f.name}
                     style="cursor:pointer"

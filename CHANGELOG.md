@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Smarter import field mapping** — auto-mapping now matches source headers against Salesforce field **labels** as well as API names (so a column like "Account Name" maps to the `Name` field), with a confidence-scored engine (`suggestFieldMappings`) that also surfaces fuzzy near-misses for review.
 - **Unmapped-required warning** — the Import/Push screen now flags required, createable fields that have no mapping *before* you push, so rows no longer fail in the org with `REQUIRED_FIELD_MISSING`.
+- **Searchable object & field pickers** — long object and field lists are now type-to-filter. The Import/Push screen's object picker and per-row target-field dropdowns use a searchable combobox (no more scrolling 500+ options), and the Objects screen gained a field search box.
 
 ## [0.2.0] — 2026-06-08
 
