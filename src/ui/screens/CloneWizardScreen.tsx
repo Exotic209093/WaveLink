@@ -21,6 +21,7 @@ import {
   remapIds,
 } from '../utils/crossObjectClone';
 import { RelationshipTree } from '../components/RelationshipTree';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { Toast } from '../components/Toast';
 import type { SObjectDescribe, SObjectField } from '../../core/types/salesforce';
 
@@ -85,7 +86,6 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
   // Step 1: Object selection
   const [objects, setObjects] = useState<Array<{ name: string; label: string }>>([]);
   const [rootObject, setRootObject] = useState('');
-  const [objectSearch, setObjectSearch] = useState('');
 
   // Step 2: Configuration
   const [graph, setGraph] = useState<CloneGraph | null>(null);
@@ -126,15 +126,6 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
         // tabs unavailable; cross-org step still works in single-tab mode
       });
   }, [sf]);
-
-  /** Filtered objects for search. O(O). */
-  const filteredObjects = useMemo(() => {
-    const q = objectSearch.trim().toLowerCase();
-    if (!q) return objects;
-    return objects.filter(
-      (o) => o.name.toLowerCase().includes(q) || o.label.toLowerCase().includes(q)
-    );
-  }, [objects, objectSearch]);
 
   /** Topological order of selected objects. O(O + E). */
   const topoOrder = useMemo(() => {
@@ -380,24 +371,13 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
               <div class="wl-muted">
                 Choose the primary SObject to clone. Related objects will be discovered from reference fields.
               </div>
-              <input
-                class="wl-input"
-                placeholder="Search objects..."
-                value={objectSearch}
-                onInput={(e) => setObjectSearch((e.currentTarget as HTMLInputElement).value)}
-              />
-              <select
-                class="wl-select"
+              <SearchableSelect
+                ariaLabel="Root object to clone"
+                placeholder="Select an object..."
                 value={rootObject}
-                onChange={(e) => setRootObject((e.currentTarget as HTMLSelectElement).value)}
-              >
-                <option value="">Select an object...</option>
-                {filteredObjects.map((o) => (
-                  <option key={o.name} value={o.name}>
-                    {o.label} ({o.name})
-                  </option>
-                ))}
-              </select>
+                onChange={setRootObject}
+                options={objects.map((o) => ({ value: o.name, label: o.label, sublabel: o.name }))}
+              />
             </div>
           </div>
         </div>

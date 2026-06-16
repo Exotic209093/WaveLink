@@ -13,6 +13,7 @@ import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
 import { downloadTextFile } from '../../utils/download';
+import { SearchableSelect } from '../SearchableSelect';
 
 export interface ValidationErrorRow {
   field: string;
@@ -61,7 +62,6 @@ export function ValidationPanel(props: {
   } = props;
 
   const [open, setOpen] = useState(true);
-  const [objectSearch, setObjectSearch] = useState('');
 
   const grouped = useMemo(() => {
     if (!errors) return null;
@@ -73,12 +73,6 @@ export function ValidationPanel(props: {
     }
     return Array.from(byField.entries()).sort((a, b) => b[1].length - a[1].length);
   }, [errors]);
-
-  const filteredObjects = useMemo(() => {
-    const q = objectSearch.trim().toLowerCase();
-    if (!q) return objects;
-    return objects.filter(o => o.name.toLowerCase().includes(q) || o.label.toLowerCase().includes(q));
-  }, [objects, objectSearch]);
 
   return (
     <div class="wl-card">
@@ -100,7 +94,13 @@ export function ValidationPanel(props: {
               <div class="wl-row2">
                 <div>
                   <div class="wl-muted" style="margin-bottom:6px">SObject</div>
-                  <input class="wl-input" placeholder="Search objects..." value={objectSearch} onInput={(e) => setObjectSearch((e.currentTarget as HTMLInputElement).value)} />
+                  <SearchableSelect
+                    ariaLabel="Validation object"
+                    placeholder="Search objects..."
+                    value={objectName}
+                    onChange={onObjectName}
+                    options={objects.map(o => ({ value: o.name, label: o.label, sublabel: o.name }))}
+                  />
                 </div>
                 <div>
                   <div class="wl-muted" style="margin-bottom:6px">Operation</div>
@@ -112,12 +112,6 @@ export function ValidationPanel(props: {
                   </select>
                 </div>
               </div>
-
-              <select class="wl-select" value={objectName} onChange={(e) => onObjectName((e.currentTarget as HTMLSelectElement).value)}>
-                {filteredObjects.slice(0, 2000).map(o => (
-                  <option key={o.name} value={o.name}>{o.label} ({o.name})</option>
-                ))}
-              </select>
 
               <div class="wl-actions" style="align-items:center">
                 <button class="wl-btn wl-btnPrimary" onClick={onRun} disabled={!canRun}>Run Validation</button>

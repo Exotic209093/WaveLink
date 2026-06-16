@@ -19,6 +19,7 @@ import type { SfApi } from '../api/sf';
 import type { SfContext } from '../api/sf';
 import { TypedConfirmModal } from '../components/TypedConfirmModal';
 import { Toast } from '../components/Toast';
+import { SearchableSelect } from '../components/SearchableSelect';
 
 interface ObjectOption {
   name: string;
@@ -213,24 +214,14 @@ export function BulkObjectOpsScreen(props: { sf: SfApi; tabId: number }): VNode 
           <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
             <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:4px">
               <label style="font-size:12px;font-weight:700">Object</label>
-              <select
-                class="wl-select"
-                value={selectedObject}
-                onChange={(e) => onObjectChange((e.currentTarget as HTMLSelectElement).value)}
+              <SearchableSelect
+                ariaLabel="Object for bulk operation"
+                placeholder={loadingObjects ? 'Loading objects...' : objects.length === 0 ? 'No objects found' : 'Select object...'}
                 disabled={loadingObjects}
-              >
-                {loadingObjects ? (
-                  <option value="">Loading objects...</option>
-                ) : objects.length === 0 ? (
-                  <option value="">No objects found</option>
-                ) : (
-                  objects.map((o) => (
-                    <option key={o.name} value={o.name}>
-                      {o.label} ({o.name})
-                    </option>
-                  ))
-                )}
-              </select>
+                value={selectedObject}
+                onChange={onObjectChange}
+                options={objects.map((o) => ({ value: o.name, label: o.label, sublabel: o.name }))}
+              />
             </div>
           </div>
 
