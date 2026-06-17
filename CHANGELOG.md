@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **REST / Tooling API Explorer** — a new Advanced tool to make ad-hoc authenticated calls against the org: pick a method and path (relative to `/services/data/vXX`, or a `/services/`-rooted absolute path) with an optional JSON body, and view the raw status + response. Quick-example chips for common endpoints; powered by a shared non-throwing `rawCall` primitive so error responses are visible too.
+- **Apex debug-log capture** — the Anonymous Apex runner can now capture the execution's debug log: it ensures a short-lived TraceFlag/DebugLevel for the current user, then fetches the resulting ApexLog body (filtered to this run and polled for async persistence). Best-effort — the Apex still runs and reports status if capture is unavailable.
 - **Anonymous Apex runner** — a new Advanced tool that executes anonymous Apex against the org via the Tooling API (⌘/Ctrl+Enter to run) and reports compile problems, runtime exceptions with stack traces, and line/column, with a note that debug-log capture requires trace flags.
 - **Record Inspector — create & delete** — alongside inline edit, you can now create a new record of any createable object (with picklist/boolean selects) and jump straight into it, delete the current record (guarded), and drill into parent records via 🔍 on reference fields.
 - **Smarter import field mapping** — auto-mapping now matches source headers against Salesforce field **labels** as well as API names (so a column like "Account Name" maps to the `Name` field), with a confidence-scored engine (`suggestFieldMappings`) that also surfaces fuzzy near-misses for review.
