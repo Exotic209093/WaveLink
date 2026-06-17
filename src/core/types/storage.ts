@@ -112,6 +112,8 @@ export interface UiSettings {
   accentColor?: string;
   /** User-assigned org colors for visual differentiation, keyed by orgId */
   orgColorMap?: Record<string, string>;
+  /** Opt-in to the experimental, thinly-tested cross-org Migration suite. Default off. */
+  experimentalMigration?: boolean;
 }
 
 /** Saved data template for reusable data pushes */

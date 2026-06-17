@@ -106,6 +106,7 @@ export function AppRoot(): VNode {
   const [undoPanelOpen, setUndoPanelOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [experimentalMigration, setExperimentalMigration] = useState(false);
 
   async function refreshTabs(): Promise<void> {
     try {
@@ -141,6 +142,7 @@ export function AppRoot(): VNode {
       const resolved = resolveTheme(savedTheme);
       applyTheme(resolved);
       applyAccentColor(settings.accentColor);
+      setExperimentalMigration(settings.experimentalMigration ?? false);
     }).catch(e => {
       console.error('Failed to load theme:', e);
       applyTheme('light');
@@ -265,7 +267,9 @@ export function AppRoot(): VNode {
         { key: 'convert', label: 'Convert' },
       ],
     },
-    {
+    // The Migration suite is experimental (thinly tested) — only surface it
+    // when the user has opted in via Settings.
+    ...(experimentalMigration ? [{
       key: 'migration', label: 'Migration', items: [
         { key: 'migration/projects', label: 'Migration Projects' },
         { key: 'migration/validation', label: 'Migration Validation' },
@@ -273,7 +277,7 @@ export function AppRoot(): VNode {
         { key: 'migration/templates', label: 'Migration Templates' },
         { key: 'migration/idMaps', label: 'ID Maps' },
       ],
-    },
+    }] as NavGroup[] : []),
     {
       key: 'extras', label: 'Library', items: [
         { key: 'templates', label: 'Templates' },
@@ -415,7 +419,37 @@ export function AppRoot(): VNode {
     if (route === 'schedules') return <SchedulesScreen sf={sf} />;
     if (route === 'diff') return <CompareScreen sf={sf} />;
 
-    // ── Migration suite (top-level) ──
+    // ── Migration suite (top-level, experimental) ──
+    // Guard direct navigation (legacy aliases, command palette, saved routes)
+    // when the suite hasn't been enabled in Settings.
+    if (route.startsWith('migration/') && !experimentalMigration) {
+      return (
+        <div class="wl-card">
+          <div class="wl-cardSection">
+            <div class="wl-emptyState">
+              <div class="wl-emptyState__icon">🧪</div>
+              <p class="wl-emptyState__title">Migration is an experimental feature</p>
+              <p class="wl-emptyState__desc">
+                The cross-org Migration suite is still being hardened. Enable it in
+                Settings to try it.
+              </p>
+              <div style="margin-top:12px">
+                <button
+                  class="wl-buttonBrand"
+                  onClick={() => {
+                    setExperimentalMigration(true);
+                    sf.setUiSettings({ experimentalMigration: true }).catch(() => {});
+                  }}
+                >
+                  Enable migration tools
+                </button>
+                <button class="wl-btn" style="margin-left:8px" onClick={() => setRoute('home')}>Back to Home</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
     if (route === 'migration/projects' && activeProjectId) return <MigrationWorkspaceScreen sf={sf} tabId={selectedTabId!} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />;
     if (route === 'migration/projects') return <MigrationProjectsScreen sf={sf} onOpenProject={(id) => setActiveProjectId(id)} />;
     if (route === 'migration/validation' && activeProjectId) return <MigrationValidationScreen sf={sf} tabId={selectedTabId!} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />;
