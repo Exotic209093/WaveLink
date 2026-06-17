@@ -399,6 +399,31 @@ messageBus.on('SF_UPDATE_RECORD', async (message, sender): Promise<MessageRespon
   }
 });
 
+messageBus.on('SF_API_REQUEST', async (message, sender): Promise<MessageResponse> => {
+  try {
+    const { method, path, body, rawText } = message.payload as {
+      method: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
+      path: string;
+      body?: unknown;
+      rawText?: boolean;
+    };
+    const org = await resolveSfOrg(message.payload, sender);
+    const client = new SalesforceApiClient({
+      instanceUrl: org.instanceUrl,
+      accessToken: org.accessToken,
+      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
+    });
+    const result = await client.rawCall(method, path, body, { rawText });
+    return { success: true, data: result, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'SF_API_REQUEST_ERROR', message: error instanceof Error ? error.message : 'API request failed' },
+      requestId: message.requestId,
+    };
+  }
+});
+
 messageBus.on('SF_EXECUTE_ANONYMOUS', async (message, sender): Promise<MessageResponse> => {
   try {
     const { apexBody } = message.payload as { apexBody: string };
