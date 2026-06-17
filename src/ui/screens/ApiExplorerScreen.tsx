@@ -13,6 +13,7 @@ import { useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { RawCallResult } from '../../services/salesforce/api-client';
 import { Toast } from '../components/Toast';
+import { copyToClipboard } from '../utils/clipboard';
 
 type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
 const METHODS: Method[] = ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'];
@@ -21,12 +22,8 @@ const EXAMPLES: { label: string; method: Method; path: string }[] = [
   { label: 'Limits', method: 'GET', path: '/limits' },
   { label: 'All objects', method: 'GET', path: '/sobjects' },
   { label: 'API versions', method: 'GET', path: '/services/data' },
-  { label: 'Tooling query', method: 'GET', path: '/tooling/query?q=SELECT Id, Name FROM ApexClass LIMIT 5' },
+  { label: 'Tooling query', method: 'GET', path: '/tooling/query?q=SELECT+Id,+Name+FROM+ApexClass+LIMIT+5' },
 ];
-
-async function copyText(text: string): Promise<void> {
-  try { await navigator.clipboard.writeText(text); } catch { /* clipboard unavailable */ }
-}
 
 export function ApiExplorerScreen(props: { sf: SfApi; tabId: number }): VNode {
   const { sf, tabId } = props;
@@ -117,7 +114,7 @@ export function ApiExplorerScreen(props: { sf: SfApi; tabId: number }): VNode {
             <span class="wl-pill" style={`color:#fff;${result.ok ? 'background:var(--wl-accent)' : 'background:var(--wl-danger)'}`}>
               {result.status}{result.ok ? ' OK' : ''}
             </span>
-            <button class="wl-btn" style="padding:2px 10px;font-size:11px;margin-left:auto" onClick={() => { copyText(pretty); setToast({ title: 'Copied', body: 'Response copied' }); }}>Copy response</button>
+            <button class="wl-btn" style="padding:2px 10px;font-size:11px;margin-left:auto" onClick={async () => { if (await copyToClipboard(pretty)) setToast({ title: 'Copied', body: 'Response copied' }); }}>Copy response</button>
           </div>
           <pre class="wl-mono" style="white-space:pre-wrap;font-size:12px;margin:8px 0 0;max-height:480px;overflow:auto;background:var(--wl-surface-2,rgba(0,0,0,0.04));padding:10px;border-radius:8px">{pretty}</pre>
         </div>
