@@ -16,7 +16,7 @@ import { MessageBus } from '../../services/messaging';
 import type { SalesforceOrg, SObjectDescribe } from '../../core/types/salesforce';
 import type { UiSettings, SavedQuery, PushHistoryEntry, QueryFolder, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
 import type { MigrationProject, IdMap, IdMapEntry, MigrationTemplate, MigrationSummaryReport } from '../../core/types/migration';
-import type { DescribeGlobalResult, QueryResult, QueryExplainResult, ExecuteAnonymousResult } from '../../services/salesforce/api-client';
+import type { DescribeGlobalResult, QueryResult, QueryExplainResult, ExecuteAnonymousResult, RawCallResult } from '../../services/salesforce/api-client';
 import type { DataPushCancelResponse, DataPushResultGetResponse, PushHistoryGetResponse } from '../../core/types/messaging';
 
 export interface SfTabInfo {
@@ -119,6 +119,21 @@ export class SfApi {
       { tabId, objectName, recordId, fields },
     );
     if (!res.success) throw new Error(res.error?.message ?? 'Update failed');
+  }
+
+  async apiCall(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT',
+    path: string,
+    body?: unknown,
+    rawText?: boolean,
+    tabId?: number,
+  ): Promise<RawCallResult> {
+    const res = await this.bus.send<{ tabId?: number; method: string; path: string; body?: unknown; rawText?: boolean }, RawCallResult>(
+      'SF_API_REQUEST',
+      { tabId, method, path, body, rawText },
+    );
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'API request failed');
+    return res.data;
   }
 
   async executeAnonymous(apexBody: string, tabId?: number): Promise<ExecuteAnonymousResult> {

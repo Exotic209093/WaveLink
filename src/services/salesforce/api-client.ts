@@ -261,6 +261,50 @@ export class SalesforceApiClient {
     return this.request('/limits');
   }
 
+  /**
+   * Make a raw, un-retried API call and return the status + parsed body without
+   * throwing on non-2xx — so callers (the REST explorer, debug-log fetch) can
+   * inspect error responses and plain-text bodies directly.
+   *
+   * Path resolution:
+   * - Absolute URL (`https://…`) → used as-is.
+   * - Path starting with `/services/` → appended to the instance URL.
+   * - Otherwise → treated as relative to `/services/data/vXX`.
+   */
+  async rawCall(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT',
+    path: string,
+    body?: unknown,
+    opts: { rawText?: boolean } = {},
+  ): Promise<RawCallResult> {
+    const url = /^https?:\/\//.test(path)
+      ? path
+      : path.startsWith('/services/')
+        ? `${this.config.instanceUrl}${path}`
+        : `${this.config.instanceUrl}${API_BASE_PATH}/${this.config.apiVersion}${path.startsWith('/') ? path : `/${path}`}`;
+
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${this.config.accessToken}`,
+        'Accept': opts.rawText ? 'text/plain, application/json' : 'application/json',
+        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+
+    let parsed: unknown = null;
+    if (response.status !== 204) {
+      const text = await response.text();
+      if (opts.rawText) {
+        parsed = text;
+      } else {
+        try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
+      }
+    }
+    return { status: response.status, ok: response.ok, body: parsed };
+  }
+
   /** Get query explain plan for a SOQL query */
   async queryExplain(soql: string): Promise<QueryExplainResult> {
     const encodedQuery = encodeURIComponent(soql);
@@ -373,6 +417,12 @@ export interface QueryResult<T> {
   done: boolean;
   records: T[];
   nextRecordsUrl?: string;
+}
+
+export interface RawCallResult {
+  status: number;
+  ok: boolean;
+  body: unknown;
 }
 
 export interface ExecuteAnonymousResult {
