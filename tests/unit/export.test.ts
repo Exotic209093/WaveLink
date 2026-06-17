@@ -108,9 +108,9 @@ describe('exportRecords', () => {
     expect(mockDownload).not.toHaveBeenCalled();
   });
 
-  it('throws on an unsupported format', () => {
-    expect(() =>
+  it('throws on an unsupported format', async () => {
+    await expect(
       exportRecords(records, columns, { format: 'pdf' as ExportFormat, filename: 'a.pdf' }),
-    ).toThrow(/Unsupported export format/);
+    ).rejects.toThrow(/Unsupported export format/);
   });
 });

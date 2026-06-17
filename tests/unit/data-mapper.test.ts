@@ -86,6 +86,118 @@ describe('DataMapper', () => {
       const mappings = mapper.autoMapFields(sourceFields, targetFields);
       expect(mappings).toHaveLength(0);
     });
+
+    it('should match a source header against the field label (not just the API name)', () => {
+      const sourceFields = ['Account Name'];
+      const targetFields: SObjectField[] = [
+        { ...createMockField('Name'), label: 'Account Name' },
+      ];
+
+      const mappings = mapper.autoMapFields(sourceFields, targetFields);
+      expect(mappings).toHaveLength(1);
+      expect(mappings[0].targetField).toBe('Name');
+    });
+
+    it('should not include low-confidence fuzzy guesses', () => {
+      const sourceFields = ['Emial']; // typo — fuzzy match only
+      const targetFields: SObjectField[] = [createMockField('Email')];
+
+      // autoMapFields is conservative (>= 0.9), so a fuzzy guess is excluded.
+      expect(mapper.autoMapFields(sourceFields, targetFields)).toHaveLength(0);
+    });
+  });
+
+  describe('suggestFieldMappings', () => {
+    it('should rank an exact API-name match at full confidence', () => {
+      const suggestions = mapper.suggestFieldMappings(['Email'], [createMockField('Email')]);
+      expect(suggestions).toHaveLength(1);
+      expect(suggestions[0].confidence).toBe(1);
+      expect(suggestions[0].matchedOn).toBe('name-exact');
+    });
+
+    it('should match normalized names (spaces/underscores/case)', () => {
+      const suggestions = mapper.suggestFieldMappings(
+        ['first_name'],
+        [createMockField('FirstName')],
+      );
+      expect(suggestions[0].targetField).toBe('FirstName');
+      expect(suggestions[0].matchedOn).toBe('name-normalized');
+    });
+
+    it('should suggest a fuzzy match for a near-miss typo', () => {
+      const suggestions = mapper.suggestFieldMappings(['Departmnet'], [createMockField('Department')]);
+      expect(suggestions).toHaveLength(1);
+      expect(suggestions[0].targetField).toBe('Department');
+      expect(suggestions[0].matchedOn).toBe('fuzzy');
+      expect(suggestions[0].confidence).toBeLessThan(0.95);
+    });
+
+    it('should drop weak matches below the confidence floor', () => {
+      const suggestions = mapper.suggestFieldMappings(
+        ['Phone'],
+        [createMockField('AnnualRevenue')],
+      );
+      expect(suggestions).toHaveLength(0);
+    });
+
+    it('should not assign one target field to two source headers', () => {
+      // Both headers are plausible matches for Name; only the best should win it.
+      const suggestions = mapper.suggestFieldMappings(
+        ['Name', 'Naem'],
+        [createMockField('Name')],
+      );
+      const claimsOfName = suggestions.filter(s => s.targetField === 'Name');
+      expect(claimsOfName).toHaveLength(1);
+      expect(claimsOfName[0].sourceField).toBe('Name'); // exact beats fuzzy
+    });
+
+    it('should respect a custom minConfidence', () => {
+      const conservative = mapper.suggestFieldMappings(
+        ['Emial'],
+        [createMockField('Email')],
+        { minConfidence: 0.95 },
+      );
+      expect(conservative).toHaveLength(0);
+    });
+  });
+
+  describe('findUnmappedRequiredFields', () => {
+    const targetFields: SObjectField[] = [
+      { ...createMockField('LastName'), required: true },
+      { ...createMockField('Email'), required: false },
+      { ...createMockField('Industry'), required: true },
+    ];
+
+    it('should report required createable fields with no mapping', () => {
+      const mappings: FieldMapping[] = [
+        { sourceField: 'email', targetField: 'Email', required: false },
+      ];
+      const unmapped = mapper.findUnmappedRequiredFields(targetFields, mappings);
+      expect(unmapped.map(f => f.name).sort()).toEqual(['Industry', 'LastName']);
+    });
+
+    it('should ignore required fields that are mapped', () => {
+      const mappings: FieldMapping[] = [
+        { sourceField: 'ln', targetField: 'LastName', required: true },
+        { sourceField: 'ind', targetField: 'Industry', required: true },
+      ];
+      expect(mapper.findUnmappedRequiredFields(targetFields, mappings)).toHaveLength(0);
+    });
+
+    it('should treat an empty target as unmapped', () => {
+      const mappings: FieldMapping[] = [
+        { sourceField: 'ln', targetField: '', required: true },
+      ];
+      const unmapped = mapper.findUnmappedRequiredFields(targetFields, mappings);
+      expect(unmapped.map(f => f.name)).toContain('LastName');
+    });
+
+    it('should not report non-createable required fields', () => {
+      const fields: SObjectField[] = [
+        { ...createMockField('Id'), required: true, createable: false },
+      ];
+      expect(mapper.findUnmappedRequiredFields(fields, [])).toHaveLength(0);
+    });
   });
 });
 

@@ -16,7 +16,7 @@ import { MessageBus } from '../../services/messaging';
 import type { SalesforceOrg, SObjectDescribe } from '../../core/types/salesforce';
 import type { UiSettings, SavedQuery, PushHistoryEntry, QueryFolder, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
 import type { MigrationProject, IdMap, IdMapEntry, MigrationTemplate, MigrationSummaryReport } from '../../core/types/migration';
-import type { DescribeGlobalResult, QueryResult, QueryExplainResult } from '../../services/salesforce/api-client';
+import type { DescribeGlobalResult, QueryResult, QueryExplainResult, ExecuteAnonymousResult } from '../../services/salesforce/api-client';
 import type { DataPushCancelResponse, DataPushResultGetResponse, PushHistoryGetResponse } from '../../core/types/messaging';
 
 export interface SfTabInfo {
@@ -111,6 +111,40 @@ export class SfApi {
     );
     if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Describe SObject failed');
     return res.data;
+  }
+
+  async updateRecord(objectName: string, recordId: string, fields: Record<string, unknown>, tabId?: number): Promise<void> {
+    const res = await this.bus.send<{ tabId?: number; objectName: string; recordId: string; fields: Record<string, unknown> }, { recordId: string }>(
+      'SF_UPDATE_RECORD',
+      { tabId, objectName, recordId, fields },
+    );
+    if (!res.success) throw new Error(res.error?.message ?? 'Update failed');
+  }
+
+  async executeAnonymous(apexBody: string, tabId?: number): Promise<ExecuteAnonymousResult> {
+    const res = await this.bus.send<{ tabId?: number; apexBody: string }, ExecuteAnonymousResult>(
+      'SF_EXECUTE_ANONYMOUS',
+      { tabId, apexBody },
+    );
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Execute anonymous failed');
+    return res.data;
+  }
+
+  async createRecord(objectName: string, fields: Record<string, unknown>, tabId?: number): Promise<string> {
+    const res = await this.bus.send<{ tabId?: number; objectName: string; fields: Record<string, unknown> }, { id: string }>(
+      'SF_CREATE_RECORD',
+      { tabId, objectName, fields },
+    );
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Create failed');
+    return res.data.id;
+  }
+
+  async deleteRecord(objectName: string, recordId: string, tabId?: number): Promise<void> {
+    const res = await this.bus.send<{ tabId?: number; objectName: string; recordId: string }, { recordId: string }>(
+      'SF_DELETE_RECORD',
+      { tabId, objectName, recordId },
+    );
+    if (!res.success) throw new Error(res.error?.message ?? 'Delete failed');
   }
 
   async getLimits(tabId?: number): Promise<Record<string, { Max: number; Remaining: number }>> {

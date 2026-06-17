@@ -25,6 +25,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { TypedConfirmModal } from '../components/TypedConfirmModal';
 import { PromptModal } from '../components/PromptModal';
 import { DropZone } from '../components/DropZone';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { RetryModal } from '../components/RetryModal';
 import { MigrationProgressDashboard } from '../components/MigrationProgressDashboard';
 import { computePushProgress } from '../utils/pushMetrics';
@@ -34,6 +35,7 @@ import type { DryRunReport } from '../utils/pushDryRun';
 import { buildRetryDataset } from '../utils/pushRetry';
 import { parseCsvFile, parseJsonFile } from '../utils/fileParse';
 import { DataMapper } from '../../data/mappers';
+import type { MappingMatchKind } from '../../data/mappers';
 import { DataValidator } from '../../data/validators';
 import type { FieldMapping, TransformationType, DataTemplate } from '../../core/types/storage';
 import type { SObjectField } from '../../core/types/salesforce';
@@ -43,6 +45,20 @@ import { validateIdFirst } from '../utils/pushGuards';
 import { clampBatchSize, clampThreads } from '../utils/pushOptions';
 
 type Strategy = 'auto' | 'rest' | 'bulk';
+
+/** Small pill describing how a header was auto-matched to a field. */
+function matchBadge(kind: MappingMatchKind): { text: string; cls: string } | null {
+  switch (kind) {
+    case 'name-exact':
+    case 'name-normalized':
+      return { text: 'auto', cls: 'wl-pill--success' };
+    case 'label-exact':
+    case 'label-normalized':
+      return { text: 'via label', cls: 'wl-pill--brand' };
+    default:
+      return null;
+  }
+}
 
 function makeEmptyMappings(headers: string[]): FieldMapping[] {
   return headers.map(h => ({
@@ -94,6 +110,8 @@ export function DataPushScreen(props: {
   const [retryModalOpen, setRetryModalOpen] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [loadTemplate, setLoadTemplate] = useState<{ templates: DataTemplate[]; selected: string } | null>(null);
+  // All saved templates, used to auto-surface a reusable mapping for the current object.
+  const [allTemplates, setAllTemplates] = useState<DataTemplate[]>([]);
 
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean; updateable: boolean; deletable: boolean }>>([]);
   const [describeFields, setDescribeFields] = useState<SObjectField[] | null>(null);
@@ -104,6 +122,10 @@ export function DataPushScreen(props: {
   const sourceHeaders = props.cleanedHeaders ?? dataset?.headers ?? (sourceRecords[0] ? Object.keys(sourceRecords[0]) : []);
 
   const [mappings, setMappings] = useState<FieldMapping[]>([]);
+  // How each source header was auto-matched (for the "auto"/"guess" hint badges),
+  // plus low-confidence suggestions the user can accept with one click.
+  const [matchInfo, setMatchInfo] = useState<Record<string, { kind: MappingMatchKind; confidence: number }>>({});
+  const [suggestions, setSuggestions] = useState<Record<string, { target: string; label: string }>>({});
   const [mappingErrors, setMappingErrors] = useState<Array<{ recordIndex: number; field: string; message: string; value?: unknown }> | null>(null);
   const [mappedRecords, setMappedRecords] = useState<Record<string, unknown>[] | null>(null);
   const [validationErrors, setValidationErrors] = useState<Array<{ field: string; message: string; value?: unknown }> | null>(null);
@@ -167,6 +189,17 @@ export function DataPushScreen(props: {
     };
   }, []);
 
+  function refreshTemplates(): void {
+    sf.listTemplates().then(setAllTemplates).catch(() => undefined);
+  }
+  useEffect(() => { refreshTemplates(); }, [sf]);
+
+  // Saved mappings that target the currently selected object.
+  const objectProfiles = useMemo(
+    () => allTemplates.filter(t => t.objectName === objectName && t.fieldMappings && t.fieldMappings.length > 0),
+    [allTemplates, objectName],
+  );
+
   // Tick once a second while a push is in flight so elapsed/throughput/ETA stay live.
   useEffect(() => {
     if (push?.status !== 'processing') return;
@@ -199,11 +232,25 @@ export function DataPushScreen(props: {
       return;
     }
     const mapper = new DataMapper();
-    const auto = describeFields ? mapper.autoMapFields(sourceHeaders, describeFields) : [];
-    const autoMap = new Map(auto.map(m => [m.sourceField, m]));
+    // Score every header; auto-apply confident matches (>= 0.9) and keep the
+    // weaker fuzzy hits as one-click suggestions rather than silently applying them.
+    const scored = describeFields ? mapper.suggestFieldMappings(sourceHeaders, describeFields, { minConfidence: 0.6 }) : [];
+    const applied = new Map(scored.filter(s => s.confidence >= 0.9).map(s => [s.sourceField, s]));
+    const guesses = scored.filter(s => s.confidence < 0.9);
+
+    const info: Record<string, { kind: MappingMatchKind; confidence: number }> = {};
+    const sugg: Record<string, { target: string; label: string }> = {};
+    for (const s of applied.values()) info[s.sourceField] = { kind: s.matchedOn, confidence: s.confidence };
+    for (const g of guesses) {
+      if (applied.has(g.sourceField)) continue;
+      const target = describeFields?.find(f => f.name === g.targetField);
+      sugg[g.sourceField] = { target: g.targetField, label: target?.label ?? g.targetField };
+    }
+    setMatchInfo(info);
+    setSuggestions(sugg);
 
     const next = sourceHeaders.map(h => {
-      const found = autoMap.get(h);
+      const found = applied.get(h);
       return {
         sourceField: h,
         targetField: found?.targetField ?? '',
@@ -238,6 +285,13 @@ export function DataPushScreen(props: {
     if (!describeFields) return [];
     return describeFields.filter(f => f.externalId);
   }, [describeFields]);
+
+  // Required, createable fields with no mapping — surfaces REQUIRED_FIELD_MISSING
+  // before the push rather than after it fails. Only meaningful for insert/upsert.
+  const unmappedRequired = useMemo(() => {
+    if (!describeFields || (operation !== 'insert' && operation !== 'upsert')) return [];
+    return new DataMapper().findUnmappedRequiredFields(describeFields, mappings);
+  }, [describeFields, mappings, operation]);
 
   async function onFileSelected(file: File): Promise<void> {
     try {
@@ -339,6 +393,7 @@ export function DataPushScreen(props: {
     setSaveTemplateOpen(false);
     try {
       await sf.upsertTemplate({ id: `tmpl_${Date.now()}`, name, objectName, fieldMappings: mappings });
+      refreshTemplates();
       setToast({ title: 'Saved', body: `Template "${name}" saved.` });
     } catch (e) {
       setToast({ title: 'Save Failed', body: e instanceof Error ? e.message : 'Unknown error' });
@@ -479,21 +534,20 @@ export function DataPushScreen(props: {
           ) : null}
 
           <div class="wl-row2">
-            <select class="wl-select" value={objectName} onChange={(e) => setObjectName((e.currentTarget as HTMLSelectElement).value)}>
-              {availableObjects
+            <SearchableSelect
+              ariaLabel="Target object"
+              placeholder="Search objects..."
+              value={objectName}
+              onChange={setObjectName}
+              options={availableObjects
                 .filter(o => {
                   if (operation === 'insert') return o.createable;
                   if (operation === 'update' || operation === 'upsert') return o.updateable;
                   if (operation === 'delete') return o.deletable;
                   return o.createable;
                 })
-                .slice(0, 2000)
-                .map(o => (
-                  <option key={o.name} value={o.name}>
-                    {o.label} ({o.name})
-                  </option>
-                ))}
-            </select>
+                .map(o => ({ value: o.name, label: o.label, sublabel: o.name }))}
+            />
             <select class="wl-select" value={operation} onChange={(e) => setOperation((e.currentTarget as HTMLSelectElement).value as never)}>
               <option value="insert">insert</option>
               <option value="update">update</option>
@@ -581,6 +635,36 @@ export function DataPushScreen(props: {
           </div>
         </div>
 
+        {hasDataset && objectProfiles.length > 0 ? (
+          <div class="wl-row" style="margin-bottom:10px;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="wl-muted">Saved mapping{objectProfiles.length === 1 ? '' : 's'} for {objectName}:</span>
+            {objectProfiles.map(t => (
+              <button
+                key={t.id}
+                class="wl-pill wl-pill--brand"
+                style="padding:2px 10px;font-size:12px;cursor:pointer;border:none"
+                title={`Apply the saved field mapping "${t.name}"`}
+                onClick={() => {
+                  if (t.fieldMappings) setMappings(t.fieldMappings);
+                  setMatchInfo({});
+                  setSuggestions({});
+                  setToast({ title: 'Mapping Applied', body: `Applied saved mapping "${t.name}".` });
+                }}
+              >
+                Apply: {t.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {hasDataset && unmappedRequired.length > 0 ? (
+          <div class="wl-bannerWarning" style="margin-bottom:10px">
+            <strong>{unmappedRequired.length} required field{unmappedRequired.length === 1 ? '' : 's'} not mapped.</strong>{' '}
+            Salesforce will reject rows with <span class="wl-mono">REQUIRED_FIELD_MISSING</span> unless these are mapped or given a default:{' '}
+            {unmappedRequired.map(f => `${f.label} (${f.name})`).join(', ')}.
+          </div>
+        ) : null}
+
         {hasDataset ? (
           <div class="wl-tableWrap" style="max-height:360px">
             <table class="wl-table">
@@ -595,22 +679,46 @@ export function DataPushScreen(props: {
               <tbody>
                 {mappings.map((m, idx) => (
                   <tr key={m.sourceField}>
-                    <td class="wl-mono">{m.sourceField}</td>
+                    <td class="wl-mono">
+                      {m.sourceField}
+                      {(() => {
+                        const info = matchInfo[m.sourceField];
+                        const badge = info ? matchBadge(info.kind) : null;
+                        return badge ? <span class={`wl-pill ${badge.cls}`} style="margin-left:6px;padding:1px 6px;font-size:10px">{badge.text}</span> : null;
+                      })()}
+                    </td>
                     <td>
-                      <select
-                        class="wl-select"
+                      <SearchableSelect
+                        ariaLabel={`Target field for ${m.sourceField}`}
+                        placeholder="(skip)"
                         value={m.targetField}
-                        onChange={(e) => {
-                          const v = (e.currentTarget as HTMLSelectElement).value;
+                        onChange={(v) => {
                           const field = targetableFields.find(f => f.name === v);
                           setMappings(prev => prev.map((p, i) => i === idx ? { ...p, targetField: v, required: field?.required ?? false } : p));
+                          // A manual choice overrides the auto-hint for this row.
+                          setMatchInfo(prev => { const n = { ...prev }; delete n[m.sourceField]; return n; });
+                          setSuggestions(prev => { const n = { ...prev }; delete n[m.sourceField]; return n; });
                         }}
-                      >
-                        <option value="">(skip)</option>
-                        {targetableFields.map(f => (
-                          <option key={f.name} value={f.name}>{f.label} ({f.name})</option>
-                        ))}
-                      </select>
+                        options={[
+                          { value: '', label: '(skip)' },
+                          ...targetableFields.map(f => ({ value: f.name, label: f.label, sublabel: f.name })),
+                        ]}
+                      />
+                      {!m.targetField && suggestions[m.sourceField] ? (
+                        <button
+                          class="wl-pill wl-pill--warning"
+                          style="margin-top:4px;padding:1px 8px;font-size:11px;cursor:pointer;border:none"
+                          title="Apply this suggested mapping"
+                          onClick={() => {
+                            const s = suggestions[m.sourceField];
+                            const field = targetableFields.find(f => f.name === s.target);
+                            setMappings(prev => prev.map((p, i) => i === idx ? { ...p, targetField: s.target, required: field?.required ?? false } : p));
+                            setSuggestions(prev => { const n = { ...prev }; delete n[m.sourceField]; return n; });
+                          }}
+                        >
+                          Suggest: {suggestions[m.sourceField].label} ↵
+                        </button>
+                      ) : null}
                     </td>
                     <td>
                       <select

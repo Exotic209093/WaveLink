@@ -4,7 +4,11 @@
  * Complexity: O(N*C) where N is number of records and C is number of columns.
  */
 
-import * as XLSX from 'xlsx';
+// SheetJS is ~875 KiB. Load it on demand (dynamic import) so CSV/JSON/XML
+// users never pay for it — webpack splits it into its own async chunk.
+async function loadXLSX(): Promise<typeof import('xlsx')> {
+  return import(/* webpackChunkName: "xlsx" */ 'xlsx');
+}
 
 /**
  * Converts records to Excel file and triggers download.
@@ -14,12 +18,13 @@ import * as XLSX from 'xlsx';
  * @param filename - Name of the file to download
  * @param sheetName - Name of the Excel sheet (default: "Sheet1")
  */
-export function recordsToExcel(
+export async function recordsToExcel(
   records: Record<string, unknown>[],
   columns: string[],
   filename: string,
   sheetName: string = 'Sheet1'
-): void {
+): Promise<void> {
+  const XLSX = await loadXLSX();
   // Filter records to only include specified columns
   const filtered = records.map(record => {
     const filtered: Record<string, unknown> = {};
@@ -69,11 +74,12 @@ export function recordsToExcel(
  * @param sheetName - Name of the Excel sheet
  * @returns ArrayBuffer containing the Excel file
  */
-export function recordsToExcelBuffer(
+export async function recordsToExcelBuffer(
   records: Record<string, unknown>[],
   columns: string[],
   sheetName: string = 'Sheet1'
-): ArrayBuffer {
+): Promise<ArrayBuffer> {
+  const XLSX = await loadXLSX();
   const filtered = records.map(record => {
     const filtered: Record<string, unknown> = {};
     for (const col of columns) {

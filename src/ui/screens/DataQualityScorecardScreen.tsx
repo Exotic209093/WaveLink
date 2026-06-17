@@ -19,6 +19,7 @@ import type { SfApi } from '../api/sf';
 import { scoreDataset, getDefaultRulesForField } from '../utils/dataQuality';
 import type { ScorecardResult } from '../utils/dataQuality';
 import { Skeleton } from '../components/Skeleton';
+import { SearchableSelect } from '../components/SearchableSelect';
 import type { QualityRule, QualityRuleSet } from '../../core/types/storage';
 import { QualityRuleEditor } from '../components/QualityRuleEditor';
 import { QualityScorecard } from '../components/QualityScorecard';
@@ -277,30 +278,20 @@ export function DataQualityScorecardScreen(props: { sf: SfApi; tabId: number }):
           <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
             <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:4px">
               <label style="font-size:12px;font-weight:700">Object</label>
-              <select
-                class="wl-select"
+              <SearchableSelect
+                ariaLabel="Object to score"
+                placeholder={loadingObjects ? 'Loading objects...' : objects.length === 0 ? 'No objects found' : 'Select object...'}
+                disabled={loadingObjects}
                 value={selectedObject}
-                onChange={(e) => {
-                  setSelectedObject((e.currentTarget as HTMLSelectElement).value);
+                onChange={(v) => {
+                  setSelectedObject(v);
                   setRules([]);
                   setResult(null);
                   setSelectedRuleSetId('');
                   setRuleSetName('');
                 }}
-                disabled={loadingObjects}
-              >
-                {loadingObjects ? (
-                  <option value="">Loading objects...</option>
-                ) : objects.length === 0 ? (
-                  <option value="">No objects found</option>
-                ) : (
-                  objects.map((o) => (
-                    <option key={o.name} value={o.name}>
-                      {o.label} ({o.name})
-                    </option>
-                  ))
-                )}
-              </select>
+                options={objects.map((o) => ({ value: o.name, label: o.label, sublabel: o.name }))}
+              />
             </div>
 
             <div style="flex:0 0 120px;display:flex;flex-direction:column;gap:4px">

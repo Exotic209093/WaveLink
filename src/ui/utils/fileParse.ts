@@ -9,7 +9,6 @@
  */
 
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
 
 export interface ParsedDataset {
   records: Record<string, unknown>[];
@@ -83,6 +82,8 @@ export async function parseCsvFile(file: File): Promise<ParsedDataset> {
 }
 
 export async function parseExcelFile(file: File): Promise<ParsedDataset> {
+  // Load SheetJS (~875 KiB) only when an Excel file is actually parsed.
+  const XLSX = await import(/* webpackChunkName: "xlsx" */ 'xlsx');
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array' });
   const sheetName = wb.SheetNames[0];

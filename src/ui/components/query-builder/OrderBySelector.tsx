@@ -2,6 +2,7 @@ import type { VNode } from 'preact';
 import { h } from 'preact';
 import type { SObjectField } from '../../../core/types/salesforce';
 import type { OrderByClause } from '../../utils/soqlBuilder';
+import { fieldDisplay } from '../../utils/fieldDisplay';
 
 export function OrderBySelector(props: {
   fields: SObjectField[];
@@ -28,7 +29,7 @@ export function OrderBySelector(props: {
           }}
         >
           <option value="">None</option>
-          {fields.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
+          {fields.map(f => <option key={f.name} value={f.name}>{fieldDisplay(f)}</option>)}
         </select>
         {orderBy && (
           <div class="wl-qb-segmented">

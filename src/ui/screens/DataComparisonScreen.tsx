@@ -9,6 +9,7 @@ import { useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import { OrgPicker } from '../components/OrgPicker';
 import { DataDiffView } from '../components/DataDiffView';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { Toast } from '../components/Toast';
 import { diffRecords, diffToCsv } from '../utils/dataDiff';
 import type { DataDiffResult } from '../utils/dataDiff';
@@ -223,31 +224,26 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
             <div class="wl-row" style="gap:12px;flex-wrap:wrap">
               <div style="flex:1;min-width:200px">
                 <label class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">OBJECT</label>
-                <select
-                  class="wl-select"
-                  style="width:100%"
+                <SearchableSelect
+                  ariaLabel="Object to compare"
+                  placeholder="Select object..."
                   value={objectName}
-                  onChange={(e) => {
-                    const v = (e.currentTarget as HTMLSelectElement).value;
+                  onChange={(v) => {
                     setObjectName(v);
                     if (v) loadCommonFields(v);
                   }}
-                >
-                  <option value="">Select object...</option>
-                  {commonObjects.map(o => (
-                    <option key={o.name} value={o.name}>{o.label} ({o.name})</option>
-                  ))}
-                </select>
+                  options={commonObjects.map(o => ({ value: o.name, label: o.label, sublabel: o.name }))}
+                />
               </div>
               <div style="flex:1;min-width:200px">
                 <label class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">MATCH BY</label>
-                <select class="wl-select" style="width:100%" value={matchField} onChange={(e) => setMatchField((e.currentTarget as HTMLSelectElement).value)}>
-                  {commonFields.map(f => (
-                    <option key={f.name} value={f.name}>
-                      {f.name}{f.externalId ? ' (External ID)' : ''}
-                    </option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  ariaLabel="Field to match records by"
+                  placeholder="Select field..."
+                  value={matchField}
+                  onChange={setMatchField}
+                  options={commonFields.map(f => ({ value: f.name, label: `${f.name}${f.externalId ? ' (External ID)' : ''}` }))}
+                />
               </div>
             </div>
 

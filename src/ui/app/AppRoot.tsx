@@ -50,6 +50,8 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 // Named exports are mapped to the { default } shape lazy() expects, and the
 // webpackChunkName comments give the emitted chunks readable filenames.
 const ObjectsScreen = lazy(() => import(/* webpackChunkName: "adv-objects" */ '../screens/ObjectsScreen').then(m => ({ default: m.ObjectsScreen })));
+const RecordInspectorScreen = lazy(() => import(/* webpackChunkName: "adv-inspector" */ '../screens/RecordInspectorScreen').then(m => ({ default: m.RecordInspectorScreen })));
+const ApexRunnerScreen = lazy(() => import(/* webpackChunkName: "adv-apex" */ '../screens/ApexRunnerScreen').then(m => ({ default: m.ApexRunnerScreen })));
 const PushHistoryScreen = lazy(() => import(/* webpackChunkName: "adv-history" */ '../screens/PushHistoryScreen').then(m => ({ default: m.PushHistoryScreen })));
 const DataCleanserScreen = lazy(() => import(/* webpackChunkName: "adv-cleanser" */ '../screens/DataCleanserScreen').then(m => ({ default: m.DataCleanserScreen })));
 const TestDataGeneratorScreen = lazy(() => import(/* webpackChunkName: "adv-test-data" */ '../screens/TestDataGeneratorScreen').then(m => ({ default: m.TestDataGeneratorScreen })));
@@ -78,6 +80,16 @@ export function AppRoot(): VNode {
   const [selectedTabId, setSelectedTabId] = useState<number | null>(null);
   const [context, setContext] = useState<SfContext | null>(null);
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
+  // Proactive low-storage awareness: warn app-wide before users hit the quota.
+  const [storagePct, setStoragePct] = useState<number | null>(null);
+  const [storageDismissed, setStorageDismissed] = useState(false);
+  // Record ID to preload into the Record Inspector (set when opened from a results grid).
+  const [inspectId, setInspectId] = useState<string | undefined>(undefined);
+
+  const openInspector = (id: string): void => {
+    setInspectId(id);
+    setRoute('advanced/inspector');
+  };
   const [soql, setSoql] = useState<string>('SELECT Id, Name FROM Account LIMIT 10');
 
   const [dataset, setDataset] = useState<{
@@ -205,6 +217,14 @@ export function AppRoot(): VNode {
     };
   }, []);
 
+  // Sample storage usage on load (and when returning to Home) so the warning
+  // reflects recent pushes/snapshots without polling constantly.
+  useEffect(() => {
+    sf.getStorageUsage()
+      .then(u => setStoragePct(u.quota > 0 ? Math.round((u.bytesInUse / u.quota) * 100) : null))
+      .catch(() => undefined);
+  }, [sf, route === 'home']);
+
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
     sf.setUiSettings({ theme: newTheme }).catch(e => console.error('Failed to save theme:', e));
@@ -282,6 +302,8 @@ export function AppRoot(): VNode {
   // from the command palette so power users can jump straight to them.
   const advancedToolItems: NavItem[] = [
     { key: 'advanced/objects', label: 'Objects' },
+    { key: 'advanced/inspector', label: 'Record Inspector' },
+    { key: 'advanced/apex', label: 'Anonymous Apex' },
     { key: 'advanced/relationships', label: 'Relationship Explorer' },
     { key: 'advanced/schemaCompare', label: 'Schema Gap Analysis' },
     { key: 'advanced/fieldAnalytics', label: 'Field Analytics' },
@@ -304,6 +326,8 @@ export function AppRoot(): VNode {
     'migration/projects': true,
     'migration/validation': true,
     'advanced/objects': true,
+    'advanced/inspector': true,
+    'advanced/apex': true,
     'advanced/cleanse': true,
     'advanced/testData': true,
     'advanced/schemaCompare': true,
@@ -402,10 +426,12 @@ export function AppRoot(): VNode {
 
     // ── Advanced hub + tools ──
     if (route === 'advanced/index') return <AdvancedLabScreen onNavigate={setRoute} />;
-    if (route === 'advanced/query') return <QueryScreen sf={sf} tabId={selectedTabId!} context={context ?? undefined} soql={soql} onSoqlChange={setSoql} />;
+    if (route === 'advanced/query') return <QueryScreen sf={sf} tabId={selectedTabId!} context={context ?? undefined} soql={soql} onSoqlChange={setSoql} onInspectId={openInspector} />;
     if (route === 'advanced/objects') return (
       <ObjectsScreen sf={sf} tabId={selectedTabId!} onInsertToken={(token) => setSoql(prev => `${prev}${prev.endsWith(' ') ? '' : ' '}${token}`)} />
     );
+    if (route === 'advanced/inspector') return <RecordInspectorScreen sf={sf} tabId={selectedTabId!} initialId={inspectId} />;
+    if (route === 'advanced/apex') return <ApexRunnerScreen sf={sf} tabId={selectedTabId!} />;
     if (route === 'advanced/cleanse') return (
       <DataCleanserScreen
         sf={sf}
@@ -464,6 +490,15 @@ export function AppRoot(): VNode {
         theme={theme}
         onThemeChange={handleThemeChange}
       >
+        {storagePct !== null && storagePct >= 80 && !storageDismissed && route !== 'settings' ? (
+          <div class="wl-bannerWarning" style="margin-bottom:12px;display:flex;align-items:center;gap:10px">
+            <span style="flex:1">
+              <strong>Local storage is {storagePct}% full.</strong> WaveLink may fail to save history, snapshots, or undo data soon.
+            </span>
+            <button class="wl-btn" style="padding:4px 10px;font-size:12px" onClick={() => setRoute('settings')}>Manage storage</button>
+            <button class="wl-btn" style="padding:4px 8px;font-size:12px" aria-label="Dismiss storage warning" onClick={() => setStorageDismissed(true)}>✕</button>
+          </div>
+        ) : null}
         {effectiveRoute.startsWith('advanced/') && effectiveRoute !== 'advanced/index' ? (
           <button
             class="wl-btn"

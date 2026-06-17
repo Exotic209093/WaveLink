@@ -21,6 +21,7 @@ import type { SfApi } from '../api/sf';
 import type { MatchStrategy, DetectionConfig, DuplicateGroup } from '../utils/duplicateDetection';
 import { detectDuplicates } from '../utils/duplicateDetection';
 import { MergeWizard } from '../components/MergeWizard';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { Toast } from '../components/Toast';
 
 export interface DuplicateDetectionScreenProps {
@@ -256,18 +257,13 @@ export function DuplicateDetectionScreen(props: DuplicateDetectionScreenProps): 
           {/* Object selector */}
           <div>
             <div class="wl-muted" style="margin-bottom:6px">Object</div>
-            <select
-              class="wl-select"
+            <SearchableSelect
+              ariaLabel="Object for duplicate detection"
+              placeholder="Select an object..."
               value={selectedObject}
-              onChange={(e) => setSelectedObject((e.currentTarget as HTMLSelectElement).value)}
-            >
-              <option value="">Select an object...</option>
-              {objects.map((o) => (
-                <option key={o.name} value={o.name}>
-                  {o.label} ({o.name})
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedObject}
+              options={objects.map((o) => ({ value: o.name, label: o.label, sublabel: o.name }))}
+            />
           </div>
 
           {/* Strategy selector */}

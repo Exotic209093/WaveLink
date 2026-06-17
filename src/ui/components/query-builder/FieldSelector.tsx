@@ -14,7 +14,7 @@ export function FieldSelector(props: {
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(
-    () => fuzzyFilter(fields, search, f => f.name),
+    () => fuzzyFilter(fields, search, f => `${f.label} ${f.name}`),
     [fields, search],
   );
 
@@ -97,7 +97,10 @@ export function FieldSelector(props: {
               checked={selectedSet.has(f.name)}
               onChange={() => toggle(f.name)}
             />
-            <span class="wl-mono" style="font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{f.name}</span>
+            <span style="font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              {f.label && f.label !== f.name ? <span>{f.label} </span> : null}
+              <span class="wl-mono wl-muted" style="font-size:11px">{f.name}</span>
+            </span>
             <span class="wl-qb-typeBadge">{f.type}</span>
           </label>
         ))}
