@@ -375,6 +375,30 @@ messageBus.on('SF_DESCRIBE_SOBJECT', async (message, sender): Promise<MessageRes
   }
 });
 
+messageBus.on('SF_UPDATE_RECORD', async (message, sender): Promise<MessageResponse> => {
+  try {
+    const { objectName, recordId, fields } = message.payload as {
+      objectName: string;
+      recordId: string;
+      fields: Record<string, unknown>;
+    };
+    const org = await resolveSfOrg(message.payload, sender);
+    const client = new SalesforceApiClient({
+      instanceUrl: org.instanceUrl,
+      accessToken: org.accessToken,
+      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
+    });
+    await client.updateRecord(objectName, recordId, fields);
+    return { success: true, data: { recordId }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'SF_UPDATE_RECORD_ERROR', message: error instanceof Error ? error.message : 'Update failed' },
+      requestId: message.requestId,
+    };
+  }
+});
+
 messageBus.on('SF_LIMITS_GET', async (message, sender): Promise<MessageResponse> => {
   try {
     const org = await resolveSfOrg(message.payload, sender);

@@ -82,6 +82,13 @@ export function AppRoot(): VNode {
   // Proactive low-storage awareness: warn app-wide before users hit the quota.
   const [storagePct, setStoragePct] = useState<number | null>(null);
   const [storageDismissed, setStorageDismissed] = useState(false);
+  // Record ID to preload into the Record Inspector (set when opened from a results grid).
+  const [inspectId, setInspectId] = useState<string | undefined>(undefined);
+
+  const openInspector = (id: string): void => {
+    setInspectId(id);
+    setRoute('advanced/inspector');
+  };
   const [soql, setSoql] = useState<string>('SELECT Id, Name FROM Account LIMIT 10');
 
   const [dataset, setDataset] = useState<{
@@ -416,11 +423,11 @@ export function AppRoot(): VNode {
 
     // ── Advanced hub + tools ──
     if (route === 'advanced/index') return <AdvancedLabScreen onNavigate={setRoute} />;
-    if (route === 'advanced/query') return <QueryScreen sf={sf} tabId={selectedTabId!} context={context ?? undefined} soql={soql} onSoqlChange={setSoql} />;
+    if (route === 'advanced/query') return <QueryScreen sf={sf} tabId={selectedTabId!} context={context ?? undefined} soql={soql} onSoqlChange={setSoql} onInspectId={openInspector} />;
     if (route === 'advanced/objects') return (
       <ObjectsScreen sf={sf} tabId={selectedTabId!} onInsertToken={(token) => setSoql(prev => `${prev}${prev.endsWith(' ') ? '' : ' '}${token}`)} />
     );
-    if (route === 'advanced/inspector') return <RecordInspectorScreen sf={sf} tabId={selectedTabId!} />;
+    if (route === 'advanced/inspector') return <RecordInspectorScreen sf={sf} tabId={selectedTabId!} initialId={inspectId} />;
     if (route === 'advanced/cleanse') return (
       <DataCleanserScreen
         sf={sf}

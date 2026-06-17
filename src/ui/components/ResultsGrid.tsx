@@ -15,7 +15,7 @@
  */
 
 import type { VNode } from 'preact';
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { FlatRecord } from '../utils/records';
 
@@ -36,8 +36,10 @@ export function ResultsGrid(props: {
   onSelectedColumnsChange: (cols: string[]) => void;
   sf?: { updateRecord: (objectName: string, recordId: string, data: Record<string, unknown>) => Promise<void> };
   objectName?: string;
+  /** Open the Record Inspector for an ID-looking cell value. */
+  onInspectId?: (id: string) => void;
 }): VNode {
-  const { instanceUrl, records, columns, selectedColumns, onSelectedColumnsChange, sf, objectName } = props;
+  const { instanceUrl, records, columns, selectedColumns, onSelectedColumnsChange, sf, objectName, onInspectId } = props;
   const [showCols, setShowCols] = useState(false);
   const [copyToast, setCopyToast] = useState<string | null>(null);
 
@@ -348,11 +350,23 @@ export function ResultsGrid(props: {
                             }}
                             onBlur={cancelEdit}
                           />
-                        ) : isId ? (
-                          <a class="wl-link" href={`${instanceUrl}/${v}`} target="_blank" rel="noreferrer">
-                            {display}
-                          </a>
-                        ) : display}
+                        ) : (
+                          <Fragment>
+                            {isId ? (
+                              <a class="wl-link" href={`${instanceUrl}/${v}`} target="_blank" rel="noreferrer">
+                                {display}
+                              </a>
+                            ) : display}
+                            {onInspectId && looksLikeSfId(v) ? (
+                              <button
+                                class="wl-btn"
+                                style="margin-left:6px;padding:0 5px;font-size:10px"
+                                title="Inspect this record"
+                                onClick={() => onInspectId(String(v))}
+                              >🔍</button>
+                            ) : null}
+                          </Fragment>
+                        )}
                       </td>
                     );
                   })}

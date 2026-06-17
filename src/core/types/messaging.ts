@@ -47,6 +47,7 @@ export type MessageType =
   | 'SF_TOOLING_QUERY_MORE'
   | 'SF_DESCRIBE_GLOBAL'
   | 'SF_DESCRIBE_SOBJECT'
+  | 'SF_UPDATE_RECORD'
   | 'SF_LIMITS_GET'
   | 'SF_QUERY_EXPLAIN'
   // UI control

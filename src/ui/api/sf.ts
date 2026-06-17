@@ -113,6 +113,14 @@ export class SfApi {
     return res.data;
   }
 
+  async updateRecord(objectName: string, recordId: string, fields: Record<string, unknown>, tabId?: number): Promise<void> {
+    const res = await this.bus.send<{ tabId?: number; objectName: string; recordId: string; fields: Record<string, unknown> }, { recordId: string }>(
+      'SF_UPDATE_RECORD',
+      { tabId, objectName, recordId, fields },
+    );
+    if (!res.success) throw new Error(res.error?.message ?? 'Update failed');
+  }
+
   async getLimits(tabId?: number): Promise<Record<string, { Max: number; Remaining: number }>> {
     const res = await this.bus.send<{ tabId?: number }, Record<string, { Max: number; Remaining: number }>>(
       'SF_LIMITS_GET',

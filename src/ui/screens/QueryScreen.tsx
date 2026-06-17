@@ -46,6 +46,7 @@ export function QueryScreen(props: {
   context?: SfContext;
   onSoqlChange?: (soql: string) => void;
   soql?: string;
+  onInspectId?: (id: string) => void;
 }): VNode {
   const { sf, tabId, context } = props;
   const [soql, setSoql] = useState(props.soql ?? 'SELECT Id, Name FROM Account LIMIT 10');
@@ -477,10 +478,6 @@ export function QueryScreen(props: {
       ) : null}
 
       {flatRecords.length > 0 ? (
-        // ResultsGrid inline cell-editing needs a record-update API that SfApi
-        // does not expose yet, so `sf` is intentionally not passed — wiring it
-        // through would call an undefined updateRecord and crash on commit.
-        // Re-enable once a verified single-record update path lands.
         <ResultsGrid
           instanceUrl={context?.instanceUrl}
           records={flatRecords}
@@ -488,6 +485,8 @@ export function QueryScreen(props: {
           selectedColumns={selectedColumns.length ? selectedColumns : columns}
           onSelectedColumnsChange={setSelectedColumns}
           objectName={acCtx.fromObject ?? undefined}
+          sf={sf}
+          onInspectId={props.onInspectId}
         />
       ) : (
         <div class="wl-card">
