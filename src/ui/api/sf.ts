@@ -121,6 +121,23 @@ export class SfApi {
     if (!res.success) throw new Error(res.error?.message ?? 'Update failed');
   }
 
+  async createRecord(objectName: string, fields: Record<string, unknown>, tabId?: number): Promise<string> {
+    const res = await this.bus.send<{ tabId?: number; objectName: string; fields: Record<string, unknown> }, { id: string }>(
+      'SF_CREATE_RECORD',
+      { tabId, objectName, fields },
+    );
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Create failed');
+    return res.data.id;
+  }
+
+  async deleteRecord(objectName: string, recordId: string, tabId?: number): Promise<void> {
+    const res = await this.bus.send<{ tabId?: number; objectName: string; recordId: string }, { recordId: string }>(
+      'SF_DELETE_RECORD',
+      { tabId, objectName, recordId },
+    );
+    if (!res.success) throw new Error(res.error?.message ?? 'Delete failed');
+  }
+
   async getLimits(tabId?: number): Promise<Record<string, { Max: number; Remaining: number }>> {
     const res = await this.bus.send<{ tabId?: number }, Record<string, { Max: number; Remaining: number }>>(
       'SF_LIMITS_GET',

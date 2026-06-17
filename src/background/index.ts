@@ -399,6 +399,46 @@ messageBus.on('SF_UPDATE_RECORD', async (message, sender): Promise<MessageRespon
   }
 });
 
+messageBus.on('SF_CREATE_RECORD', async (message, sender): Promise<MessageResponse> => {
+  try {
+    const { objectName, fields } = message.payload as { objectName: string; fields: Record<string, unknown> };
+    const org = await resolveSfOrg(message.payload, sender);
+    const client = new SalesforceApiClient({
+      instanceUrl: org.instanceUrl,
+      accessToken: org.accessToken,
+      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
+    });
+    const result = await client.createRecord(objectName, fields);
+    return { success: true, data: { id: result.id }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'SF_CREATE_RECORD_ERROR', message: error instanceof Error ? error.message : 'Create failed' },
+      requestId: message.requestId,
+    };
+  }
+});
+
+messageBus.on('SF_DELETE_RECORD', async (message, sender): Promise<MessageResponse> => {
+  try {
+    const { objectName, recordId } = message.payload as { objectName: string; recordId: string };
+    const org = await resolveSfOrg(message.payload, sender);
+    const client = new SalesforceApiClient({
+      instanceUrl: org.instanceUrl,
+      accessToken: org.accessToken,
+      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
+    });
+    await client.deleteRecord(objectName, recordId);
+    return { success: true, data: { recordId }, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'SF_DELETE_RECORD_ERROR', message: error instanceof Error ? error.message : 'Delete failed' },
+      requestId: message.requestId,
+    };
+  }
+});
+
 messageBus.on('SF_LIMITS_GET', async (message, sender): Promise<MessageResponse> => {
   try {
     const org = await resolveSfOrg(message.payload, sender);
