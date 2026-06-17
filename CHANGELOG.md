@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Anonymous Apex runner** — a new Advanced tool that executes anonymous Apex against the org via the Tooling API (⌘/Ctrl+Enter to run) and reports compile problems, runtime exceptions with stack traces, and line/column, with a note that debug-log capture requires trace flags.
+- **Record Inspector — create & delete** — alongside inline edit, you can now create a new record of any createable object (with picklist/boolean selects) and jump straight into it, delete the current record (guarded), and drill into parent records via 🔍 on reference fields.
 - **Smarter import field mapping** — auto-mapping now matches source headers against Salesforce field **labels** as well as API names (so a column like "Account Name" maps to the `Name` field), with a confidence-scored engine (`suggestFieldMappings`) that also surfaces fuzzy near-misses for review.
 - **Unmapped-required warning** — the Import/Push screen now flags required, createable fields that have no mapping *before* you push, so rows no longer fail in the org with `REQUIRED_FIELD_MISSING`.
 - **Searchable object & field pickers** — long object and field lists are now type-to-filter across the app. A new reusable combobox replaces the native dropdowns on Import/Push (object + per-row target-field), Compare/Data Comparison (object + match field), Bulk Object Ops, Duplicate Detection, Data Quality Scorecard, Clone Wizard, and the Cleanser validation panel — no more scrolling 500+ options. The Objects screen also gained a field search box.

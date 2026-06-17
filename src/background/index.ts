@@ -399,6 +399,26 @@ messageBus.on('SF_UPDATE_RECORD', async (message, sender): Promise<MessageRespon
   }
 });
 
+messageBus.on('SF_EXECUTE_ANONYMOUS', async (message, sender): Promise<MessageResponse> => {
+  try {
+    const { apexBody } = message.payload as { apexBody: string };
+    const org = await resolveSfOrg(message.payload, sender);
+    const client = new SalesforceApiClient({
+      instanceUrl: org.instanceUrl,
+      accessToken: org.accessToken,
+      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
+    });
+    const result = await client.executeAnonymous(apexBody);
+    return { success: true, data: result, requestId: message.requestId };
+  } catch (error) {
+    return {
+      success: false,
+      error: { code: 'SF_EXECUTE_ANONYMOUS_ERROR', message: error instanceof Error ? error.message : 'Execute anonymous failed' },
+      requestId: message.requestId,
+    };
+  }
+});
+
 messageBus.on('SF_CREATE_RECORD', async (message, sender): Promise<MessageResponse> => {
   try {
     const { objectName, fields } = message.payload as { objectName: string; fields: Record<string, unknown> };

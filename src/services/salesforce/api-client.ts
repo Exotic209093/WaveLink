@@ -126,6 +126,12 @@ export class SalesforceApiClient {
     return this.request<QueryResult<T>>(`/tooling/query?q=${encodedQuery}`);
   }
 
+  /** Execute anonymous Apex via the Tooling API. Returns compile/run status. */
+  async executeAnonymous(apexBody: string): Promise<ExecuteAnonymousResult> {
+    const encoded = encodeURIComponent(apexBody);
+    return this.request<ExecuteAnonymousResult>(`/tooling/executeAnonymous/?anonymousBody=${encoded}`);
+  }
+
   /** Fetch next page of query results */
   async queryMore<T = Record<string, unknown>>(nextRecordsUrl: string): Promise<QueryResult<T>> {
     return this.request<QueryResult<T>>(nextRecordsUrl, { useFullPath: true });
@@ -367,6 +373,16 @@ export interface QueryResult<T> {
   done: boolean;
   records: T[];
   nextRecordsUrl?: string;
+}
+
+export interface ExecuteAnonymousResult {
+  compiled: boolean;
+  compileProblem: string | null;
+  success: boolean;
+  line: number;
+  column: number;
+  exceptionMessage: string | null;
+  exceptionStackTrace: string | null;
 }
 
 export interface DescribeGlobalResult {
