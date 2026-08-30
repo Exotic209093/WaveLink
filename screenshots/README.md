@@ -22,6 +22,16 @@ Take screenshots of these key flows in the extension:
 All five images were captured from the packaged v0.6.0 release-candidate build on 2026-08-30 at
 exactly 1280x800. Org, user, and record identifiers were redacted before capture.
 
+## Promotional assets
+
+Run `npm run assets:store` to regenerate the two brand-consistent promotional images:
+
+- `promo-small-440x280.png` — required small promotional tile
+- `promo-marquee-1400x560.png` — optional marquee promotional tile
+
+The generator uses the checked-in WaveLink SVG and deterministic SVG composition, so the assets
+can be reproduced without external services or licensed stock imagery.
+
 ## How to Take Them
 
 1. Load the unpacked extension in Chrome (`chrome://extensions` → Load unpacked → select `dist/`)

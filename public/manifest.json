@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WaveLink — Salesforce Data Export & Import",
   "version": "0.6.0",
-  "description": "Fast Salesforce data export & import: CSV in, query records out, schedule snapshots, diff exports, convert CSV/JSON/Excel/XML.",
+  "description": "Safely export, import, compare, schedule, and repeat Salesforce data jobs—directly from your browser.",
   "homepage_url": "https://github.com/Exotic209093/WaveLink",
   "permissions": [
     "storage",

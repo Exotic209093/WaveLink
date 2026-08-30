@@ -1,200 +1,187 @@
-# Chrome Web Store Submission Guide
+# Chrome Web Store release kit
 
-This document contains all the information needed to publish and update WaveLink on the Chrome Web Store.
+This file is the source of truth for the WaveLink 0.6.0 listing and privacy declarations. Copy text exactly unless the Chrome Web Store dashboard requires a shorter value.
 
----
+## Dashboard and public links
 
-## Dashboard
+- Developer dashboard: https://chrome.google.com/webstore/devconsole
+- Extension ID: `ccknhhibbedolfnbgnenomdohlmojblo`
+- Store listing: https://chromewebstore.google.com/detail/wavelink/ccknhhibbedolfnbgnenomdohlmojblo
+- Homepage/source: https://github.com/Exotic209093/WaveLink
+- Privacy policy: https://github.com/Exotic209093/WaveLink/blob/main/PRIVACY.md
+- Support: https://github.com/Exotic209093/WaveLink/issues
 
-- **Developer Dashboard**: https://chrome.google.com/webstore/devconsole
-- **Extension ID**: *(fill in after first publish)*
-- **Store Listing URL**: *(fill in after first publish)*
+## Package
 
----
-
-## Build & Package
-
-```bash
-# Build production bundle
-npm run build
-
-# Create store-ready zip (outputs wavelink-<version>.zip)
-npm run package
-
-# Regenerate icons from SVG (requires sharp)
-node scripts/generate-icons.js
-```
-
-The zip includes only what Chrome needs:
-- `manifest.json`
-- `app/index.js` + `app/app.html`
-- `popup/index.js` + `popup/popup.html`
-- `background/index.js`
-- `content/index.js`
-- `icons/` (16, 32, 48, 128 PNG)
-- `privacy.html`
-
-Excluded from zip: `src/`, `tests/`, `.d.ts`, `.d.ts.map`, `.LICENSE.txt`
-
----
-
-## Store Listing Tab
-
-### Description
-
-> Migrate data between Salesforce orgs with dependency ordering, ID remapping, schema comparison, data validation, and transformation pipelines — all from your browser.
->
-> Features:
-> - Migration Projects — Plan and execute multi-object data migrations with automatic dependency ordering and ID remapping
-> - Schema Gap Analysis — Diff fields across orgs to catch mismatches before migration
-> - Data Push — Upload CSV, JSON, or Excel files and push records via REST or Bulk API 2.0
-> - SOQL Query Editor — Visual query builder with aggregates, GROUP BY, date literals, subqueries, syntax highlighting, and explain plans
-> - Data Validation — Pre/post migration validation with quality scorecards and record count comparison
-> - Pipeline Builder — Visual step-chain for data transformation during migration
-> - Multi-Org Support — Connect and switch between multiple Salesforce orgs
-> - Data Comparison — Compare records across orgs with colour-coded diffs and selective sync
-> - Cross-Object Cloning — Clone records with dependency graph detection and ID remapping
-> - Duplicate Detection — Find duplicates using exact, fuzzy, or phonetic matching
-> - Audit Trail & Rollback — Full operation log with one-click undo
-> - Dark mode, command palette (Ctrl+K), keyboard shortcuts
->
-> All data stays on your device. No analytics, telemetry, or external servers.
-
-### Category
-
-**Developer Tools**
-
-### Language
-
-**English**
-
-### Icon
-
-Upload `public/icons/icon-128.png` (128x128 PNG)
-
-### Screenshots
-
-Upload from `screenshots/` directory. Requirements:
-- 1-5 images
-- Exactly 1280x800 or 640x400 pixels
-- PNG or JPEG
-
-The current review-ready set is `screenshot-01-home.png` through
-`screenshot-05-activity.png`. Each is a redacted 1280x800 capture of the packaged
-build covering Home, Export, Import review, Compare, and Jobs & Activity.
-
-Resize command (PowerShell):
 ```powershell
-Add-Type -AssemblyName System.Drawing
-$src = [System.Drawing.Image]::FromFile("path\to\screenshot.png")
-$dst = New-Object System.Drawing.Bitmap(1280, 800)
-$g = [System.Drawing.Graphics]::FromImage($dst)
-$g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-$g.DrawImage($src, 0, 0, 1280, 800)
-$g.Dispose(); $src.Dispose()
-$dst.Save("screenshots\screenshot-01.png", [System.Drawing.Imaging.ImageFormat]::Png)
-$dst.Dispose()
+npm run assets:store
+npm run package
 ```
 
----
+Upload `wavelink-0.6.0.zip`. The package contains the compiled Manifest V3 extension, icons, and bundled privacy page; it excludes source, tests, and build-only files.
 
-## Privacy Practices Tab
+## Store listing
 
-### Single Purpose Description
+### Product name
 
-> WaveLink helps Salesforce administrators and developers safely export, import, compare, schedule, and repeat Salesforce data jobs from the browser.
+> WaveLink — Salesforce Data Export & Import
 
-### Permission Justifications
+The product name comes from `public/manifest.json` and is 42 characters.
 
-**activeTab**
-> Required to detect whether the current browser tab is a logged-in Salesforce org. WaveLink reads the tab URL and cookies to establish an authenticated API connection to the user's Salesforce instance. No data is accessed on non-Salesforce tabs.
+### Summary
 
-**cookies**
-> Required to read the Salesforce session ID (sid cookie) from authenticated Salesforce tabs. This token is used to make REST API calls to the user's own Salesforce org. No cookies are read from any non-Salesforce domains.
+> Safely export, import, compare, schedule, and repeat Salesforce data jobs—directly from your browser.
 
-**host permissions (*.salesforce.com, *.force.com, etc.)**
-> Required to make Salesforce REST API calls (SOQL queries, record CRUD, metadata describe) to the user's connected Salesforce orgs. Host permissions are restricted exclusively to Salesforce domains. No requests are made to any other hosts.
+The summary comes from `public/manifest.json` and is 101 characters, below Chrome's 132-character limit.
+
+### Detailed description
+
+> Move data in and out of your org with confidence.
+>
+> WaveLink is a local-first data workspace for administrators, developers, and consultants. Query and export records, validate imports before they run, compare snapshots, schedule recurring exports, and replay saved jobs—all without sending customer data to a WaveLink server.
+>
+> WHAT YOU CAN DO
+>
+> • Export with SOQL through REST or Bulk API 2.0
+> • Download CSV, JSON, Excel, or XML with only the columns you choose
+> • Import CSV, JSON, and XLSX through a guided mapping and validation flow
+> • Preview impact with dry runs, production warnings, and typed confirmation
+> • Retry failed rows, download results, and undo supported inserts
+> • Save reusable jobs and schedule local snapshots
+> • Compare files, snapshots, or connected orgs
+> • Copy a reviewed single-object dataset between connected orgs
+> • Inspect objects, records, API usage, and schemas in Advanced tools
+>
+> BUILT FOR SAFER DATA WORK
+>
+> The target org, environment, operation, and record count remain visible before a write. Bulk jobs keep resumable checkpoints, and unified activity history makes results and eligible recovery actions easy to find.
+>
+> LOCAL-FIRST PRIVACY
+>
+> WaveLink has no analytics, telemetry, advertising, or developer-operated backend. Data is stored in your browser and exchanged only with Salesforce domains selected by you. Uploaded records, query results, snapshots, job history, account details, and authentication information are handled only to provide the features you request. See the privacy policy for complete handling and deletion details.
+>
+> Requires an active Salesforce browser session. WaveLink is independent and is not affiliated with or endorsed by Salesforce, Inc.
+
+### Category and language
+
+- Category: **Developer Tools**
+- Language: **English**
+
+### Release notes
+
+> WaveLink 0.6.0 is a major workflow, safety, and reliability update:
+>
+> • New task-first interface and seven-stage Guided Import
+> • Unified Saved Jobs, Schedules, Snapshots, and Activity
+> • Bulk API 2.0 query support and resumable job checkpoints
+> • CSV, JSON, Excel, and XML exports with selected-column support
+> • Production typed confirmation and clearer org context
+> • Improved accessibility, performance budgets, and package security
+> • A focused, single-object Copy flow replaces the former migration suite
+
+If no release-notes field is shown, keep this text for the submission notes rather than appending it to the permanent description.
+
+## Visual assets
+
+Upload in this order:
+
+| Order | File | Dimensions | Purpose |
+|---:|---|---:|---|
+| Icon | `public/icons/icon-128.png` | 128×128 | Store and install icon |
+| 1 | `screenshots/screenshot-01-home.png` | 1280×800 | Connected Home workspace |
+| 2 | `screenshots/screenshot-02-export.png` | 1280×800 | SOQL export and results |
+| 3 | `screenshots/screenshot-03-import-review.png` | 1280×800 | Production-aware import review |
+| 4 | `screenshots/screenshot-04-compare.png` | 1280×800 | Compare workspace |
+| 5 | `screenshots/screenshot-05-activity.png` | 1280×800 | Jobs and activity history |
+| Small promo | `screenshots/promo-small-440x280.png` | 440×280 | Required promotional tile |
+| Marquee promo | `screenshots/promo-marquee-1400x560.png` | 1400×560 | Optional large promotional tile |
+
+All screenshots are captures of v0.6.0 at the required dimensions. Organisation, user, and record identifiers are redacted. Regenerate promotional graphics with `npm run assets:store`.
+
+## Privacy practices
+
+### Single purpose
+
+> WaveLink provides a local-first workspace for authenticated Salesforce users to export, import, compare, schedule, and repeat data jobs against organisations they explicitly select.
+
+### Permission justifications
 
 **storage**
-> Required to persist user data locally on the device: connected org credentials, saved SOQL queries, query folders, push history, data templates, and UI settings. All data is stored in chrome.storage.local and never transmitted to external servers.
+
+> Saves selected Salesforce org connections and authentication information, queries, mappings, reusable jobs, schedules, snapshots, results, activity history, checkpoints, undo information, and preferences in Chrome extension storage. This keeps the workspace available across extension sessions without a WaveLink backend.
+
+**cookies**
+
+> Reads the Salesforce `sid` session cookie from supported Salesforce domains so the user can connect an already authenticated org and make requested API calls. WaveLink does not read cookies from unrelated domains.
+
+**activeTab**
+
+> Identifies the Salesforce context in the tab where the user invokes WaveLink. It is not used to inspect unrelated page content.
 
 **tabs**
-> Required to list open browser tabs to identify which ones are logged-in Salesforce orgs. This allows the user to select which Salesforce tab/org to connect to. Tab URLs are only checked against Salesforce domains.
 
-**Remote code**
-> WaveLink does not use any remote code. All JavaScript is bundled locally in the extension package. No scripts are fetched or executed from external servers.
+> Finds open Salesforce tabs, lets the user select which authenticated org to connect, and opens the full extension workspace. Tab URLs are checked only to recognise supported Salesforce domains; WaveLink does not build a browsing history.
 
-### Data Use Certification
+**alarms**
 
-Check the compliance box. WaveLink:
-- Stores all data locally via `chrome.storage.local`
-- Only communicates with the user's own Salesforce orgs
-- Collects no analytics, telemetry, or crash reports
-- Has no external server or backend
+> Wakes the Manifest V3 background worker to run export schedules that the user explicitly created and to update their local status.
 
----
+**offscreen**
 
-## Version Bumping
+> Creates a local extension document for eligible long-running job and file-processing work when no visible extension page is available. It is not used for hidden browsing, advertising, analytics, or tracking.
 
-When releasing a new version:
+**Host permissions**
 
-1. Update version in `package.json`
-2. Update version in `public/manifest.json`
-3. Run `npm run package`
-4. Upload the new zip to the developer dashboard
-5. Fill in "Changes in this version" notes
+> Allow the Salesforce page integration and authenticated REST, Bulk API 2.0, and metadata requests on supported Salesforce domains only: `*.salesforce.com`, `*.force.com`, `*.lightning.force.com`, `*.my.salesforce.com`, `login.salesforce.com`, and `test.salesforce.com`. No other network hosts are permitted by the manifest.
 
-Chrome Web Store version must be higher than the previous published version.
+### Remote code
 
----
+Select **No, I am not using remote code**.
 
-## Review Process
+> WaveLink does not download or execute remote code. All executable JavaScript is bundled in the submitted extension package. Network requests exchange data with Salesforce APIs but do not retrieve executable code.
 
-- Review typically takes **1-3 business days**
-- Common rejection reasons:
-  - Insufficient permission justifications
-  - Missing privacy policy
-  - Requesting unnecessary permissions
-  - Inline code / remote code violations
-- WaveLink has none of these issues
+### Data categories
 
----
+Disclose the following categories because Chrome considers locally processed information to be collected:
 
-## Privacy Policy
+- **Personally identifiable information:** Salesforce username, display name, organisation/account identifiers, and instance details.
+- **Authentication information:** Salesforce session cookies and access tokens.
+- **Website content:** Salesforce records, query results, object metadata, and API results requested by the user.
+- **User-generated content:** uploaded data files, saved queries, mappings, job definitions, schedules, and snapshots.
+- **Web history / browsing activity:** only the URLs of open tabs checked to locate supported Salesforce pages; no browsing profile or history is retained.
 
-Bundled at `public/privacy.html` and included in the extension package.
+Do not select financial information, health information, personal communications, location, or unrelated categories unless the dashboard groups Salesforce record content into one of them and the extension is being marketed for that specific use.
 
-Covers:
-- All data stored locally, none transmitted to external servers
-- Permission justifications for each Chrome permission
-- OAuth token handling
-- Data deletion instructions
-- Contact information (GitHub issues)
+For each disclosed category, select the product-functionality purpose only. The information is not used for advertising, analytics, personalisation outside WaveLink, creditworthiness, or unrelated purposes.
 
----
+### Limited-use certifications
 
-## Assets & Icons
+Certify that:
 
-| File | Size | Purpose |
-|------|------|---------|
-| `public/icons/icon-16.png` | 16x16 | Toolbar |
-| `public/icons/icon-32.png` | 32x32 | Taskbar |
-| `public/icons/icon-48.png` | 48x48 | Extensions page |
-| `public/icons/icon-128.png` | 128x128 | Store listing + install dialog |
-| `public/icons/wavelink-icon.svg` | Vector | Source SVG for regeneration |
-| `screenshots/screenshot-01-home.png` | 1280x800 | Connected Home workspace |
-| `screenshots/screenshot-02-export.png` | 1280x800 | SOQL Export results |
-| `screenshots/screenshot-03-import-review.png` | 1280x800 | Production-aware Import review |
-| `screenshots/screenshot-04-compare.png` | 1280x800 | Compare workspace |
-| `screenshots/screenshot-05-activity.png` | 1280x800 | Jobs & Activity history |
+- Data is not sold or transferred to third parties outside the approved use case.
+- Data is not used or transferred for purposes unrelated to WaveLink's single purpose.
+- Data is not used or transferred to determine creditworthiness or for lending.
+- Humans do not read the data; there is no developer-operated backend through which the developer can access it.
+- All collection and transfer is prominently disclosed in the listing and privacy policy.
 
-To regenerate icons: `node scripts/generate-icons.js`
+### Privacy policy URL
 
----
+Use:
 
-## Links
+> https://github.com/Exotic209093/WaveLink/blob/main/PRIVACY.md
 
-- **Source Code**: https://github.com/Exotic209093/WaveLink
-- **Privacy Policy**: Bundled in extension (`privacy.html`)
-- **Bug Reports**: https://github.com/Exotic209093/WaveLink/issues
-- **Homepage**: https://github.com/Exotic209093/WaveLink
+The repository must be pushed before saving this URL so reviewers can reach the current policy without installing the extension.
+
+## Final submission checklist
+
+- [ ] Push the v0.6.0 code and public privacy policy to `main`.
+- [ ] Confirm the privacy-policy URL loads while signed out of GitHub.
+- [ ] Upload `wavelink-0.6.0.zip` and confirm version 0.6.0 is detected.
+- [ ] Replace the description with the text in this file.
+- [ ] Upload all five screenshots in the documented order.
+- [ ] Upload the icon and promotional tiles.
+- [ ] Verify category, language, homepage, support URL, and privacy URL.
+- [ ] Reconfirm every permission and data-use declaration against the uploaded package.
+- [ ] Add the v0.6.0 release notes where the dashboard permits.
+- [ ] Preview the public listing at desktop width and check every image crop.
+- [ ] Save the draft, review the dashboard's warnings, and submit only after a final joint check.

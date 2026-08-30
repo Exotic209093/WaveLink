@@ -1,7 +1,7 @@
 {
   "name": "wavelink",
   "version": "0.6.0",
-  "description": "Fast Salesforce data export & import - Chrome Extension to query records out, push data in, schedule snapshots, and convert CSV/JSON/Excel/XML",
+  "description": "A local-first Chrome extension for safer Salesforce data exports, imports, comparisons, schedules, and reusable jobs.",
   "private": true,
   "scripts": {
     "dev": "webpack --watch --config webpack.config.ts --mode development",
@@ -12,6 +12,7 @@
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "audit:dev": "npm audit --audit-level=high",
     "smoke:package": "node scripts/validate-package.js",
+    "assets:store": "node scripts/generate-store-assets.js",
     "validate:salesforce": "ts-node --transpile-only --project scripts/tsconfig.json scripts/validate-salesforce-org.ts",
     "lint": "eslint src/ --ext .ts,.tsx",
     "lint:fix": "eslint src/ --ext .ts,.tsx --fix",

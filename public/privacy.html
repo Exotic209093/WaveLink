@@ -5,120 +5,83 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>WaveLink Privacy Policy</title>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 800px;
-      margin: 40px auto;
-      padding: 0 24px;
-      color: #1a1a1a;
-      line-height: 1.7;
-    }
-    h1 { font-size: 2rem; margin-bottom: 4px; }
-    h2 { font-size: 1.25rem; margin-top: 2rem; color: #333; }
-    .meta { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
-    ul { padding-left: 1.5rem; }
-    a { color: #0070f3; }
-    hr { border: none; border-top: 1px solid #eee; margin: 2rem 0; }
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 820px; margin: 48px auto; padding: 0 24px 64px; color: CanvasText; background: Canvas; line-height: 1.7; }
+    h1 { font-size: 2rem; line-height: 1.2; margin-bottom: 4px; }
+    h2 { font-size: 1.25rem; margin-top: 2.2rem; }
+    .meta, .note { color: GrayText; }
+    .summary { border-left: 4px solid #0284a8; padding: 12px 18px; background: color-mix(in srgb, #48cae4 10%, Canvas); }
+    code { font-size: 0.92em; }
+    a { color: #0284a8; }
   </style>
 </head>
 <body>
   <h1>WaveLink Privacy Policy</h1>
-  <p class="meta">Effective date: February 2026 &nbsp;|&nbsp; Last updated: February 2026</p>
+  <p class="meta">Effective date: 31 August 2026 · Last updated: 31 August 2026</p>
 
-  <p>
-    WaveLink ("the Extension") is a Chrome browser extension that helps Salesforce developers
-    and administrators push, seed, and manage data directly from their browser. This Privacy
-    Policy explains what data the Extension collects, how it is used, and how it is protected.
-  </p>
+  <p class="summary"><strong>In short:</strong> WaveLink is local-first. It has no advertising, analytics, telemetry, or developer-operated backend. Information is kept in your browser and sent only to Salesforce domains you explicitly use, as needed to perform the data work you request.</p>
 
-  <h2>1. Data We Collect</h2>
-  <p>WaveLink collects and stores the following data <strong>locally on your device</strong>:</p>
+  <p>WaveLink ("the Extension") helps authenticated Salesforce users export, import, compare, schedule, and repeat data jobs against organisations they select. This policy explains the information WaveLink handles, why it is needed, where it goes, and how you can delete it.</p>
+
+  <h2>1. Information WaveLink handles</h2>
+  <p>Depending on the features you use, WaveLink processes and may retain the following information locally on your device:</p>
   <ul>
-    <li><strong>Salesforce org metadata</strong> – org IDs, instance URLs, usernames, and display names of orgs you connect.</li>
-    <li><strong>Authentication tokens</strong> – OAuth 2.0 access tokens and session identifiers required to communicate with Salesforce APIs. These are stored in Chrome's local storage and are never transmitted to any server outside of Salesforce.</li>
-    <li><strong>Schema cache</strong> – Salesforce object and field metadata fetched from your org, cached locally to improve performance.</li>
-    <li><strong>Saved SOQL queries</strong> – Any SOQL queries you save within the Extension.</li>
-    <li><strong>Push history</strong> – A record of data push operations you have performed, including file names, record counts, and outcomes.</li>
-    <li><strong>User interface settings</strong> – Preferences such as theme and panel layout.</li>
+    <li><strong>Account and organisation details:</strong> Salesforce organisation IDs, instance URLs, usernames, display names, and environment type.</li>
+    <li><strong>Authentication information:</strong> Salesforce session identifiers or access tokens needed to authenticate API requests.</li>
+    <li><strong>Salesforce content and metadata:</strong> object and field schemas, query results, records selected for import or comparison, result files, record IDs, and operation errors.</li>
+    <li><strong>User-provided content:</strong> uploaded CSV, JSON, or XLSX data; saved SOQL queries; mappings; reusable job definitions; and schedule settings.</li>
+    <li><strong>Operational history:</strong> job status, timestamps, file names, record counts, checkpoints, snapshots, and supported undo information.</li>
+    <li><strong>Salesforce tab information:</strong> URLs of open tabs are checked only to identify Salesforce tabs and let you choose an organisation. WaveLink does not build a browsing history.</li>
+    <li><strong>Preferences:</strong> theme, layout, onboarding state, and other Extension settings.</li>
   </ul>
 
-  <h2>2. Data We Do NOT Collect</h2>
+  <h2>2. How the information is used</h2>
+  <p>WaveLink uses this information only to provide its user-facing data workflow features:</p>
   <ul>
-    <li>We do <strong>not</strong> collect, transmit, or store any data on our own servers.</li>
-    <li>We do <strong>not</strong> collect analytics, crash reports, or telemetry.</li>
-    <li>We do <strong>not</strong> access, read, or transmit the contents of files you upload beyond sending them directly to Salesforce on your behalf.</li>
-    <li>We do <strong>not</strong> share any data with third parties.</li>
+    <li>Authenticate requests to an organisation you selected.</li>
+    <li>Query, export, validate, import, compare, or inspect Salesforce records and metadata at your direction.</li>
+    <li>Run schedules you created and recover eligible long-running jobs after Chrome suspends the background worker.</li>
+    <li>Display connected organisations, saved jobs, snapshots, results, activity, and preferences in the Extension.</li>
   </ul>
 
-  <h2>3. How Data Is Used</h2>
-  <p>All data collected by WaveLink is used solely to operate the Extension's features:</p>
+  <h2>3. Storage and transfers</h2>
+  <p>WaveLink stores its working data in Chrome extension storage on your device. Some authentication information is also held in Chrome session storage while the browser session is active. This information is not synced through Chrome Sync.</p>
+  <p>When you request an operation, the necessary authentication information, Salesforce content, metadata, or uploaded records are transmitted over HTTPS directly between the Extension and the Salesforce domains listed in its manifest. WaveLink does not send this information to a WaveLink server or any advertising, analytics, or data-broker service.</p>
+
+  <h2>4. Limited use and sharing</h2>
   <ul>
-    <li>Authentication tokens are used exclusively to make authenticated API calls to Salesforce on your behalf.</li>
-    <li>Org metadata is displayed within the Extension UI so you can select and switch between orgs.</li>
-    <li>Schema cache data is used to populate field-mapping UIs and speed up data pushes.</li>
-    <li>Saved queries and push history are stored for your convenience so you can reuse and review past operations.</li>
+    <li>WaveLink does not sell personal information or user data.</li>
+    <li>WaveLink does not use or transfer information for advertising, profiling, creditworthiness, lending, or purposes unrelated to its single purpose.</li>
+    <li>WaveLink does not allow humans to read your data. It has no developer-operated backend through which the developer could access it.</li>
+    <li>WaveLink shares information only with the Salesforce organisation you explicitly select and only to complete the action you request.</li>
   </ul>
 
-  <h2>4. Data Storage and Security</h2>
-  <p>
-    All data is stored using Chrome's built-in <code>chrome.storage.local</code> API, which means
-    it is stored on your local device and is accessible only to this Extension. It is not synced
-    to Chrome Sync or any external service.
-  </p>
-  <p>
-    Authentication tokens are scoped to Salesforce's OAuth flow and can be revoked at any time
-    from within your Salesforce org's Connected Apps settings.
-  </p>
-
-  <h2>5. Third-Party Services</h2>
-  <p>
-    WaveLink communicates exclusively with Salesforce APIs (*.salesforce.com, *.force.com,
-    *.lightning.force.com, *.my.salesforce.com, login.salesforce.com, test.salesforce.com).
-    No data is sent to any other external service. The Salesforce platform's own
-    <a href="https://www.salesforce.com/company/privacy/" target="_blank" rel="noopener">Privacy Policy</a>
-    governs how Salesforce handles data on their platform.
-  </p>
-
-  <h2>6. Permissions Justification</h2>
+  <h2>5. Chrome permission explanations</h2>
   <ul>
-    <li><strong>storage</strong> – Required to save org connections, tokens, preferences, and push history locally.</li>
-    <li><strong>cookies</strong> – Required to detect an active Salesforce session on pages you visit, so the Extension can authenticate without requiring you to log in again.</li>
-    <li><strong>activeTab</strong> – Required to detect which Salesforce org you are currently viewing.</li>
-    <li><strong>tabs</strong> – Required to open the WaveLink panel and communicate between the Extension and active Salesforce tabs.</li>
-    <li><strong>host permissions (*.salesforce.com etc.)</strong> – Required to inject the content script that detects your Salesforce org and to make authenticated API requests.</li>
+    <li><strong>storage:</strong> saves organisation connections, tokens, queries, mappings, jobs, schedules, snapshots, results, activity, and preferences locally.</li>
+    <li><strong>cookies:</strong> reads the <code>sid</code> cookie from supported Salesforce domains to authenticate to an existing Salesforce session.</li>
+    <li><strong>activeTab:</strong> identifies the Salesforce context in the tab where you invoke WaveLink.</li>
+    <li><strong>tabs:</strong> finds open Salesforce tabs, lets you choose a connected organisation, and opens the full Extension workspace.</li>
+    <li><strong>alarms:</strong> wakes the Extension to run locally configured export schedules.</li>
+    <li><strong>offscreen:</strong> provides a local extension document for eligible long-running job and file-processing work when a visible page is not available.</li>
+    <li><strong>Salesforce host permissions:</strong> run the Salesforce page integration and make authenticated REST, Bulk API 2.0, and metadata requests only on supported Salesforce domains.</li>
   </ul>
 
-  <h2>7. Data Deletion</h2>
-  <p>
-    You can delete all data stored by WaveLink at any time by:
-  </p>
-  <ul>
-    <li>Removing an individual org connection from within the Extension.</li>
-    <li>Using your browser's "Clear site data" or extension storage controls.</li>
-    <li>Uninstalling the Extension, which removes all locally stored data.</li>
-  </ul>
+  <h2>6. Remote code</h2>
+  <p>WaveLink does not download or execute remote code. Its executable JavaScript is bundled in the reviewed Extension package.</p>
 
-  <h2>8. Children's Privacy</h2>
-  <p>
-    WaveLink is a developer tool intended for professional use. It is not directed at children
-    under 13 and does not knowingly collect data from children.
-  </p>
+  <h2>7. Retention and deletion</h2>
+  <p>Locally retained information remains until you remove it. WaveLink provides controls to disconnect organisations and delete saved jobs, schedules, snapshots, history, and other local records. You may also remove all locally stored information by clearing the Extension's storage or uninstalling it. Revoking the relevant Salesforce session or connected-app access invalidates the associated authentication token.</p>
 
-  <h2>9. Changes to This Policy</h2>
-  <p>
-    If we make material changes to this Privacy Policy, we will update the "Last updated" date
-    above and post the new policy at the same URL. Continued use of the Extension after changes
-    constitutes acceptance of the updated policy.
-  </p>
+  <h2>8. Security</h2>
+  <p>Requests to Salesforce use HTTPS. WaveLink restricts network access to declared Salesforce hosts and applies a Manifest V3 content security policy. No method of local storage or network transmission is guaranteed to be completely secure, so users should follow their organisation's security and data-handling requirements.</p>
 
-  <h2>10. Contact</h2>
-  <p>
-    If you have questions about this Privacy Policy, please open an issue on
-    <a href="https://github.com/Exotic209093/WaveLink/issues" target="_blank" rel="noopener">GitHub</a>
-    or contact us via the Chrome Web Store listing.
-  </p>
+  <h2>9. Children</h2>
+  <p>WaveLink is intended for professional use and is not directed to children under 13.</p>
 
-  <hr />
-  <p style="font-size:0.85rem;color:#888;">WaveLink is not affiliated with or endorsed by Salesforce, Inc.</p>
+  <h2>10. Changes and contact</h2>
+  <p>Material changes will be reflected by the “Last updated” date on this page. Questions or privacy requests can be submitted through <a href="https://github.com/Exotic209093/WaveLink/issues" target="_blank" rel="noopener noreferrer">WaveLink's GitHub issue tracker</a>.</p>
+
+  <p class="note">WaveLink is independent and is not affiliated with or endorsed by Salesforce, Inc.</p>
 </body>
 </html>
