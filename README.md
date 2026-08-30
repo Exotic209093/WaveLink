@@ -70,7 +70,7 @@ Search for **WaveLink** in the Chrome Web Store and click **Add to Chrome**.
 
 ### From Source
 
-1. Clone the repo: `git clone https://github.com/jc-wave/wave-link.git`
+1. Clone the repo: `git clone https://github.com/Exotic209093/WaveLink.git`
 2. Install dependencies: `npm install`
 3. Build: `npm run build`
 4. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select the `dist/` folder.

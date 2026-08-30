@@ -222,8 +222,10 @@ export function QueryManager(props: QueryManagerProps): VNode {
                 }}
                 style="display:flex;align-items:center;gap:8px;padding:8px;cursor:pointer"
               >
-                <div
-                  style="flex:1;min-width:0;overflow:hidden"
+                <button
+                  type="button"
+                  class="wl-buttonText"
+                  style="flex:1;min-width:0;overflow:hidden;text-align:left"
                   onClick={() => onLoadQuery(query.soql)}
                 >
                   <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
@@ -232,7 +234,7 @@ export function QueryManager(props: QueryManagerProps): VNode {
                   <div class="wl-muted wl-mono" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                     {truncate(query.soql, 80)}
                   </div>
-                </div>
+                </button>
 
                 <button
                   class="wl-btn"

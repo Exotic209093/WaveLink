@@ -19,10 +19,12 @@ import { ThemeToggle } from './ThemeToggle';
 import { OrgSwitcher } from './OrgSwitcher';
 import type { Theme } from '../utils/theme';
 import type { SfApi } from '../api/sf';
+import { Icon } from './Icon';
 
 export interface NavItem {
   key: string;
   label: string;
+  activeRoutes?: string[];
 }
 
 export interface NavGroup {
@@ -61,15 +63,17 @@ export function AppShell(props: {
 
   // Derive which group contains the current route
   const activeGroup = navGroups?.find(g => g.items.some(item => item.key === route)) ?? null;
+  const itemIsActive = (item: NavItem): boolean =>
+    route === item.key || Boolean(item.activeRoutes?.some(activeRoute => route === activeRoute || route.startsWith(`${activeRoute}/`)));
 
   return (
     <div class="wl-app" data-mode={mode}>
       <div class="wl-topbar">
         <div class="wl-brand">
-          <span class="wl-brandMark" aria-hidden="true">〜</span>
+          <span class="wl-brandMark" aria-hidden="true"><Icon name="activity" size={14} /></span>
           <h1>WaveLink</h1>
           {mode !== 'popup' && sf ? (
-            <OrgSwitcher sf={sf} onOrgSwitch={onOrgSwitch} />
+            <OrgSwitcher sf={sf} context={context} onOrgSwitch={onOrgSwitch} />
           ) : mode !== 'popup' ? (
             <span class="wl-chip" title={context?.orgId ?? ''}>
               <span>{chipText}</span>
@@ -84,28 +88,30 @@ export function AppShell(props: {
       </div>
 
       {mode === 'popup' ? (
-        <div class="wl-popupNav">
+        <nav class="wl-popupNav" aria-label="Popup navigation">
           {navItems.map(item => (
             <button
               key={item.key}
               class="wl-popupNavBtn"
               data-active={route === item.key}
+              aria-current={route === item.key ? 'page' : undefined}
               onClick={() => onRouteChange(item.key)}
             >
               {item.label}
             </button>
           ))}
-        </div>
+        </nav>
       ) : mode === 'app' && navGroups ? (
         /* Single sticky wrapper so both rows stick together */
         <div class="wl-navBar">
           {/* Tier 1: group buttons */}
-          <div class="wl-topNav">
+          <nav class="wl-topNav" aria-label="Primary navigation">
             {navGroups.map(group => (
               <button
                 key={group.key}
                 class="wl-navGroupBtn"
                 data-active={activeGroup?.key === group.key}
+                aria-current={activeGroup?.key === group.key ? 'true' : undefined}
                 onClick={() => onRouteChange(group.items[0].key)}
               >
                 {group.label}
@@ -118,6 +124,7 @@ export function AppShell(props: {
                     key={item.key}
                     class="wl-topNavBtn"
                     data-active={route === item.key}
+                    aria-current={route === item.key ? 'page' : undefined}
                     onClick={() => onRouteChange(item.key)}
                   >
                     {item.label}
@@ -125,16 +132,46 @@ export function AppShell(props: {
                 ))}
               </div>
             ) : null}
-          </div>
+          </nav>
 
           {/* Tier 2: sub-screen tabs for the active group */}
           {activeGroup ? (
-            <div class="wl-subNav">
+            <nav class="wl-subNav" aria-label={`${activeGroup.label} navigation`}>
               {activeGroup.items.map(item => (
                 <button
                   key={item.key}
                   class="wl-subNavBtn"
                   data-active={route === item.key}
+                  aria-current={route === item.key ? 'page' : undefined}
+                  onClick={() => onRouteChange(item.key)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          ) : null}
+        </div>
+      ) : mode === 'app' ? (
+        <nav class="wl-topNav wl-topNav--sticky" aria-label="Application navigation">
+          {navItems.map(item => (
+            <button
+              key={item.key}
+              class="wl-topNavBtn"
+              data-active={itemIsActive(item)}
+              aria-current={itemIsActive(item) ? 'page' : undefined}
+              onClick={() => onRouteChange(item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
+          {pinnedItems && pinnedItems.length > 0 ? (
+            <div class="wl-navPinned">
+              {pinnedItems.map(item => (
+                <button
+                  key={item.key}
+                  class="wl-topNavBtn"
+                  data-active={itemIsActive(item)}
+                  aria-current={itemIsActive(item) ? 'page' : undefined}
                   onClick={() => onRouteChange(item.key)}
                 >
                   {item.label}
@@ -142,20 +179,7 @@ export function AppShell(props: {
               ))}
             </div>
           ) : null}
-        </div>
-      ) : mode === 'app' ? (
-        <div class="wl-topNav wl-topNav--sticky">
-          {navItems.map(item => (
-            <button
-              key={item.key}
-              class="wl-topNavBtn"
-              data-active={route === item.key}
-              onClick={() => onRouteChange(item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        </nav>
       ) : null}
 
       {mode === 'panel' ? (
@@ -167,6 +191,8 @@ export function AppShell(props: {
                 class="wl-panelTab"
                 role="tab"
                 data-active={route === item.key}
+                aria-selected={route === item.key}
+                tabIndex={route === item.key ? 0 : -1}
                 onClick={() => onRouteChange(item.key)}
               >
                 {item.label}

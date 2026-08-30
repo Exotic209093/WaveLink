@@ -634,42 +634,73 @@ export class StorageService {
     await chrome.storage.session.clear();
   }
 
-  // -- Active Pushes (Session) ------------------------------------------------
+  // -- Active Pushes (Durable checkpoints) -----------------------------------
 
-  /** Store an active push entry in session storage */
-  async setActivePush(push: ActivePush): Promise<void> {
-    const all = (await this.getSession<Record<string, ActivePush>>(STORAGE_KEYS.ACTIVE_PUSHES)) ?? {};
-    all[push.id] = push;
-    await this.setSession(STORAGE_KEYS.ACTIVE_PUSHES, all);
+  /**
+   * Read durable checkpoint metadata, migrating the pre-v0.4 session shape once.
+   * Checkpoints contain job IDs and counters only; credentials and source rows
+   * remain session/file scoped.
+   */
+  private async getActivePushMap(): Promise<Record<string, ActivePush>> {
+    const durable = (await this.getLocal<Record<string, ActivePush>>(STORAGE_KEYS.ACTIVE_PUSHES)) ?? {};
+    if (Object.keys(durable).length > 0) return durable;
+    const legacy = (await this.getSession<Record<string, ActivePush>>(STORAGE_KEYS.ACTIVE_PUSHES)) ?? {};
+    if (Object.keys(legacy).length > 0) await this.setLocal(STORAGE_KEYS.ACTIVE_PUSHES, legacy);
+    return legacy;
   }
 
-  /** Update the status of an active push in session storage */
+  /** Store non-sensitive active-job metadata across browser restarts. */
+  async setActivePush(push: ActivePush): Promise<void> {
+    const all = await this.getActivePushMap();
+    all[push.id] = push;
+    await this.setLocal(STORAGE_KEYS.ACTIVE_PUSHES, all);
+  }
+
+  /** Update the status of a durable active-job checkpoint. */
   async updateActivePushStatus(pushId: string, status: ActivePush['status']): Promise<void> {
-    const all = (await this.getSession<Record<string, ActivePush>>(STORAGE_KEYS.ACTIVE_PUSHES)) ?? {};
+    const all = await this.getActivePushMap();
     if (all[pushId]) {
       all[pushId].status = status;
-      await this.setSession(STORAGE_KEYS.ACTIVE_PUSHES, all);
+      all[pushId].updatedAt = Date.now();
+      await this.setLocal(STORAGE_KEYS.ACTIVE_PUSHES, all);
     }
   }
 
-  /** Get all active pushes from session storage */
+  /** Merge a durable progress checkpoint into an active push entry. */
+  async updateActivePush(pushId: string, patch: Partial<ActivePush>): Promise<void> {
+    const all = await this.getActivePushMap();
+    if (!all[pushId]) return;
+    all[pushId] = { ...all[pushId], ...patch, id: pushId, updatedAt: Date.now() };
+    await this.setLocal(STORAGE_KEYS.ACTIVE_PUSHES, all);
+  }
+
+  async getActivePush(pushId: string): Promise<ActivePush | null> {
+    const all = await this.getActivePushMap();
+    return all[pushId] ?? null;
+  }
+
+  /** Get all durable active-job checkpoints. */
   async getActivePushes(): Promise<ActivePush[]> {
-    const all = (await this.getSession<Record<string, ActivePush>>(STORAGE_KEYS.ACTIVE_PUSHES)) ?? {};
+    const all = await this.getActivePushMap();
     return Object.values(all);
   }
 
   /** Mark any "processing" pushes as interrupted (called on service worker startup) */
   async markInterruptedPushes(): Promise<number> {
-    const all = (await this.getSession<Record<string, ActivePush>>(STORAGE_KEYS.ACTIVE_PUSHES)) ?? {};
+    const all = await this.getActivePushMap();
     let count = 0;
     for (const push of Object.values(all)) {
       if (push.status === 'processing' || push.status === 'queued') {
-        push.status = 'error';
+        push.status = 'interrupted';
+        push.lastError = push.resumeSupported
+          ? 'The extension worker restarted. This Salesforce job can be resumed.'
+          : 'The extension worker restarted. Re-run this local REST job from its source file.';
+        push.updatedAt = Date.now();
         count++;
       }
     }
     if (count > 0) {
-      await this.setSession(STORAGE_KEYS.ACTIVE_PUSHES, all);
+      await this.setLocal(STORAGE_KEYS.ACTIVE_PUSHES, all);
     }
     return count;
   }

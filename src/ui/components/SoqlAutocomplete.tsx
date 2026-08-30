@@ -40,6 +40,9 @@ export function SoqlAutocomplete(props: {
       {suggestions.map((s, i) => (
         <div
           key={`${s.text}-${i}`}
+          role="option"
+          aria-selected={i === activeIndex}
+          tabIndex={-1}
           class={`wl-ac-item${i === activeIndex ? ' wl-ac-itemActive' : ''}`}
           onMouseDown={(e) => {
             e.preventDefault(); // Prevent textarea blur

@@ -11,6 +11,7 @@ import { parseAnyFile } from '../utils/fileParse';
 import type { SupportedInputFormat } from '../utils/fileParse';
 import { exportRecords, ensureCorrectExtension } from '../utils/export';
 import type { ExportFormat } from '../utils/export';
+import { Icon } from '../components/Icon';
 
 const FORMAT_LABELS: Record<ExportFormat, string> = {
   csv: 'CSV',
@@ -19,7 +20,7 @@ const FORMAT_LABELS: Record<ExportFormat, string> = {
   xml: 'XML',
 };
 
-const ACCEPT = ['.csv', '.tsv', '.json', '.xlsx', '.xls', '.xml'];
+const ACCEPT = ['.csv', '.tsv', '.json', '.xlsx', '.xml'];
 
 function baseName(filename: string): string {
   return filename.replace(/\.[^.]+$/, '');
@@ -106,10 +107,10 @@ export function ConvertScreen(): VNode {
         <div class="wl-card">
           <div class="wl-cardSection">
             <DropZone accept={ACCEPT} onDrop={handleFile} className="wl-dropZone--lg">
-              <div class="wl-dropZone__icon">📁</div>
+              <div class="wl-dropZone__icon"><Icon name="folder" size={32} /></div>
               <p class="wl-dropZone__title">Drop a file to convert</p>
               <p class="wl-dropZone__hint">
-                CSV · TSV · JSON · Excel (.xlsx, .xls) · XML — or click to browse
+                CSV · TSV · JSON · Excel (.xlsx) · XML — or click to browse
               </p>
             </DropZone>
             {error ? <div class="wl-bannerDanger" style="margin-top:12px">{error}</div> : null}
@@ -125,15 +126,15 @@ export function ConvertScreen(): VNode {
               </div>
               <div class="wl-cardSection">
                 <div class="wl-formRow">
-                  <label class="wl-formRow__label">File</label>
+                  <div class="wl-formRow__label">File</div>
                   <div class="wl-mono" style="font-size:13px">{sourceName}</div>
                 </div>
                 <div class="wl-formRow">
-                  <label class="wl-formRow__label">Records</label>
+                  <div class="wl-formRow__label">Records</div>
                   <div style="font-size:22px;font-weight:800;letter-spacing:-0.3px">{records.length.toLocaleString()}</div>
                 </div>
                 <div class="wl-formRow">
-                  <label class="wl-formRow__label">Columns ({headers.length})</label>
+                  <div class="wl-formRow__label">Columns ({headers.length})</div>
                   <div style="display:flex;flex-wrap:wrap;gap:6px">
                     {headers.map(col => (
                       <label key={col} class={`wl-pill ${columnFilter.has(col) ? 'wl-pill--brand' : ''}`} style="cursor:pointer">
@@ -157,8 +158,8 @@ export function ConvertScreen(): VNode {
               </div>
               <div class="wl-cardSection">
                 <div class="wl-formRow">
-                  <label class="wl-formRow__label wl-formRow__label--required">Format</label>
-                  <div class="wl-flowTabs" style="margin-bottom:0">
+                  <span id="convert-format-label" class="wl-formRow__label wl-formRow__label--required">Format</span>
+                  <div class="wl-flowTabs" role="group" aria-labelledby="convert-format-label" style="margin-bottom:0">
                     {(['csv', 'json', 'excel', 'xml'] as ExportFormat[]).map(fmt => (
                       <button
                         key={fmt}
@@ -172,7 +173,7 @@ export function ConvertScreen(): VNode {
                   </div>
                 </div>
                 <div class="wl-formRow">
-                  <label class="wl-formRow__label">Filename preview</label>
+                  <div class="wl-formRow__label">Filename preview</div>
                   <div class="wl-mono" style="font-size:13px">
                     {ensureCorrectExtension(baseName(sourceName) + '-converted', outputFormat)}
                   </div>
@@ -184,7 +185,7 @@ export function ConvertScreen(): VNode {
                   disabled={columnFilter.size === 0}
                   style="margin-top:8px"
                 >
-                  ⬇ Download as {FORMAT_LABELS[outputFormat]}
+                  <Icon name="arrow-down" size={16} /> Download as {FORMAT_LABELS[outputFormat]}
                 </button>
               </div>
             </div>

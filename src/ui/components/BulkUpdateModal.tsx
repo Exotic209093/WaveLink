@@ -81,8 +81,8 @@ export function BulkUpdateModal(props: BulkUpdateModalProps): VNode | null {
   }, [fields, targetField]);
 
   return (
-    <div class="wl-modalOverlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Bulk Update">
-      <div class="wl-modal wl-card" onClick={(e) => e.stopPropagation()}>
+    <div class="wl-modalOverlay" role="dialog" aria-modal="true" aria-label="Bulk Update">
+      <div class="wl-modal wl-card">
         <div class="wl-cardHeader">
           <h2>Bulk Update</h2>
           <button class="wl-btn" onClick={onClose}>Close</button>
@@ -91,10 +91,11 @@ export function BulkUpdateModal(props: BulkUpdateModalProps): VNode | null {
         <div class="wl-row">
           {/* Target field selector */}
           <div>
-            <label style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">
+            <label htmlFor="bulk-update-target" style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">
               Target Field
             </label>
             <select
+              id="bulk-update-target"
               class="wl-select"
               value={targetField}
               onChange={(e) => setTargetField((e.currentTarget as HTMLSelectElement).value)}
@@ -107,10 +108,11 @@ export function BulkUpdateModal(props: BulkUpdateModalProps): VNode | null {
 
           {/* Mode selector */}
           <div>
-            <label style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">
+            <label htmlFor="bulk-update-mode" style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">
               Update Mode
             </label>
             <select
+              id="bulk-update-mode"
               class="wl-select"
               value={mode}
               onChange={(e) => setMode((e.currentTarget as HTMLSelectElement).value as UpdateMode)}
@@ -123,10 +125,11 @@ export function BulkUpdateModal(props: BulkUpdateModalProps): VNode | null {
           {/* Mode-specific controls */}
           {mode === 'formula' ? (
             <div>
-              <label style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">
+              <label htmlFor="bulk-update-template" style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">
                 Template
               </label>
               <input
+                id="bulk-update-template"
                 class="wl-input"
                 type="text"
                 placeholder="e.g. {FirstName} {LastName}"
@@ -140,9 +143,9 @@ export function BulkUpdateModal(props: BulkUpdateModalProps): VNode | null {
             </div>
           ) : (
             <div>
-              <label style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">
+              <div style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">
                 Condition
-              </label>
+              </div>
               <ConditionalBuilder
                 fields={fields}
                 rule={rule}
@@ -153,9 +156,9 @@ export function BulkUpdateModal(props: BulkUpdateModalProps): VNode | null {
 
           {/* Preview table */}
           <div>
-            <label style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">
+            <div style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">
               Preview (first {Math.min(records.length, PREVIEW_LIMIT)} records)
-            </label>
+            </div>
             <div class="wl-tableWrap" style="max-height:200px;overflow:auto">
               <table class="wl-table" style="font-size:11px">
                 <thead>

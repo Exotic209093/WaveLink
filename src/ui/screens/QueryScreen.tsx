@@ -3,7 +3,7 @@
  *
  * What this file does:
  * - Runs SOQL queries against the selected Salesforce tab/org.
- * - Supports pagination (queryMore), exporting results (CSV/JSON), and saved queries.
+ * - Supports pagination (queryMore), multi-format exports, and saved queries.
  * - Visual Query Builder for generating SOQL from structured inputs.
  * - Smart SOQL autocomplete with object/field/value suggestions.
  *
@@ -19,14 +19,14 @@ import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { SfApi, SfContext } from '../api/sf';
-import type { SavedQuery, QueryFolder } from '../../core/types/storage';
+import type { SavedQuery, QueryFolder, SavedJob, BulkQueryCheckpoint } from '../../core/types/storage';
 import { Toast } from '../components/Toast';
 import { PromptModal } from '../components/PromptModal';
 import { deriveColumns, flattenRecord } from '../utils/records';
 import type { FlatRecord } from '../utils/records';
-import { recordsToCsv } from '../utils/csv';
-import { downloadTextFile } from '../utils/download';
 import { ResultsGrid } from '../components/ResultsGrid';
+import { ExportModal } from '../components/ExportModal';
+import type { ExportPreferences } from '../components/ExportModal';
 import { QueryBuilder } from '../components/query-builder/QueryBuilder';
 import { SoqlAutocomplete } from '../components/SoqlAutocomplete';
 import type { Suggestion } from '../components/SoqlAutocomplete';
@@ -39,6 +39,8 @@ import { SoqlHighlighter } from '../components/SoqlHighlighter';
 import { QueryExplainPanel } from '../components/QueryExplainPanel';
 import { QueryMetricsStore, formatDuration } from '../utils/queryMetrics';
 import { extractFromObject } from '../utils/soqlParser';
+import { extractQueryParameters, renderParameterizedQuery } from '../utils/queryParameters';
+import { sleep } from '../../core/utils';
 
 export function QueryScreen(props: {
   sf: SfApi;
@@ -46,6 +48,12 @@ export function QueryScreen(props: {
   context?: SfContext;
   onSoqlChange?: (soql: string) => void;
   soql?: string;
+  selectedColumns?: string[];
+  exportPreferences?: ExportPreferences;
+  queryMode?: 'rest' | 'bulk';
+  onSelectedColumnsChange?: (columns: string[]) => void;
+  onExportPreferencesChange?: (preferences: ExportPreferences) => void;
+  onQueryModeChange?: (mode: 'rest' | 'bulk') => void;
   onInspectId?: (id: string) => void;
 }): VNode {
   const { sf, tabId, context } = props;
@@ -59,7 +67,7 @@ export function QueryScreen(props: {
 
   const flatRecords = useMemo<FlatRecord[]>(() => rawRecords.map(r => flattenRecord(r)), [rawRecords]);
   const columns = useMemo(() => deriveColumns(rawRecords), [rawRecords]);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(props.selectedColumns ?? []);
 
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([]);
   const [selectedSaved, setSelectedSaved] = useState<string>('');
@@ -67,9 +75,18 @@ export function QueryScreen(props: {
   const [managerVisible, setManagerVisible] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [explainVisible, setExplainVisible] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [saveQueryOpen, setSaveQueryOpen] = useState(false);
   const [queryFolders, setQueryFolders] = useState<QueryFolder[]>([]);
   const [lastExecMs, setLastExecMs] = useState<number | null>(null);
+  const [parameterValues, setParameterValues] = useState<Record<string, string>>({});
+  const [queryMode, setQueryMode] = useState<'rest' | 'bulk'>(props.queryMode ?? 'rest');
+  const [bulkJobId, setBulkJobId] = useState<string | null>(null);
+  const [bulkLocator, setBulkLocator] = useState<string | null>(null);
+  const [bulkStatus, setBulkStatus] = useState<string | null>(null);
+  const [recoverableBulkQuery, setRecoverableBulkQuery] = useState<BulkQueryCheckpoint | null>(null);
+  const cancelRequested = useRef(false);
+  const parameterNames = useMemo(() => extractQueryParameters(soql), [soql]);
 
   // Builder & autocomplete state
   const [builderVisible, setBuilderVisible] = useState(false);
@@ -80,6 +97,15 @@ export function QueryScreen(props: {
 
   // Shared schema loader
   const schema = useSchemaLoader(sf, tabId);
+
+  useEffect(() => {
+    if (props.soql !== undefined && props.soql !== soql) setSoql(props.soql);
+  }, [props.soql]);
+
+  function updateSelectedColumns(next: string[]): void {
+    setSelectedColumns(next);
+    props.onSelectedColumnsChange?.(next);
+  }
 
   // Autocomplete context & suggestions (single source of truth)
   const acCtx = useMemo(() => parseSoqlContext(soql, cursorPos), [soql, cursorPos]);
@@ -211,36 +237,130 @@ export function QueryScreen(props: {
   }, [sf]);
 
   useEffect(() => {
+    if (!context?.orgId) {
+      setRecoverableBulkQuery(null);
+      return;
+    }
+    const key = `bulkQueryCheckpoint:${context.orgId}`;
+    chrome.storage.local.get([key, 'bulkQueryCheckpoints']).then(result => {
+      const checkpoint = (result.bulkQueryCheckpoints as Record<string, BulkQueryCheckpoint> | undefined)?.[context.orgId]
+        ?? result[key] as BulkQueryCheckpoint | undefined;
+      setRecoverableBulkQuery(checkpoint && !['Aborted', 'Failed'].includes(checkpoint.state) ? checkpoint : null);
+    }).catch(() => setRecoverableBulkQuery(null));
+  }, [context?.orgId]);
+
+  async function saveBulkCheckpoint(jobId: string, state: string, query: string): Promise<void> {
+    if (!context?.orgId) return;
+    const checkpoint: BulkQueryCheckpoint = { jobId, orgId: context.orgId, soql: query, state, updatedAt: Date.now() };
+    const stored = await chrome.storage.local.get('bulkQueryCheckpoints');
+    const checkpoints = (stored.bulkQueryCheckpoints as Record<string, BulkQueryCheckpoint>) ?? {};
+    await chrome.storage.local.set({ [`bulkQueryCheckpoint:${context.orgId}`]: checkpoint, bulkQueryCheckpoints: { ...checkpoints, [context.orgId]: checkpoint } });
+    setRecoverableBulkQuery(checkpoint);
+  }
+
+  async function resumeBulkQuery(checkpoint: BulkQueryCheckpoint): Promise<void> {
+    setBusy(true);
+    cancelRequested.current = false;
+    setQueryMode('bulk');
+    props.onQueryModeChange?.('bulk');
+    setSoql(checkpoint.soql);
+    props.onSoqlChange?.(checkpoint.soql);
+    setBulkJobId(checkpoint.jobId);
+    setBulkStatus(checkpoint.state);
+    try {
+      let completed = await sf.getBulkQueryStatus(checkpoint.jobId, tabId);
+      for (let attempt = 0; completed.state !== 'JobComplete'; attempt++) {
+        if (cancelRequested.current) throw new Error('Bulk query cancelled.');
+        if (completed.state === 'Failed') throw new Error(completed.errorMessage ?? 'Bulk query failed.');
+        if (completed.state === 'Aborted') throw new Error('Bulk query cancelled.');
+        if (attempt >= 300) throw new Error('Bulk query did not finish within 10 minutes.');
+        setBulkStatus(completed.state);
+        setTotalSize(completed.numberRecordsProcessed ?? null);
+        await saveBulkCheckpoint(checkpoint.jobId, completed.state, checkpoint.soql);
+        await sleep(2000);
+        completed = await sf.getBulkQueryStatus(checkpoint.jobId, tabId);
+      }
+      const page = await sf.getBulkQueryResults(checkpoint.jobId, undefined, tabId);
+      setRawRecords(page.records);
+      setBulkLocator(page.locator);
+      setTotalSize(completed.numberRecordsProcessed ?? page.records.length);
+      setBulkStatus('JobComplete');
+      await saveBulkCheckpoint(checkpoint.jobId, 'ResultsReady', checkpoint.soql);
+    } catch (error) {
+      setToast({ title: 'Resume Failed', body: error instanceof Error ? error.message : 'Unable to resume Bulk query' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
     if (selectedColumns.length === 0 && columns.length > 0) {
       const defaults = ['Id', 'Name'].filter(c => columns.includes(c));
       const rest = columns.filter(c => !defaults.includes(c));
-      setSelectedColumns([...defaults, ...rest].slice(0, 14));
+      updateSelectedColumns([...defaults, ...rest].slice(0, 14));
     }
   }, [columns, selectedColumns.length]);
 
   async function runQuery(): Promise<void> {
     setBusy(true);
-    setSelectedColumns([]); // Reset columns so new results get fresh defaults
+    cancelRequested.current = false;
+    updateSelectedColumns([]); // Reset columns so new results get fresh defaults
     setLastExecMs(null);
+    setNextUrl(undefined);
+    setBulkJobId(null);
+    setBulkLocator(null);
+    setBulkStatus(null);
     const t0 = performance.now();
     try {
-      const res = await sf.runQuery(soql, tabId);
+      const executableSoql = renderParameterizedQuery(soql, parameterValues);
+      let records: Array<Record<string, unknown>> = [];
+      let recordTotal: number | null = null;
+      let hasMore = false;
+      if (queryMode === 'bulk') {
+        const started = await sf.startBulkQuery(executableSoql, tabId);
+        setBulkJobId(started.id);
+        setBulkStatus(started.state);
+        await saveBulkCheckpoint(started.id, started.state, executableSoql);
+        let completed = started;
+        for (let attempt = 0; completed.state !== 'JobComplete'; attempt++) {
+          if (cancelRequested.current) throw new Error('Bulk query cancelled.');
+          if (completed.state === 'Failed') throw new Error(completed.errorMessage ?? 'Bulk query failed.');
+          if (completed.state === 'Aborted') throw new Error('Bulk query cancelled.');
+          if (attempt >= 300) throw new Error('Bulk query did not finish within 10 minutes. Check the Salesforce job using the displayed job ID.');
+          await sleep(2000);
+          completed = await sf.getBulkQueryStatus(started.id, tabId);
+          setBulkStatus(completed.state);
+          setTotalSize(completed.numberRecordsProcessed ?? null);
+          await saveBulkCheckpoint(started.id, completed.state, executableSoql);
+        }
+        const page = await sf.getBulkQueryResults(started.id, undefined, tabId);
+        records = page.records;
+        recordTotal = completed.numberRecordsProcessed;
+        hasMore = Boolean(page.locator);
+        setBulkLocator(page.locator);
+        await saveBulkCheckpoint(started.id, 'ResultsReady', executableSoql);
+      } else {
+        const res = await sf.runQuery(executableSoql, tabId);
+        records = res.records ?? [];
+        recordTotal = res.totalSize ?? null;
+        hasMore = Boolean(res.nextRecordsUrl);
+        setNextUrl(res.nextRecordsUrl);
+      }
       const elapsed = Math.round(performance.now() - t0);
       setLastExecMs(elapsed);
-      setRawRecords(res.records ?? []);
-      setNextUrl(res.nextRecordsUrl);
-      setTotalSize(res.totalSize ?? null);
+      setRawRecords(records);
+      setTotalSize(recordTotal);
       props.onSoqlChange?.(soql);
 
       // Track in metrics store
       QueryMetricsStore.getInstance().add({
         id: crypto.randomUUID(),
-        soql,
+        soql: executableSoql,
         executionTimeMs: elapsed,
-        recordCount: res.records?.length ?? 0,
+        recordCount: records.length,
         timestamp: Date.now(),
-        hasMore: !!res.nextRecordsUrl,
-        objectName: extractFromObject(soql) ?? undefined,
+        hasMore,
+        objectName: extractFromObject(executableSoql) ?? undefined,
       });
     } catch (e) {
       setLastExecMs(Math.round(performance.now() - t0));
@@ -251,13 +371,19 @@ export function QueryScreen(props: {
   }
 
   async function loadMore(): Promise<void> {
-    if (!nextUrl) return;
+    if (queryMode === 'bulk' ? (!bulkJobId || !bulkLocator) : !nextUrl) return;
     setBusy(true);
     try {
-      const res = await sf.queryMore(nextUrl, tabId);
-      setRawRecords(prev => [...prev, ...(res.records ?? [])]);
-      setNextUrl(res.nextRecordsUrl);
-      setTotalSize(res.totalSize ?? totalSize);
+      if (queryMode === 'bulk' && bulkJobId && bulkLocator) {
+        const page = await sf.getBulkQueryResults(bulkJobId, bulkLocator, tabId);
+        setRawRecords(prev => [...prev, ...page.records]);
+        setBulkLocator(page.locator);
+      } else if (nextUrl) {
+        const res = await sf.queryMore(nextUrl, tabId);
+        setRawRecords(prev => [...prev, ...(res.records ?? [])]);
+        setNextUrl(res.nextRecordsUrl);
+        setTotalSize(res.totalSize ?? totalSize);
+      }
     } catch (e) {
       setToast({ title: 'Load More Failed', body: e instanceof Error ? e.message : 'Unknown error' });
     } finally {
@@ -265,14 +391,23 @@ export function QueryScreen(props: {
     }
   }
 
-  function exportCsv(): void {
-    const cols = selectedColumns.length ? selectedColumns : columns;
-    const csv = recordsToCsv(flatRecords, cols);
-    downloadTextFile(`wavelink-query-${Date.now()}.csv`, csv, 'text/csv');
-  }
-
-  function exportJson(): void {
-    downloadTextFile(`wavelink-query-${Date.now()}.json`, JSON.stringify(rawRecords, null, 2), 'application/json');
+  async function cancelBulkQuery(): Promise<void> {
+    if (!bulkJobId) return;
+    cancelRequested.current = true;
+    try {
+      await sf.cancelBulkQuery(bulkJobId, tabId);
+      setBulkStatus('Aborted');
+      if (context?.orgId) {
+        const stored = await chrome.storage.local.get('bulkQueryCheckpoints');
+        const checkpoints = { ...((stored.bulkQueryCheckpoints as Record<string, BulkQueryCheckpoint>) ?? {}) };
+        delete checkpoints[context.orgId];
+        await chrome.storage.local.remove(`bulkQueryCheckpoint:${context.orgId}`);
+        await chrome.storage.local.set({ bulkQueryCheckpoints: checkpoints });
+        setRecoverableBulkQuery(null);
+      }
+    } catch (error) {
+      setToast({ title: 'Cancellation Failed', body: error instanceof Error ? error.message : 'Unable to cancel bulk query' });
+    }
   }
 
   function saveQuery(): void {
@@ -283,6 +418,21 @@ export function QueryScreen(props: {
     setSaveQueryOpen(false);
     try {
       const saved = await sf.upsertSavedQuery({ id: `q_${Date.now()}`, name, soql });
+      const now = Date.now();
+      const savedJob: SavedJob = {
+        schemaVersion: 1, id: `job-export-${now}`, name, favorite: false,
+        definition: {
+          kind: 'export', operation: 'query', query: soql,
+          orgRoles: { source: 'active-org' },
+          columns: selectedColumns.length ? selectedColumns : undefined,
+          api: { strategy: queryMode },
+          safety: { dryRun: false, requireProductionConfirmation: false },
+          output: { format: props.exportPreferences?.format ?? 'csv' },
+        },
+        version: 1, revisions: [], createdAt: now, updatedAt: now, usageCount: 0,
+      };
+      const stored = await chrome.storage.local.get('savedJobs');
+      await chrome.storage.local.set({ savedJobs: [...((stored.savedJobs as SavedJob[]) ?? []), savedJob] });
       setSavedQueries(prev => [saved, ...prev]);
       setToast({ title: 'Saved', body: `Saved query "${saved.name}"` });
     } catch (e) {
@@ -297,7 +447,7 @@ export function QueryScreen(props: {
     setRawRecords([]);
     setNextUrl(undefined);
     setTotalSize(null);
-    setSelectedColumns([]);
+    updateSelectedColumns([]);
     props.onSoqlChange?.(q.soql);
   }
 
@@ -366,15 +516,15 @@ export function QueryScreen(props: {
               Builder
             </button>
             <button class="wl-buttonBrand" onClick={runQuery} disabled={busy || !context}>
-              {busy ? 'Running…' : '▶ Run'}
+              {busy ? 'Running…' : 'Run query'}
             </button>
-            <button class="wl-btn" onClick={loadMore} disabled={busy || !nextUrl}>Load More</button>
+            <button class="wl-btn" onClick={loadMore} disabled={busy || (queryMode === 'bulk' ? !bulkLocator : !nextUrl)}>Load More</button>
+            {busy && queryMode === 'bulk' && bulkJobId ? <button class="wl-btn" onClick={cancelBulkQuery}>Cancel</button> : null}
             <button class="wl-btn" onClick={saveQuery} disabled={!soql.trim()}>Save</button>
             <button class="wl-btn" data-active={managerVisible ? 'true' : undefined} onClick={() => setManagerVisible(v => !v)}>Manage</button>
             <button class="wl-btn" data-active={historyVisible ? 'true' : undefined} onClick={() => setHistoryVisible(v => !v)}>History</button>
             <button class="wl-btn" data-active={explainVisible ? 'true' : undefined} onClick={() => setExplainVisible(v => !v)}>Explain</button>
-            <button class="wl-btn" onClick={exportCsv} disabled={flatRecords.length === 0}>CSV</button>
-            <button class="wl-btn" onClick={exportJson} disabled={rawRecords.length === 0}>JSON</button>
+            <button class="wl-btn" onClick={() => setExportOpen(true)} disabled={flatRecords.length === 0}>Export…</button>
           </div>
         </div>
 
@@ -390,8 +540,17 @@ export function QueryScreen(props: {
 
         <div class="wl-row">
           <div class="wl-row2">
+            <select class="wl-select" aria-label="Query API" value={queryMode} onChange={(event) => {
+              const next = (event.currentTarget as HTMLSelectElement).value as 'rest' | 'bulk';
+              setQueryMode(next);
+              props.onQueryModeChange?.(next);
+            }}>
+              <option value="rest">REST Query — best for interactive exports</option>
+              <option value="bulk">Bulk API 2.0 Query — large asynchronous exports</option>
+            </select>
             <select
               class="wl-select"
+              aria-label="Saved queries"
               value={selectedSaved}
               onChange={(e) => {
                 const id = (e.currentTarget as HTMLSelectElement).value;
@@ -404,19 +563,29 @@ export function QueryScreen(props: {
             </select>
             <input
               class="wl-input"
+              aria-label="Connected Salesforce org"
               value={context ? `${context.orgId}` : 'Open a logged-in Salesforce tab'}
               disabled
             />
           </div>
+          <div class="wl-formRow__hint">REST returns an interactive first page. Bulk API 2.0 runs asynchronously and retrieves results in resumable 10,000-record pages.</div>
+          {recoverableBulkQuery && recoverableBulkQuery.jobId !== bulkJobId ? (
+            <div class="wl-inlineNotice" role="status">
+              <span>Recoverable Bulk query <code>{recoverableBulkQuery.jobId}</code> ({recoverableBulkQuery.state})</span>
+              <button class="wl-buttonNeutral" onClick={() => resumeBulkQuery(recoverableBulkQuery)} disabled={busy}>Resume</button>
+            </div>
+          ) : null}
           <div style="position:relative" class="wl-soql-editor">
             <SoqlHighlighter soql={soql} />
             <textarea
               ref={textareaRef}
               class="wl-textarea wl-soql-textarea"
+              aria-label="SOQL query"
               value={soql}
               onInput={(e) => {
                 const ta = e.currentTarget as HTMLTextAreaElement;
                 setSoql(ta.value);
+                props.onSoqlChange?.(ta.value);
                 setCursorPos(ta.selectionStart);
               }}
               onClick={(e) => {
@@ -438,11 +607,28 @@ export function QueryScreen(props: {
               />
             )}
           </div>
+          {parameterNames.length > 0 ? (
+            <div class="wl-parameterGrid" aria-label="Query parameters">
+              {parameterNames.map(name => (
+                <label key={name}>
+                  <span>{name}</span>
+                  <input
+                    class="wl-input"
+                    value={parameterValues[name] ?? ''}
+                    onInput={(event) => setParameterValues(current => ({ ...current, [name]: (event.currentTarget as HTMLInputElement).value }))}
+                    placeholder={`Value for ${name}`}
+                  />
+                </label>
+              ))}
+              <p class="wl-muted">Parameters are inserted as escaped SOQL string values when the query runs.</p>
+            </div>
+          ) : null}
           <div class="wl-muted" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span>
               {totalSize !== null ? `${rawRecords.length} loaded (totalSize: ${totalSize})` : `${rawRecords.length} loaded`}
-              {nextUrl ? ' - more available' : ''}
+              {(queryMode === 'bulk' ? bulkLocator : nextUrl) ? ' - more available' : ''}
             </span>
+            {bulkStatus ? <span class="wl-pill wl-pill--brand">Bulk: {bulkStatus}</span> : null}
             {lastExecMs !== null && (
               <span style={`font-weight:600;color:${lastExecMs > 3000 ? 'var(--wl-danger)' : lastExecMs > 1000 ? '#f0a030' : 'var(--wl-accent)'}`}>
                 {formatDuration(lastExecMs)}
@@ -483,7 +669,7 @@ export function QueryScreen(props: {
           records={flatRecords}
           columns={columns}
           selectedColumns={selectedColumns.length ? selectedColumns : columns}
-          onSelectedColumnsChange={setSelectedColumns}
+          onSelectedColumnsChange={updateSelectedColumns}
           objectName={acCtx.fromObject ?? undefined}
           sf={sf}
           onInspectId={props.onInspectId}
@@ -506,6 +692,16 @@ export function QueryScreen(props: {
         confirmText="Save"
         onCancel={() => setSaveQueryOpen(false)}
         onSubmit={confirmSaveQuery}
+      />
+
+      <ExportModal
+        open={exportOpen}
+        records={flatRecords}
+        columns={selectedColumns.length ? selectedColumns : columns}
+        defaultFilename={`wavelink-query-${Date.now()}`}
+        preferences={props.exportPreferences}
+        onPreferencesChange={props.onExportPreferencesChange}
+        onClose={() => setExportOpen(false)}
       />
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}

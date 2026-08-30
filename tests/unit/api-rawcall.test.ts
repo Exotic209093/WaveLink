@@ -92,4 +92,22 @@ describe('SalesforceApiClient.rawCall', () => {
     const res = await client().rawCall('GET', '/weird');
     expect(res.body).toBe('not json');
   });
+
+  it('adds the required sObject type metadata to collection updates', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => [{ id: '001xx', success: true, errors: [] }],
+    } as unknown as Response);
+    global.fetch = fetchMock;
+
+    await client().collectionUpdate('Account', [{ Id: '001xx', Name: 'Updated' }]);
+
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(request.method).toBe('PATCH');
+    expect(JSON.parse(String(request.body))).toEqual({
+      allOrNone: false,
+      records: [{ attributes: { type: 'Account' }, Id: '001xx', Name: 'Updated' }],
+    });
+  });
 });

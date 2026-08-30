@@ -48,14 +48,20 @@ export interface LocalStorageSchema {
   scheduledExports: ScheduledExport[];
   /** v0.2: snapshots produced by scheduled exports (keyed by snapshot id) */
   exportSnapshots: Record<string, ExportSnapshot>;
+  /** v0.5: unified, versioned repeatable workflow definitions */
+  savedJobs: SavedJob[];
+  /** v0.4: bounded schedule execution history */
+  scheduleRunHistory: ScheduleRunHistoryEntry[];
+  /** v0.4: non-sensitive job checkpoints retained across browser restarts */
+  activePushes: Record<string, ActivePush>;
+  /** v0.4: resumable Bulk Query 2.0 jobs keyed by org ID. */
+  bulkQueryCheckpoints: Record<string, BulkQueryCheckpoint>;
 }
 
 /** Data stored in chrome.storage.session (ephemeral, cleared on browser close) */
 export interface SessionStorageSchema {
   /** Active access tokens keyed by orgId */
   activeTokens: Record<string, string>;
-  /** In-progress push operations */
-  activePushes: Record<string, ActivePush>;
   /** Completed push results retained for the current browser session */
   pushResults: Record<string, PushResult>;
 }
@@ -136,6 +142,24 @@ export interface FieldMapping {
   transformation?: TransformationType;
   defaultValue?: unknown;
   required: boolean;
+  /** Explicit handling for empty CSV cells; defaults to ignore. */
+  blankBehavior?: 'ignore' | 'clear';
+  /** Resolve a Salesforce reference by ID or relationship field notation. */
+  lookup?: {
+    mode: 'id' | 'externalId' | 'relatedField';
+    /** Relationship API name, for example Account or Parent__r. */
+    relationshipName?: string;
+    /** External ID or related-record field used inside the relationship object. */
+    matchField?: string;
+  };
+}
+
+export interface BulkQueryCheckpoint {
+  jobId: string;
+  orgId: string;
+  soql: string;
+  state: string;
+  updatedAt: number;
 }
 
 export type TransformationType =
@@ -249,7 +273,14 @@ export interface ActivePush {
   processedRecords: number;
   failedRecords: number;
   startedAt: number;
-  status: 'queued' | 'processing' | 'complete' | 'error' | 'cancelled';
+  updatedAt?: number;
+  status: 'queued' | 'processing' | 'interrupted' | 'complete' | 'error' | 'cancelled';
+  strategy?: 'rest' | 'bulk';
+  tabId?: number;
+  bulkJobId?: string;
+  checkpoint?: number;
+  resumeSupported?: boolean;
+  lastError?: string;
   abortController?: string;
 }
 
@@ -326,6 +357,77 @@ export interface ScheduledExport {
   lastRunStatus?: 'success' | 'error';
   lastRunError?: string;
   nextRunAt?: number;
+  /** IANA time zone used for previews and daily cadence interpretation. */
+  timeZone?: string;
+}
+
+export interface ScheduleRunHistoryEntry {
+  id: string;
+  scheduleId: string;
+  startedAt: number;
+  completedAt: number;
+  status: 'success' | 'error';
+  recordCount: number;
+  error?: string;
+  nextRunAt: number;
+}
+
+export interface SavedJobDefinition {
+  kind: 'export' | 'import';
+  /** Runtime connection roles only. Saved jobs never persist an org ID or credential. */
+  orgRoles?: {
+    source?: 'active-org' | 'choose-at-run';
+    target?: 'active-org' | 'choose-at-run';
+  };
+  objectName?: string;
+  operation?: 'query' | 'insert' | 'update' | 'upsert' | 'delete';
+  query?: string;
+  inputSource?: 'local-file';
+  columns?: string[];
+  mappings?: FieldMapping[];
+  externalIdField?: string;
+  api: {
+    strategy: 'auto' | 'rest' | 'bulk';
+    batchSize?: number;
+    concurrency?: number;
+  };
+  safety: {
+    dryRun: boolean;
+    requireProductionConfirmation: boolean;
+  };
+  output?: {
+    format: SavedExportFormat;
+    filenameBase?: string;
+  };
+  schedule?: {
+    interval: ScheduleInterval;
+    retention: number;
+    timeZone: string;
+  };
+}
+
+export interface SavedJobRevision {
+  version: number;
+  changedAt: number;
+  definition: SavedJobDefinition;
+  name: string;
+  description?: string;
+}
+
+/** Portable, credential-free definition for a repeatable data workflow. */
+export interface SavedJob {
+  schemaVersion: 1;
+  id: string;
+  name: string;
+  description?: string;
+  favorite: boolean;
+  definition: SavedJobDefinition;
+  version: number;
+  revisions: SavedJobRevision[];
+  createdAt: number;
+  updatedAt: number;
+  usageCount: number;
+  lastUsedAt?: number;
 }
 
 /** A single snapshot produced by a scheduled-export run. */
@@ -339,4 +441,7 @@ export interface ExportSnapshot {
   records: Record<string, unknown>[];
   /** First error from this run, if any */
   error?: string;
+  orgId?: string;
+  objectName?: string;
+  pinned?: boolean;
 }

@@ -42,7 +42,16 @@ export function ColumnList(props: {
           <div
             key={source}
             class={`wl-colRow${isSelected ? ' wl-colRowSelected' : ''}`}
+            role="button"
+            tabIndex={0}
             onClick={(e) => onToggleSelected(source, e as unknown as MouseEvent)}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onToggleSelected(source, e as unknown as MouseEvent);
+              }
+            }}
             title={source}
           >
             <div class="wl-colRowLeft">
@@ -65,8 +74,8 @@ export function ColumnList(props: {
               {hasErr ? <span class="wl-badge wl-badgeErr">Err</span> : null}
               {op.drop ? <span class="wl-badge wl-badgeDrop">Dropped</span> : null}
               {tfBadge ? <span class="wl-badge">{tfBadge}</span> : null}
-              <label class="wl-badge wl-badgeBtn" onClick={(e) => e.stopPropagation()}>
-                <input type="checkbox" checked={op.drop} onChange={() => onToggleDrop(source)} />
+              <label class="wl-badge wl-badgeBtn">
+                <input aria-label={`Drop ${source}`} type="checkbox" checked={op.drop} onClick={(e) => e.stopPropagation()} onChange={() => onToggleDrop(source)} />
                 <span>Drop</span>
               </label>
             </div>

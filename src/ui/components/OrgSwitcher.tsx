@@ -14,9 +14,10 @@ const PRESET_COLORS = ['#0284a8', '#e74c3c', '#27ae60', '#f39c12', '#8e44ad', '#
 
 export function OrgSwitcher(props: {
   sf: SfApi;
+  context?: { orgId?: string; username?: string; instanceUrl?: string; environment?: 'production' | 'sandbox' };
   onOrgSwitch?: (orgId: string) => void;
 }): VNode {
-  const { sf, onOrgSwitch } = props;
+  const { sf, context, onOrgSwitch } = props;
   const { orgs, activeOrgId, switchOrg, connectFromTab, disconnectOrg, updateOrgNickname, refreshOrgToken } = useOrgList(sf);
 
   const [open, setOpen] = useState(false);
@@ -106,16 +107,25 @@ export function OrgSwitcher(props: {
     return orgColorMap[orgId] || '#7f8c8d';
   }
 
-  const triggerLabel = activeOrg ? getOrgLabel(activeOrg) : 'No org connected';
-  const triggerEnv = activeOrg?.environment === 'sandbox' ? 'SBX' : activeOrg ? 'PROD' : '';
+  const contextualLabel = context?.instanceUrl ? new URL(context.instanceUrl).hostname : null;
+  const triggerLabel = activeOrg ? getOrgLabel(activeOrg) : contextualLabel ?? 'No org connected';
+  const triggerEnv = activeOrg?.environment === 'sandbox'
+    ? 'SBX'
+    : activeOrg
+      ? 'PROD'
+      : context?.environment === 'sandbox'
+        ? 'SBX'
+        : context?.environment === 'production'
+          ? 'PROD'
+          : '';
 
   return (
     <div class="wl-orgSwitcher" ref={flyoutRef}>
       <button class="wl-orgSwitcherTrigger" onClick={() => setOpen(v => !v)}>
-        {activeOrg ? <span class="wl-orgColorDot" style={{ background: getOrgColor(activeOrgId!) }} /> : null}
+        {activeOrg || context?.orgId ? <span class="wl-orgColorDot" style={{ background: getOrgColor(activeOrgId ?? context?.orgId ?? '') }} /> : null}
         <span style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{triggerLabel}</span>
         {triggerEnv ? (
-          <span class="wl-orgBadge" data-env={activeOrg?.environment === 'sandbox' ? 'sandbox' : 'production'}>{triggerEnv}</span>
+          <span class="wl-orgBadge" data-env={(activeOrg?.environment ?? context?.environment) === 'sandbox' ? 'sandbox' : 'production'}>{triggerEnv}</span>
         ) : null}
         <span style="font-size:10px;opacity:0.6">{open ? '\u25B2' : '\u25BC'}</span>
       </button>
@@ -126,19 +136,35 @@ export function OrgSwitcher(props: {
             <>
               <div style="padding:4px 8px;font-size:11px;color:var(--wl-ink-dim);font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Connected Orgs</div>
               {orgs.length === 0 ? (
-                <div style="padding:12px;color:var(--wl-ink-dim);font-size:13px">No orgs connected. Open a Salesforce tab and connect.</div>
+                <div style="padding:12px;color:var(--wl-ink-dim);font-size:13px">
+                  {context?.orgId
+                    ? 'The current Salesforce tab is connected for this session. Use Connect from Tab to save it to the org switcher.'
+                    : 'No orgs connected. Open a Salesforce tab and connect.'}
+                </div>
               ) : null}
               {orgs.map(org => (
                 <div key={org.orgId}>
                   <div
                     class="wl-orgItem"
                     data-active={org.orgId === activeOrgId}
-                    onClick={() => handleSwitch(org.orgId)}
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest('button,input,.wl-orgMenu,.wl-orgColorPicker')) return;
+                      handleSwitch(org.orgId);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleSwitch(org.orgId);
+                      }
+                    }}
                   >
                     <span class="wl-orgColorDot" style={{ background: getOrgColor(org.orgId) }} />
                     <div style="flex:1;min-width:0">
                       {editingNickname === org.orgId ? (
-                        <div class="wl-row" style="gap:4px" onClick={(e: Event) => e.stopPropagation()}>
+                        <div class="wl-row" style="gap:4px">
                           <input
                             class="wl-input"
                             style="font-size:12px;padding:2px 6px;flex:1"
@@ -169,7 +195,7 @@ export function OrgSwitcher(props: {
                   </div>
 
                   {menuOrgId === org.orgId ? (
-                    <div class="wl-orgMenu" onClick={(e: Event) => e.stopPropagation()}>
+                    <div class="wl-orgMenu">
                       <button class="wl-orgMenuBtn" onClick={() => { setEditingNickname(org.orgId); setNicknameValue(org.nickname || ''); setMenuOrgId(null); }}>
                         Set Nickname
                       </button>
@@ -186,7 +212,7 @@ export function OrgSwitcher(props: {
                   ) : null}
 
                   {colorPickerOrgId === org.orgId ? (
-                    <div class="wl-orgColorPicker" onClick={(e: Event) => e.stopPropagation()}>
+                    <div class="wl-orgColorPicker">
                       {PRESET_COLORS.map(c => (
                         <button
                           key={c}

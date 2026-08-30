@@ -143,7 +143,8 @@ export function SchemaComparisonScreen(props: { sf: SfApi; tabId: number }): VNo
         {searchValue && !selected ? (
           <div style="max-height:180px;overflow:auto;border:1px solid var(--wl-line-2);border-radius:var(--wl-radius-sm)">
             {filteredList.slice(0, 40).map((o) => (
-              <div
+              <button
+                type="button"
                 key={o.name}
                 class="wl-qb-objItem"
                 onClick={() => {
@@ -153,7 +154,7 @@ export function SchemaComparisonScreen(props: { sf: SfApi; tabId: number }): VNo
               >
                 <span class="wl-mono" style="font-size:12px">{o.name}</span>
                 <span class="wl-muted">{o.label}</span>
-              </div>
+              </button>
             ))}
             {filteredList.length === 0 ? (
               <div class="wl-muted" style="padding:8px 12px">No matching objects</div>

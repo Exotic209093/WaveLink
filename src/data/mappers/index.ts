@@ -113,8 +113,9 @@ export class DataMapper {
       for (const mapping of mappings) {
         const sourceValue = source[mapping.sourceField];
         const value = sourceValue !== undefined ? sourceValue : mapping.defaultValue;
+        const blank = value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
 
-        if (value === undefined || value === null) {
+        if (blank) {
           if (mapping.required) {
             errors.push({
               recordIndex: i,
@@ -123,11 +124,22 @@ export class DataMapper {
             });
             hasError = true;
           }
+          if (mapping.blankBehavior === 'clear' && !mapping.required) {
+            mapped[mapping.targetField] = null;
+          }
           continue;
         }
 
         try {
-          mapped[mapping.targetField] = this.applyTransformation(value, mapping.transformation);
+          const transformed = this.applyTransformation(value, mapping.transformation);
+          if (mapping.lookup && mapping.lookup.mode !== 'id') {
+            if (!mapping.lookup.relationshipName || !mapping.lookup.matchField) {
+              throw new Error('Relationship name and match field are required for lookup resolution');
+            }
+            mapped[mapping.lookup.relationshipName] = { [mapping.lookup.matchField]: transformed };
+          } else {
+            mapped[mapping.targetField] = transformed;
+          }
         } catch (error) {
           errors.push({
             recordIndex: i,

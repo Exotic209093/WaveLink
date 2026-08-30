@@ -7,7 +7,7 @@
 // SheetJS is ~875 KiB. Load it on demand (dynamic import) so CSV/JSON/XML
 // users never pay for it — webpack splits it into its own async chunk.
 async function loadXLSX(): Promise<typeof import('xlsx')> {
-  return import(/* webpackChunkName: "xlsx" */ 'xlsx');
+  return import(/* webpackChunkName: "xlsx" */ 'xlsx/dist/xlsx.mini.min.js');
 }
 
 /**

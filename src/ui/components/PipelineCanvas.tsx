@@ -95,9 +95,17 @@ export function PipelineCanvas(props: PipelineCanvasProps): VNode {
             {/* Step card */}
             <div
               class="wl-pipelineStep"
+              role="button"
+              tabIndex={0}
               data-active={isSelected ? 'true' : undefined}
               data-debug={debugAttr}
               onClick={() => onSelectStep(step.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelectStep(step.id);
+                }
+              }}
               {...handlers}
             >
               <div style="display:flex;align-items:center;gap:8px">

@@ -14,3 +14,15 @@ export function validateIdFirst(headers: string[], operation: PushOperation): st
   return null;
 }
 
+/** Require an exact typed phrase for every delete and every production write. */
+export function pushConfirmationPhrase(
+  operation: PushOperation,
+  recordCount: number,
+  objectName: string,
+  environment?: 'production' | 'sandbox',
+): string | null {
+  if (operation === 'delete') return `DELETE ${recordCount} RECORDS`;
+  if (environment === 'production') return `${operation.toUpperCase()} ${recordCount} ${objectName}`;
+  return null;
+}
+

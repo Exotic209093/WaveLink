@@ -156,11 +156,13 @@ export function SearchableSelect(props: {
           ref={panelRef}
           class="wl-ss-panel"
           role="listbox"
+          aria-label={ariaLabel ? `${ariaLabel} options` : 'Options'}
           style={`left:${rect.left}px;top:${rect.top}px;width:${rect.width}px`}
         >
           <input
             ref={inputRef}
             class="wl-input wl-ss-search"
+            aria-label={ariaLabel ? `Search ${ariaLabel}` : 'Search options'}
             placeholder="Search..."
             value={search}
             onInput={(e) => { setSearch((e.currentTarget as HTMLInputElement).value); setActiveIndex(0); }}
@@ -174,6 +176,7 @@ export function SearchableSelect(props: {
                 <div
                   key={o.value}
                   role="option"
+                  tabIndex={-1}
                   aria-selected={o.value === value}
                   class={`wl-ss-item${i === activeIndex ? ' wl-ss-itemActive' : ''}${o.value === value ? ' wl-ss-itemSel' : ''}`}
                   onMouseEnter={() => setActiveIndex(i)}

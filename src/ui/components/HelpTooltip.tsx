@@ -73,16 +73,18 @@ export function HelpTooltip(props: {
       onMouseEnter={() => setVisible(true)}
       onMouseLeave={() => setVisible(false)}
     >
-      <span
+      <button
+        type="button"
+        aria-label="Show help"
         class="wl-helpTooltipIcon"
         onClick={(e) => {
           e.stopPropagation();
           setVisible((v) => !v);
         }}
-        style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--wl-line);background:rgba(0,166,200,0.08);font-size:11px;font-weight:900;color:var(--wl-accent);cursor:pointer;user-select:none;flex-shrink:0"
+        style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;border-radius:50%;border:1px solid var(--wl-line);background:rgba(0,166,200,0.08);font-size:11px;font-weight:900;color:var(--wl-accent);cursor:pointer;user-select:none;flex-shrink:0"
       >
         ?
-      </span>
+      </button>
 
       {visible ? (
         <div

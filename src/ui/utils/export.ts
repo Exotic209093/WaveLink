@@ -10,7 +10,7 @@ import type { FlatRecord } from './records';
 import { recordsToCsv } from './csv';
 import { recordsToExcel } from './excel';
 import { recordsToXml } from './xml';
-import { downloadTextFile } from './download';
+import { downloadBlobParts, downloadTextFile } from './download';
 
 export type ExportFormat = 'csv' | 'json' | 'excel' | 'xml';
 
@@ -34,6 +34,13 @@ export async function exportRecords(
   options: ExportOptions
 ): Promise<void> {
   const { format, filename, sheetName, includeMetadata } = options;
+
+  // Small exports stay simple. Large text exports are generated in bounded
+  // pieces so no second full-size output string or filtered-record array exists.
+  if (records.length > 5_000 && format !== 'excel') {
+    downloadLargeTextExport(records, columns, { format, filename, includeMetadata });
+    return;
+  }
 
   switch (format) {
     case 'csv': {
@@ -62,6 +69,57 @@ export async function exportRecords(
     default:
       throw new Error(`Unsupported export format: ${format}`);
   }
+}
+
+function selectColumns(record: Record<string, unknown>, columns: string[]): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {};
+  for (const column of columns) filtered[column] = record[column];
+  return filtered;
+}
+
+function downloadLargeTextExport(
+  records: Record<string, unknown>[],
+  columns: string[],
+  options: Pick<ExportOptions, 'format' | 'filename' | 'includeMetadata'>,
+): void {
+  const parts: BlobPart[] = [];
+  const chunkSize = 1_000;
+  if (options.format === 'csv') {
+    for (let start = 0; start < records.length; start += chunkSize) {
+      const csv = recordsToCsv(records.slice(start, start + chunkSize) as FlatRecord[], columns);
+      parts.push(start === 0 ? csv : `\n${csv.slice(csv.indexOf('\n') + 1)}`);
+    }
+    downloadBlobParts(options.filename, parts, 'text/csv');
+    return;
+  }
+  if (options.format === 'json') {
+    if (options.includeMetadata) {
+      parts.push(`{"exportedAt":${JSON.stringify(new Date().toISOString())},"recordCount":${records.length},"columnCount":${columns.length},"columns":${JSON.stringify(columns)},"records":[`);
+    } else {
+      parts.push('[');
+    }
+    for (let start = 0; start < records.length; start += chunkSize) {
+      const chunk = records.slice(start, start + chunkSize).map(record => selectColumns(record, columns));
+      const body = JSON.stringify(chunk).slice(1, -1);
+      if (body) parts.push(start === 0 ? body : `,${body}`);
+    }
+    parts.push(options.includeMetadata ? ']}' : ']');
+    downloadBlobParts(options.filename, parts, 'application/json');
+    return;
+  }
+  if (options.format === 'xml') {
+    parts.push('<?xml version="1.0" encoding="UTF-8"?>\n<records>');
+    for (let start = 0; start < records.length; start += chunkSize) {
+      const xml = recordsToXml(records.slice(start, start + chunkSize), columns);
+      const bodyStart = xml.indexOf('<records>') + '<records>'.length;
+      const bodyEnd = xml.lastIndexOf('</records>');
+      parts.push(xml.slice(bodyStart, bodyEnd));
+    }
+    parts.push('\n</records>');
+    downloadBlobParts(options.filename, parts, 'application/xml');
+    return;
+  }
+  throw new Error(`Unsupported export format: ${options.format}`);
 }
 
 /**

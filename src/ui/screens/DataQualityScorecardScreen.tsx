@@ -277,7 +277,7 @@ export function DataQualityScorecardScreen(props: { sf: SfApi; tabId: number }):
         <div class="wl-row">
           <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
             <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:12px;font-weight:700">Object</label>
+              <span style="font-size:12px;font-weight:700">Object</span>
               <SearchableSelect
                 ariaLabel="Object to score"
                 placeholder={loadingObjects ? 'Loading objects...' : objects.length === 0 ? 'No objects found' : 'Select object...'}
@@ -295,8 +295,9 @@ export function DataQualityScorecardScreen(props: { sf: SfApi; tabId: number }):
             </div>
 
             <div style="flex:0 0 120px;display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:12px;font-weight:700">Sample Limit</label>
+              <label htmlFor="quality-sample-limit" style="font-size:12px;font-weight:700">Sample Limit</label>
               <input
+                id="quality-sample-limit"
                 class="wl-input"
                 type="number"
                 value={sampleLimit}
@@ -326,8 +327,9 @@ export function DataQualityScorecardScreen(props: { sf: SfApi; tabId: number }):
         <div class="wl-row">
           <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
             <div style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:12px;font-weight:700">Load Saved Rule Set</label>
+              <label htmlFor="quality-rule-set" style="font-size:12px;font-weight:700">Load Saved Rule Set</label>
               <select
+                id="quality-rule-set"
                 class="wl-select"
                 value={selectedRuleSetId}
                 onChange={(e) => {
@@ -345,8 +347,9 @@ export function DataQualityScorecardScreen(props: { sf: SfApi; tabId: number }):
             </div>
 
             <div style="flex:1;min-width:160px;display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:12px;font-weight:700">Rule Set Name</label>
+              <label htmlFor="quality-rule-set-name" style="font-size:12px;font-weight:700">Rule Set Name</label>
               <input
+                id="quality-rule-set-name"
                 class="wl-input"
                 type="text"
                 value={ruleSetName}

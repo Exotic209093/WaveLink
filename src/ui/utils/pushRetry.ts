@@ -11,6 +11,47 @@ export interface RetryDataset {
   originalIndices: number[]; // new index -> original index
 }
 
+export interface PushOutcomeDatasets {
+  success: { records: Record<string, unknown>[]; headers: string[] };
+  error: { records: Record<string, unknown>[]; headers: string[] };
+}
+
+/** Build complete success/error downloads while retaining every source column. */
+export function buildPushOutcomeDatasets(
+  originalRecords: Record<string, unknown>[],
+  errors: Array<{ recordIndex: number; message: string }>,
+  successfulIds: string[] = [],
+): PushOutcomeDatasets {
+  const messages = new Map<number, string[]>();
+  for (const error of errors) {
+    if (error.recordIndex < 0 || error.recordIndex >= originalRecords.length) continue;
+    messages.set(error.recordIndex, [...(messages.get(error.recordIndex) ?? []), error.message]);
+  }
+  let successIndex = 0;
+  const successRecords: Record<string, unknown>[] = [];
+  const errorRecords: Record<string, unknown>[] = [];
+  originalRecords.forEach((record, recordIndex) => {
+    const rowErrors = messages.get(recordIndex);
+    if (rowErrors) {
+      errorRecords.push({ ...record, WaveLinkError: rowErrors.join('; '), WaveLinkSourceRow: recordIndex + 2 });
+    } else {
+      const id = successfulIds[successIndex++];
+      successRecords.push(id ? { ...record, WaveLinkRecordId: id } : { ...record });
+    }
+  });
+  const sourceHeaders = Array.from(new Set(originalRecords.flatMap(record => Object.keys(record))));
+  return {
+    success: {
+      records: successRecords,
+      headers: [...sourceHeaders, ...(successfulIds.length ? ['WaveLinkRecordId'] : [])],
+    },
+    error: {
+      records: errorRecords,
+      headers: [...sourceHeaders, 'WaveLinkError', 'WaveLinkSourceRow'],
+    },
+  };
+}
+
 /**
  * Builds a retry dataset containing only the records that failed in the original push.
  *

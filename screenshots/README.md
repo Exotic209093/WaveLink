@@ -7,17 +7,20 @@ The Chrome Web Store requires **at least 1 screenshot** before your listing can 
 - **Format:** PNG or JPEG
 - **Count:** 1–5 screenshots
 
-## Recommended Shots
+## Current release shots
 
 Take screenshots of these key flows in the extension:
 
 | File name | What to capture |
 |-----------|----------------|
-| `01-popup.png` | The popup with an active org connected |
-| `02-data-push.png` | The data push screen mid-upload with field mapping visible |
-| `03-soql-query.png` | The SOQL query editor with results |
-| `04-schema-graph.png` | The schema relationship graph for a standard object |
-| `05-org-comparison.png` | Side-by-side schema diff between two orgs |
+| `screenshot-01-home.png` | Connected Home workspace |
+| `screenshot-02-export.png` | SOQL Export with redacted live results |
+| `screenshot-03-import-review.png` | Production-aware Import review |
+| `screenshot-04-compare.png` | Local files and snapshot Compare workspace |
+| `screenshot-05-activity.png` | Unified Jobs & Activity history |
+
+All five images were captured from the packaged v0.6.0 release-candidate build on 2026-08-30 at
+exactly 1280x800. Org, user, and record identifiers were redacted before capture.
 
 ## How to Take Them
 

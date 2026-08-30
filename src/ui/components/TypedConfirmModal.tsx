@@ -10,7 +10,7 @@
  * Complexity: O(1) for rendering and validation.
  */
 
-import { h, VNode } from 'preact';
+import { h, VNode, type ComponentChildren } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 
 export interface TypedConfirmModalProps {
@@ -20,7 +20,7 @@ export interface TypedConfirmModalProps {
   onConfirm: () => void;
   onCancel: () => void;
   busy?: boolean;
-  children?: VNode | VNode[] | string;
+  children?: ComponentChildren;
 }
 
 export function TypedConfirmModal(props: TypedConfirmModalProps): VNode | null {
@@ -77,8 +77,8 @@ export function TypedConfirmModal(props: TypedConfirmModalProps): VNode | null {
   };
 
   return (
-    <div class="wl-modalOverlay" onClick={onCancel} role="dialog" aria-modal="true" aria-label={title}>
-      <div class="wl-modal wl-card" ref={modalRef} onClick={(e) => e.stopPropagation()}>
+    <div class="wl-modalOverlay" role="dialog" aria-modal="true" aria-label={title}>
+      <div class="wl-modal wl-card" ref={modalRef}>
         <div class="wl-cardHeader">
           <h2>{title}</h2>
         </div>

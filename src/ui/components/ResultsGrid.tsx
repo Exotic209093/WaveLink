@@ -16,6 +16,7 @@
 
 import type { VNode } from 'preact';
 import { h, Fragment } from 'preact';
+import { Icon } from './Icon';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { FlatRecord } from '../utils/records';
 
@@ -363,7 +364,7 @@ export function ResultsGrid(props: {
                                 style="margin-left:6px;padding:0 5px;font-size:10px"
                                 title="Inspect this record"
                                 onClick={() => onInspectId(String(v))}
-                              >🔍</button>
+                              ><Icon name="search" size={13} /></button>
                             ) : null}
                           </Fragment>
                         )}

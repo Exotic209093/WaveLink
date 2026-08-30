@@ -9,14 +9,16 @@ import { h } from 'preact';
 import type { VNode } from 'preact';
 import type { SfApi } from '../api/sf';
 import { DataPushScreen } from './DataPushScreen';
+import type { SavedJob } from '../../core/types/storage';
 
 export function ImportScreen(props: {
   sf: SfApi;
   tabId: number;
+  context?: { orgId?: string; instanceUrl?: string; environment?: 'production' | 'sandbox' };
   dataset: {
     sourceRecords: Record<string, unknown>[];
     filename: string;
-    format: 'csv' | 'json';
+    format: 'csv' | 'json' | 'excel' | 'xml';
     headers: string[];
     bytes?: number;
   } | null;
@@ -25,14 +27,15 @@ export function ImportScreen(props: {
   onDataset: (d: {
     sourceRecords: Record<string, unknown>[];
     filename: string;
-    format: 'csv' | 'json';
+    format: 'csv' | 'json' | 'excel' | 'xml';
     headers: string[];
     bytes?: number;
   } | null) => void;
   onRequestCleanser: () => void;
-  onNavigate: (route: string) => void;
+  savedJobDraft?: SavedJob;
+  onSavedJobDraftConsumed?: () => void;
 }): VNode {
-  const { sf, tabId, dataset, cleanedRecords, cleanedHeaders, onDataset, onRequestCleanser, onNavigate } = props;
+  const { sf, tabId, dataset, cleanedRecords, cleanedHeaders, onDataset, onRequestCleanser } = props;
 
   return (
     <div>
@@ -45,20 +48,19 @@ export function ImportScreen(props: {
             One-click undo on every push.
           </p>
         </div>
-        <div class="wl-pageHeader__actions">
-          <button class="wl-buttonNeutral" onClick={() => onNavigate('templates')}>📁 Templates</button>
-          <button class="wl-buttonNeutral" onClick={() => onNavigate('advanced/history')}>📜 Audit trail</button>
-        </div>
       </div>
 
       <DataPushScreen
         sf={sf}
         tabId={tabId}
+        context={props.context}
         dataset={dataset}
         cleanedRecords={cleanedRecords}
         cleanedHeaders={cleanedHeaders}
         onDataset={onDataset}
         onRequestCleanser={onRequestCleanser}
+        savedJobDraft={props.savedJobDraft}
+        onSavedJobDraftConsumed={props.onSavedJobDraftConsumed}
       />
     </div>
   );

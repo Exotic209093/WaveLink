@@ -39,7 +39,7 @@ const chrome = {
   },
   storage: {
     local: {
-      get: jest.fn((keys: string | string[]) => {
+      get: jest.fn((keys: string | string[], callback?: (result: Record<string, unknown>) => void) => {
         const result: Record<string, unknown> = {};
         const keyArray = Array.isArray(keys) ? keys : [keys];
         for (const key of keyArray) {
@@ -47,10 +47,12 @@ const chrome = {
             result[key] = storageMock.local[key];
           }
         }
+        callback?.(result);
         return Promise.resolve(result);
       }),
-      set: jest.fn((items: Record<string, unknown>) => {
+      set: jest.fn((items: Record<string, unknown>, callback?: () => void) => {
         Object.assign(storageMock.local, items);
+        callback?.();
         return Promise.resolve();
       }),
       remove: jest.fn((keys: string | string[]) => {
@@ -66,7 +68,7 @@ const chrome = {
       }),
     },
     session: {
-      get: jest.fn((keys: string | string[]) => {
+      get: jest.fn((keys: string | string[], callback?: (result: Record<string, unknown>) => void) => {
         const result: Record<string, unknown> = {};
         const keyArray = Array.isArray(keys) ? keys : [keys];
         for (const key of keyArray) {
@@ -74,10 +76,12 @@ const chrome = {
             result[key] = storageMock.session[key];
           }
         }
+        callback?.(result);
         return Promise.resolve(result);
       }),
-      set: jest.fn((items: Record<string, unknown>) => {
+      set: jest.fn((items: Record<string, unknown>, callback?: () => void) => {
         Object.assign(storageMock.session, items);
+        callback?.();
         return Promise.resolve();
       }),
       clear: jest.fn(() => {

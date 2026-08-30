@@ -206,4 +206,4 @@ If the migration needs to be undone:
 ### Getting Help
 
 - Check the [Troubleshooting Guide](TROUBLESHOOTING.md)
-- Open an issue on [GitHub](https://github.com/jc-wave/wave-link/issues)
+- Open an issue on [GitHub](https://github.com/Exotic209093/WaveLink/issues)

@@ -1,5 +1,6 @@
 import { StorageService } from '../../src/services/storage';
 import { STORAGE_KEYS } from '../../src/core/constants';
+import { buildPushOutcomeDatasets } from '../../src/ui/utils/pushRetry';
 
 describe('Push Results (Session)', () => {
   test('caps stored push results to 20 (keeps most recent by capturedAt)', async () => {
@@ -26,6 +27,23 @@ describe('Push Results (Session)', () => {
     expect(all).not.toHaveProperty('p4');
     expect(all).toHaveProperty('p5');
     expect(all).toHaveProperty('p24');
+  });
+});
+
+describe('push outcome downloads', () => {
+  test('preserves source rows and adds IDs or grouped error details', () => {
+    const result = buildPushOutcomeDatasets(
+      [{ Name: 'Good' }, { Name: 'Bad' }, { Name: 'Also good' }],
+      [{ recordIndex: 1, message: 'Missing field' }, { recordIndex: 1, message: 'Invalid value' }],
+      ['001-good', '001-also'],
+    );
+    expect(result.success.records).toEqual([
+      { Name: 'Good', WaveLinkRecordId: '001-good' },
+      { Name: 'Also good', WaveLinkRecordId: '001-also' },
+    ]);
+    expect(result.error.records).toEqual([{
+      Name: 'Bad', WaveLinkError: 'Missing field; Invalid value', WaveLinkSourceRow: 3,
+    }]);
   });
 });
 

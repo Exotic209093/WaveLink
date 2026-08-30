@@ -29,8 +29,8 @@ Be respectful. Contributions should be made in good faith and with the goal of i
 
 | Type | How |
 |------|-----|
-| **Bug report** | [Open an issue](https://github.com/jc-wave/wave-link/issues) with the Bug Report template |
-| **Feature request** | [Open an issue](https://github.com/jc-wave/wave-link/issues) with the Feature Request template |
+| **Bug report** | [Open an issue](https://github.com/Exotic209093/WaveLink/issues) with the Bug Report template |
+| **Feature request** | [Open an issue](https://github.com/Exotic209093/WaveLink/issues) with the Feature Request template |
 | **Bug fix** | Fork → branch → fix → PR |
 | **New feature** | Discuss in an issue first, then fork → branch → implement → PR |
 | **Documentation** | Edit docs directly and open a PR — no build needed |
@@ -53,7 +53,7 @@ Be respectful. Contributions should be made in good faith and with the goal of i
 ### Clone and Install
 
 ```bash
-git clone https://github.com/jc-wave/wave-link.git
+git clone https://github.com/Exotic209093/WaveLink.git
 cd wave-link
 npm install
 ```

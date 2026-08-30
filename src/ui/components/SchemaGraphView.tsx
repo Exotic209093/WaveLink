@@ -399,6 +399,8 @@ function SchemaGraphViewInner(props: {
       </div>
 
       {/* ── Pan / zoom canvas ── */}
+      {/* Mouse dragging is a pointer enhancement; zoom and reset remain available as buttons. */}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div
         ref={containerRef}
         style={`width:100%;${isFullscreen ? 'flex:1;' : 'height:680px;'}overflow:hidden;cursor:${isDragging ? 'grabbing' : 'grab'};user-select:none;background:rgba(4,20,34,0.04);border-radius:${isFullscreen ? '0' : 'var(--wl-radius-sm)'};`}
@@ -535,6 +537,9 @@ function SchemaGraphViewInner(props: {
                 <div
                   key={name}
                   class="wl-card"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open ${node.objectName}`}
                   style={`
                     position:absolute;
                     left:${pos.x + offX - nw / 2}px;
@@ -551,6 +556,12 @@ function SchemaGraphViewInner(props: {
                   onMouseEnter={() => setHoveredObject(name)}
                   onMouseLeave={() => setHoveredObject(null)}
                   onClick={() => handleNodeClick(name)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleNodeClick(name);
+                    }
+                  }}
                 >
                   <div
                     style={`font-weight:900;font-size:${isRoot ? 13 : 11}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${isRoot ? 'var(--wl-accent)' : 'var(--wl-ink)'}`}

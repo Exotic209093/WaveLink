@@ -17,12 +17,15 @@ export interface ParsedDataset {
 
 export type SupportedInputFormat = 'csv' | 'json' | 'excel' | 'xml';
 
+export const MAX_INPUT_FILE_BYTES = 50 * 1024 * 1024;
+export const MAX_EXCEL_FILE_BYTES = 20 * 1024 * 1024;
+export const MAX_EXCEL_ROWS = 100_000;
+
 const FORMAT_BY_EXT: Record<string, SupportedInputFormat> = {
   '.csv': 'csv',
   '.tsv': 'csv',
   '.json': 'json',
   '.xlsx': 'excel',
-  '.xls': 'excel',
   '.xml': 'xml',
 };
 
@@ -63,33 +66,71 @@ export async function parseJsonFile(file: File): Promise<ParsedDataset> {
   return { records: objects, headers: inferHeaders(objects) };
 }
 
-export async function parseCsvFile(file: File): Promise<ParsedDataset> {
-  const text = await file.text();
-  const result = Papa.parse<Record<string, unknown>>(text, {
-    header: true,
-    skipEmptyLines: 'greedy',
-    dynamicTyping: false,
-  });
-
-  if (result.errors?.length) {
-    const first = result.errors[0];
-    throw new Error(`CSV parse error: ${first.message} (row ${first.row ?? '?'})`);
+export async function parseCsvFile(file: File, onProgress?: (rowsParsed: number) => void): Promise<ParsedDataset> {
+  // Papa's File streamer reads bounded slices through FileReader. This avoids a
+  // second full-size text copy while still retaining parsed rows for mapping.
+  // A text fallback keeps non-browser test/runtime File shims compatible.
+  if (typeof file.slice !== 'function' || typeof FileReader === 'undefined') {
+    const result = Papa.parse<Record<string, unknown>>(await file.text(), {
+      header: true,
+      skipEmptyLines: 'greedy',
+      dynamicTyping: false,
+    });
+    if (result.errors?.length) {
+      const first = result.errors[0];
+      throw new Error(`CSV parse error: ${first.message} (row ${first.row ?? '?'})`);
+    }
+    const records = (result.data ?? []).filter(Boolean);
+    const headers = (result.meta.fields ?? []).filter(Boolean);
+    onProgress?.(records.length);
+    return { records, headers: headers.length ? headers : inferHeaders(records) };
   }
-
-  const records = (result.data ?? []).filter(Boolean) as Record<string, unknown>[];
-  const headers = (result.meta.fields ?? []).filter(Boolean);
-  return { records, headers: headers.length ? headers : inferHeaders(records) };
+  return new Promise<ParsedDataset>((resolve, reject) => {
+    const records: Array<Record<string, unknown>> = [];
+    let headers: string[] = [];
+    let settled = false;
+    Papa.parse<Record<string, unknown>>(file, {
+      header: true,
+      skipEmptyLines: 'greedy',
+      dynamicTyping: false,
+      chunkSize: 256 * 1024,
+      chunk: (result, parser) => {
+        if (result.errors?.length) {
+          const first = result.errors[0];
+          settled = true;
+          parser.abort();
+          reject(new Error(`CSV parse error: ${first.message} (row ${first.row ?? '?'})`));
+          return;
+        }
+        records.push(...(result.data ?? []).filter(Boolean));
+        if (headers.length === 0) headers = (result.meta.fields ?? []).filter(Boolean);
+        onProgress?.(records.length);
+      },
+      complete: () => {
+        if (!settled) resolve({ records, headers: headers.length ? headers : inferHeaders(records) });
+      },
+      error: error => {
+        settled = true;
+        reject(new Error(`CSV read error: ${error.message}`));
+      },
+    });
+  });
 }
 
 export async function parseExcelFile(file: File): Promise<ParsedDataset> {
-  // Load SheetJS (~875 KiB) only when an Excel file is actually parsed.
-  const XLSX = await import(/* webpackChunkName: "xlsx" */ 'xlsx');
+  if (file.size > MAX_EXCEL_FILE_BYTES) {
+    throw new Error(`Excel files must be ${MAX_EXCEL_FILE_BYTES / 1024 / 1024} MB or smaller`);
+  }
+  const XLSX = await import(/* webpackChunkName: "xlsx" */ 'xlsx/dist/xlsx.mini.min.js');
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array' });
+  const wb = XLSX.read(buf, { type: 'array', sheetRows: MAX_EXCEL_ROWS + 1 });
   const sheetName = wb.SheetNames[0];
   if (!sheetName) throw new Error('Excel file contains no sheets');
   const sheet = wb.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: false });
+  if (rows.length > MAX_EXCEL_ROWS) {
+    throw new Error(`Excel worksheets must contain ${MAX_EXCEL_ROWS.toLocaleString()} rows or fewer`);
+  }
   return { records: rows, headers: inferHeaders(rows) };
 }
 
@@ -128,6 +169,9 @@ export async function parseXmlFile(file: File): Promise<ParsedDataset> {
 }
 
 export async function parseAnyFile(file: File): Promise<ParsedDataset & { format: SupportedInputFormat }> {
+  if (file.size > MAX_INPUT_FILE_BYTES) {
+    throw new Error(`Files must be ${MAX_INPUT_FILE_BYTES / 1024 / 1024} MB or smaller`);
+  }
   const format = detectFormat(file);
   if (!format) throw new Error(`Unsupported file type: ${file.name}`);
   switch (format) {

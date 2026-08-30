@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-31
+
 ### Added
+- **Credential-free org roles** — Saved Jobs describe active/choose-at-run source and target roles without persisting org identities or authentication data.
+- **Unified Activity trail** — combines imports, scheduled runs, durable export/import checkpoints, result downloads, grouped errors, retry, resume, cancel, and time-limited undo with status/org/object/operation/source filters.
+- **Explicit null and relationship mapping** — each mapped field can ignore or clear blanks, and references can resolve by Salesforce ID, external ID, or related-record field through the REST-safe relationship path.
+- **Complete push outcome files** — Results can download source-preserving success and error CSV files, including created IDs, source row numbers, and grouped Salesforce errors.
+- **Safe onboarding examples** — onboarding can preload bounded export/import examples and only records completion after the user explicitly confirms the task.
+- **Saved Jobs library** — versioned export/import/schedule definitions with search, favourites, duplicate, revision history, legacy-template migration, and a portable format that whitelists configuration while excluding credentials, org IDs, record data, and literal customer defaults.
+- **Snapshot Center** — filter and pin scheduled snapshots, re-download four formats, compare snapshot-to-snapshot or against live org data, and turn reviewed differences into a guided Import.
+- **Bulk API 2.0 Query** — asynchronous large exports with paged results, progress, cancellation, durable Salesforce job checkpoints, and browser-restart recovery.
+- **Reliable long-running jobs** — offscreen Bulk finalization, durable non-sensitive progress checkpoints, resume by Salesforce job ID, actionable interruption states, and downloadable summaries.
+- **Schedule operations** — IANA time zones, next-run previews, bounded run history, reconnect guidance, pinned retention, and snapshot storage forecasts.
 - **REST / Tooling API Explorer** — a new Advanced tool to make ad-hoc authenticated calls against the org: pick a method and path (relative to `/services/data/vXX`, or a `/services/`-rooted absolute path) with an optional JSON body, and view the raw status + response. Quick-example chips for common endpoints; powered by a shared non-throwing `rawCall` primitive so error responses are visible too.
 - **Apex debug-log capture** — the Anonymous Apex runner can now capture the execution's debug log: it ensures a short-lived TraceFlag/DebugLevel for the current user, then fetches the resulting ApexLog body (filtered to this run and polled for async persistence). Best-effort — the Apex still runs and reports status if capture is unavailable.
 - **Anonymous Apex runner** — a new Advanced tool that executes anonymous Apex against the org via the Tooling API (⌘/Ctrl+Enter to run) and reports compile problems, runtime exceptions with stack traces, and line/column, with a note that debug-log capture requires trace flags.
@@ -22,7 +34,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Field labels in the SOQL builder** — the field checklist, WHERE, ORDER BY, and aggregate pickers now show the field label alongside the API name.
 
 ### Changed
-- **Lazy-load Excel support** — the SheetJS library (~875 KiB) now loads on demand only when an Excel file is imported or exported, cutting the main app bundle from ~745 KiB to ~344 KiB for the CSV/JSON/XML majority.
+- **Guided product and UI rework** — simplified task-first navigation, quieter semantic design tokens, local SVG icons, responsive app/panel layouts, a seven-stage Import, named draggable Export tabs with per-tab settings and parameters, and a unified Jobs & Activity hub.
+- **Honest cross-org workflow** — replaced the unvalidated migration-suite navigation with a bounded **Copy between orgs** flow that makes dry-run, typed confirmation, system-field stripping, and unsupported dependency/rollback behavior explicit.
+- **Large-data envelope** — streams CSV input, builds large CSV/JSON/XML downloads from bounded chunks, warns at local limits, auto-selects Bulk where appropriate, and documents a measured 100,000-row test envelope.
+- **Smaller startup bundles** — primary workflow screens load on navigation, keeping the app entrypoint around 189 KiB and reducing the popup entrypoint to about 142 KiB by loading Guided Import after connection. Enforced webpack budgets guard entrypoints and async assets.
+- **Secured XLSX support** — upgraded from the vulnerable npm-registry SheetJS 0.18.5 build to the official 0.20.3 distribution and its XLSX-only mini browser build. Legacy `.xls` input is no longer accepted; `.xlsx` files are capped at 20 MB and 100,000 worksheet rows.
+
+### Fixed
+- **Production write safeguards** — insert, update, upsert, and delete now require an operation/count-specific typed phrase in production; regression coverage prevents ordinary confirmation from bypassing this boundary.
+- **Fast push completion ordering** — very small REST/Bulk jobs yield until the start response is registered, preventing a completion broadcast from racing ahead of the Results screen.
+- **Current-tab org context** — the header now shows the connected Salesforce host and PROD/SBX state even before that org is saved in the switcher.
+- **Schedule relative timestamps** — sub-minute runs render as “just now” instead of “just now ago”.
+- **REST Collections updates** — collection update requests now include the required Salesforce sObject type metadata instead of sending untyped records; a guarded real-org validator and regression test cover the request contract.
+- **Compare orientation and keys** — local baseline comparisons now classify right-only rows as Added and left-only rows as Removed, and automatically choose a valid shared key when `Id` is absent or differently cased.
+- **Onboarding and Help navigation** — tutorial targets use canonical route IDs, legacy leading-slash links resolve correctly, unknown routes show an explicit not-found state, and Org Health opens the actual Org Health screen.
+- **Connected export flow** — the main query workflow exposes CSV, JSON, XLSX, and XML through one selected-column export path; JSON no longer leaks hidden fields or Salesforce `attributes` metadata.
+- **Schedule current query** — **Schedule this** opens a new schedule with the exact editor SOQL and connected org preselected.
+- **Core accessibility semantics** — Help topics are keyboard-operable, navigation exposes the current page, Query controls have accessible names, and the command palette now exposes dialog/combobox/listbox semantics, traps focus, supports Escape, and restores focus.
+- **Production dependency gate** — CI now fails on high-severity production dependency findings.
 
 ## [0.2.0] — 2026-06-08
 
@@ -54,5 +83,6 @@ in and out of Salesforce right from your browser, with nothing leaving your devi
 
 - Initial release.
 
+[0.6.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.6.0
 [0.2.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.1.0

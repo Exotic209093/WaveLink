@@ -79,6 +79,10 @@ Upload from `screenshots/` directory. Requirements:
 - Exactly 1280x800 or 640x400 pixels
 - PNG or JPEG
 
+The current review-ready set is `screenshot-01-home.png` through
+`screenshot-05-activity.png`. Each is a redacted 1280x800 capture of the packaged
+build covering Home, Export, Import review, Compare, and Jobs & Activity.
+
 Resize command (PowerShell):
 ```powershell
 Add-Type -AssemblyName System.Drawing
@@ -98,7 +102,7 @@ $dst.Dispose()
 
 ### Single Purpose Description
 
-> WaveLink helps Salesforce developers and admins migrate data between Salesforce orgs, compare schemas, validate data, and manage multi-object migrations — all from the browser.
+> WaveLink helps Salesforce administrators and developers safely export, import, compare, schedule, and repeat Salesforce data jobs from the browser.
 
 ### Permission Justifications
 
@@ -178,7 +182,11 @@ Covers:
 | `public/icons/icon-48.png` | 48x48 | Extensions page |
 | `public/icons/icon-128.png` | 128x128 | Store listing + install dialog |
 | `public/icons/wavelink-icon.svg` | Vector | Source SVG for regeneration |
-| `screenshots/screenshot-01.png` | 1280x800 | Store listing screenshot |
+| `screenshots/screenshot-01-home.png` | 1280x800 | Connected Home workspace |
+| `screenshots/screenshot-02-export.png` | 1280x800 | SOQL Export results |
+| `screenshots/screenshot-03-import-review.png` | 1280x800 | Production-aware Import review |
+| `screenshots/screenshot-04-compare.png` | 1280x800 | Compare workspace |
+| `screenshots/screenshot-05-activity.png` | 1280x800 | Jobs & Activity history |
 
 To regenerate icons: `node scripts/generate-icons.js`
 
@@ -186,7 +194,7 @@ To regenerate icons: `node scripts/generate-icons.js`
 
 ## Links
 
-- **Source Code**: https://github.com/jc-wave/wave-link
+- **Source Code**: https://github.com/Exotic209093/WaveLink
 - **Privacy Policy**: Bundled in extension (`privacy.html`)
-- **Bug Reports**: https://github.com/jc-wave/wave-link/issues
-- **Homepage**: https://github.com/jc-wave/wave-link
+- **Bug Reports**: https://github.com/Exotic209093/WaveLink/issues
+- **Homepage**: https://github.com/Exotic209093/WaveLink

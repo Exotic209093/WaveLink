@@ -24,14 +24,14 @@ import { SalesforceAuth } from '../services/salesforce/auth';
 import { SalesforceApiClient } from '../services/salesforce/api-client';
 import { BulkApiService } from '../services/salesforce/bulk-api';
 import { queryAllRecords, deriveColumns } from '../services/salesforce/queryAll';
-import { captureViaOffscreen } from './offscreen';
+import { captureViaOffscreen, runBulkPushViaOffscreen } from './offscreen';
 import { buildUpsertSubrequests, parseUpsertCompositeResponse } from '../services/salesforce/composite-upsert';
 import { DEFAULT_API_VERSION, DEFAULT_BATCH_SIZE, BULK_API_THRESHOLD, MAX_COMPOSITE_BATCH_SIZE, SCHEMA_CACHE_TTL, UNDO_TTL_MS } from '../core/constants';
 import { generateId } from '../core/utils';
 import { isSalesforceUrl } from '../core/utils';
 import type { MessageResponse } from '../core/types/messaging';
 import type { SalesforceOrg } from '../core/types/salesforce';
-import type { PushHistoryEntry, PushResult, PushTransaction, ScheduledExport, ExportSnapshot, ScheduleInterval } from '../core/types/storage';
+import type { PushHistoryEntry, PushResult, PushTransaction, ScheduledExport, ExportSnapshot, ScheduleInterval, ActivePush, ScheduleRunHistoryEntry } from '../core/types/storage';
 import type { MigrationProject } from '../core/types/migration';
 
 // ── Service Instances ────────────────────────────────────────────────
@@ -284,6 +284,55 @@ messageBus.on('SF_QUERY_MORE', async (message, sender): Promise<MessageResponse>
       error: { code: 'SF_QUERY_MORE_ERROR', message: error instanceof Error ? error.message : 'QueryMore failed' },
       requestId: message.requestId,
     };
+  }
+});
+
+function bulkServiceFor(org: SalesforceOrg): BulkApiService {
+  return new BulkApiService({
+    instanceUrl: org.instanceUrl,
+    accessToken: org.accessToken,
+    apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
+  });
+}
+
+messageBus.on('SF_BULK_QUERY_START', async (message, sender): Promise<MessageResponse> => {
+  try {
+    const { soql } = message.payload as { soql: string };
+    if (!soql?.trim()) throw new Error('SOQL query is required.');
+    const job = await bulkServiceFor(await resolveSfOrg(message.payload, sender)).createQueryJob(soql);
+    return { success: true, data: job, requestId: message.requestId };
+  } catch (error) {
+    return { success: false, error: { code: 'SF_BULK_QUERY_START_ERROR', message: error instanceof Error ? error.message : 'Bulk query failed to start' }, requestId: message.requestId };
+  }
+});
+
+messageBus.on('SF_BULK_QUERY_STATUS', async (message, sender): Promise<MessageResponse> => {
+  try {
+    const { jobId } = message.payload as { jobId: string };
+    const job = await bulkServiceFor(await resolveSfOrg(message.payload, sender)).getQueryJobStatus(jobId);
+    return { success: true, data: job, requestId: message.requestId };
+  } catch (error) {
+    return { success: false, error: { code: 'SF_BULK_QUERY_STATUS_ERROR', message: error instanceof Error ? error.message : 'Bulk query status failed' }, requestId: message.requestId };
+  }
+});
+
+messageBus.on('SF_BULK_QUERY_RESULTS', async (message, sender): Promise<MessageResponse> => {
+  try {
+    const { jobId, locator, maxRecords } = message.payload as { jobId: string; locator?: string; maxRecords?: number };
+    const page = await bulkServiceFor(await resolveSfOrg(message.payload, sender)).getQueryResults(jobId, locator, maxRecords);
+    return { success: true, data: page, requestId: message.requestId };
+  } catch (error) {
+    return { success: false, error: { code: 'SF_BULK_QUERY_RESULTS_ERROR', message: error instanceof Error ? error.message : 'Bulk query results failed' }, requestId: message.requestId };
+  }
+});
+
+messageBus.on('SF_BULK_QUERY_CANCEL', async (message, sender): Promise<MessageResponse> => {
+  try {
+    const { jobId } = message.payload as { jobId: string };
+    const job = await bulkServiceFor(await resolveSfOrg(message.payload, sender)).abortQueryJob(jobId);
+    return { success: true, data: job, requestId: message.requestId };
+  } catch (error) {
+    return { success: false, error: { code: 'SF_BULK_QUERY_CANCEL_ERROR', message: error instanceof Error ? error.message : 'Bulk query cancellation failed' }, requestId: message.requestId };
   }
 });
 
@@ -1163,19 +1212,6 @@ messageBus.on('DATA_PUSH_START', async (message): Promise<MessageResponse> => {
     const abortController = new AbortController();
     activePushes.set(pushId, { abortController });
 
-    // Persist push state to session storage for resilience across service worker restarts
-    storage.setActivePush({
-      id: pushId,
-      orgId: payload.orgId ?? '',
-      objectName: payload.objectName,
-      operation: payload.operation,
-      totalRecords: payload.records.length,
-      processedRecords: 0,
-      failedRecords: 0,
-      startedAt,
-      status: 'processing',
-    }).catch(() => undefined);
-
     if (!payload.tabId && !payload.orgId) {
       throw new Error('DATA_PUSH_START requires either tabId (full app) or orgId (popup).');
     }
@@ -1188,16 +1224,32 @@ messageBus.on('DATA_PUSH_START', async (message): Promise<MessageResponse> => {
 
     const strategy = useBulk ? 'bulk' : 'rest';
 
+    // Persist a checkpoint shell only after org and strategy resolution succeed.
+    await storage.setActivePush({
+      id: pushId,
+      orgId: org.orgId,
+      tabId: payload.tabId,
+      objectName: payload.objectName,
+      operation: payload.operation,
+      totalRecords: payload.records.length,
+      processedRecords: 0,
+      failedRecords: 0,
+      checkpoint: 0,
+      startedAt,
+      updatedAt: startedAt,
+      status: 'processing',
+      strategy,
+      resumeSupported: strategy === 'bulk',
+    });
+
     if (useBulk) {
       // Bulk API 2.0 path
       executeBulkPush(pushId, org, payload, { startedAt, abortSignal: abortController.signal, strategy })
-        .then(() => storage.updateActivePushStatus(pushId, 'complete').catch(() => undefined))
         .catch(() => storage.updateActivePushStatus(pushId, 'error').catch(() => undefined))
         .finally(() => activePushes.delete(pushId));
     } else {
       // REST API (SObject Collections + Composite) path
       executeRestPush(pushId, org, payload, { startedAt, abortSignal: abortController.signal, strategy })
-        .then(() => storage.updateActivePushStatus(pushId, 'complete').catch(() => undefined))
         .catch(() => storage.updateActivePushStatus(pushId, 'error').catch(() => undefined))
         .finally(() => activePushes.delete(pushId));
     }
@@ -1262,6 +1314,10 @@ async function executeRestPush(
    * - O(N) records processed overall, with O(B) per batch where B is `batchSize`.
    * - Network calls: O(ceil(N / B)).
    */
+  // Let DATA_PUSH_START return its push ID before a very small job can finish
+  // and broadcast completion. Otherwise the UI can miss the terminal event
+  // before it has installed the new push state.
+  await new Promise<void>(resolve => setTimeout(resolve, 0));
   const client = createApiClient(org);
 
   const effectiveBatchSize =
@@ -1281,6 +1337,7 @@ async function executeRestPush(
   const successfulIds: string[] = [];
   let broadcastedError = false;
   let cancelled = false;
+  let checkpointWrite: Promise<void> = Promise.resolve();
 
   const applyBatchResult = (res: {
     processed: number;
@@ -1293,6 +1350,15 @@ async function executeRestPush(
     failedRecords += res.failed;
     if (res.ids.length) successfulIds.push(...res.ids);
     if (res.errors.length) errors.push(...res.errors);
+
+    const processedCheckpoint = processedRecords;
+    const failedCheckpoint = failedRecords;
+    checkpointWrite = checkpointWrite.then(() => storage.updateActivePush(pushId, {
+      processedRecords: processedCheckpoint,
+      failedRecords: failedCheckpoint,
+      checkpoint: processedCheckpoint,
+      status: 'processing',
+    }));
 
     messageBus.broadcast('DATA_PUSH_PROGRESS', {
       pushId,
@@ -1380,7 +1446,7 @@ async function executeRestPush(
           results = await client.collectionCreate(payload.objectName, batch, false, { signal: ctx.abortSignal });
           break;
         case 'update':
-          results = await client.collectionUpdate(batch as Array<{ Id: string }>, false, { signal: ctx.abortSignal });
+          results = await client.collectionUpdate(payload.objectName, batch as Array<{ Id: string }>, false, { signal: ctx.abortSignal });
           break;
         case 'delete':
           results = await client.collectionDelete(batch.map(r => r.Id as string), false, { signal: ctx.abortSignal });
@@ -1463,6 +1529,7 @@ async function executeRestPush(
 
   const poolSize = Math.min(threads, Math.max(1, batchDescs.length));
   await Promise.all(Array.from({ length: poolSize }, () => worker()));
+  await checkpointWrite;
 
   const completedAt = Date.now();
 
@@ -1530,6 +1597,12 @@ async function executeRestPush(
     status: cancelled ? 'cancelled' : 'complete',
     errors: errors.length > 0 ? errors : undefined,
   });
+  await storage.updateActivePush(pushId, {
+    status: cancelled ? 'cancelled' : 'complete',
+    processedRecords,
+    failedRecords,
+    checkpoint: processedRecords,
+  });
 }
 
 async function executeBulkPush(
@@ -1543,6 +1616,8 @@ async function executeBulkPush(
   },
   ctx: { startedAt: number; abortSignal: AbortSignal; strategy: 'rest' | 'bulk' },
 ): Promise<void> {
+  // Preserve the same start-response-before-progress ordering as REST pushes.
+  await new Promise<void>(resolve => setTimeout(resolve, 0));
   /**
    * Execute a push using Bulk API 2.0.
    *
@@ -1565,6 +1640,12 @@ async function executeBulkPush(
       operation: payload.operation,
       externalIdFieldName: payload.externalIdField,
     });
+    await storage.updateActivePush(pushId, {
+      bulkJobId: job.id,
+      strategy: 'bulk',
+      resumeSupported: true,
+      status: 'processing',
+    });
 
     // Best-effort abort if cancelled after job creation.
     if (ctx.abortSignal.aborted) {
@@ -1581,7 +1662,34 @@ async function executeBulkPush(
     await bulkApi.uploadJobData(job.id, csvData);
     await bulkApi.closeJob(job.id);
 
+    // The offscreen document owns polling and final storage writes so the job
+    // survives MV3 service-worker eviction. Fallback preserves older Chrome.
+    try {
+      await runBulkPushViaOffscreen({
+        pushId,
+        jobId: job.id,
+        instanceUrl: org.instanceUrl,
+        accessToken: org.accessToken,
+        apiVersion: org.apiVersion,
+        orgId: org.orgId,
+        objectName: payload.objectName,
+        operation: payload.operation,
+        totalRecords: payload.records.length,
+        startedAt: ctx.startedAt,
+        externalIdField: payload.externalIdField,
+      });
+      return;
+    } catch {
+      // Continue with worker-side polling if offscreen is unavailable.
+    }
+
     const completedJob = await bulkApi.pollJobCompletion(job.id, 5000, 120, (progressJob) => {
+      storage.updateActivePush(pushId, {
+        processedRecords: progressJob.numberRecordsProcessed,
+        failedRecords: progressJob.numberRecordsFailed,
+        checkpoint: progressJob.numberRecordsProcessed,
+        status: 'processing',
+      }).catch(() => undefined);
       messageBus.broadcast('DATA_PUSH_PROGRESS', {
         pushId,
         totalRecords: payload.records.length,
@@ -1637,6 +1745,12 @@ async function executeBulkPush(
       failedRecords: completedJob.numberRecordsFailed,
       status: completedJob.state === 'JobComplete' ? 'complete' : 'error',
     });
+    await storage.updateActivePush(pushId, {
+      status: completedJob.state === 'JobComplete' ? 'complete' : 'error',
+      processedRecords: completedJob.numberRecordsProcessed,
+      failedRecords: completedJob.numberRecordsFailed,
+      checkpoint: completedJob.numberRecordsProcessed,
+    });
   } catch (error) {
     const cancelled = ctx.abortSignal.aborted || isAbortLikeError(error);
     if (cancelled) {
@@ -1674,6 +1788,7 @@ async function executeBulkPush(
         failedRecords: 0,
         status: 'cancelled',
       });
+      await storage.updateActivePush(pushId, { status: 'cancelled', lastError: 'Cancelled' });
       return;
     }
     const msg = error instanceof Error ? error.message : 'Bulk push failed';
@@ -1714,10 +1829,126 @@ async function executeBulkPush(
       failedRecords: payload.records.length,
       status: 'error',
     });
+    await storage.updateActivePush(pushId, { status: 'error', failedRecords: payload.records.length, lastError: msg });
   }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+/** Continue monitoring a server-side Bulk ingest job after MV3 worker eviction. */
+async function resumeBulkPush(active: ActivePush, org: SalesforceOrg, abortSignal: AbortSignal): Promise<void> {
+  if (!active.bulkJobId) throw new Error('This push has no Salesforce Bulk job ID.');
+  const bulkApi = bulkServiceFor(org);
+  const completed = await bulkApi.pollJobCompletion(active.bulkJobId, 5000, 120, progress => {
+    storage.updateActivePush(active.id, {
+      processedRecords: progress.numberRecordsProcessed,
+      failedRecords: progress.numberRecordsFailed,
+      checkpoint: progress.numberRecordsProcessed,
+      status: 'processing',
+      lastError: undefined,
+    }).catch(() => undefined);
+    messageBus.broadcast('DATA_PUSH_PROGRESS', {
+      pushId: active.id,
+      totalRecords: active.totalRecords,
+      processedRecords: progress.numberRecordsProcessed,
+      failedRecords: progress.numberRecordsFailed,
+      status: 'processing',
+    });
+  }, abortSignal);
+  if (completed.state !== 'JobComplete') throw new Error(`Salesforce Bulk job ended in ${completed.state}.`);
+
+  const successfulIds: string[] = [];
+  try {
+    for (const row of await bulkApi.getSuccessfulResults(active.bulkJobId)) {
+      if (row.sf__Id) successfulIds.push(row.sf__Id);
+    }
+  } catch {
+    // Completion remains valid if detailed result rows are unavailable.
+  }
+  const completedAt = Date.now();
+  const existingHistory = await storage.getPushHistory();
+  if (!existingHistory.some(entry => entry.id === active.id)) {
+    await storage.addPushHistory({
+      id: active.id,
+      orgId: org.orgId,
+      objectName: active.objectName,
+      operation: active.operation,
+      strategy: 'bulk',
+      totalRecords: active.totalRecords,
+      successCount: completed.numberRecordsProcessed - completed.numberRecordsFailed,
+      failureCount: completed.numberRecordsFailed,
+      startedAt: active.startedAt,
+      completedAt,
+    });
+  }
+  await storage.setPushResult({
+    pushId: active.id,
+    orgId: org.orgId,
+    objectName: active.objectName,
+    operation: active.operation,
+    ids: successfulIds,
+    capturedAt: completedAt,
+  });
+  if (active.operation === 'insert' && successfulIds.length > 0) {
+    await storage.addPushTransaction({
+      id: generateId(),
+      pushId: active.id,
+      orgId: org.orgId,
+      objectName: active.objectName,
+      operation: 'insert',
+      capturedAt: completedAt,
+      expiresAt: completedAt + UNDO_TTL_MS,
+      rollbackIds: successfulIds,
+      rollbackOperation: 'delete',
+    });
+  }
+  await storage.updateActivePush(active.id, {
+    status: 'complete',
+    processedRecords: completed.numberRecordsProcessed,
+    failedRecords: completed.numberRecordsFailed,
+    checkpoint: completed.numberRecordsProcessed,
+    lastError: undefined,
+  });
+  messageBus.broadcast('DATA_PUSH_COMPLETE', {
+    pushId: active.id,
+    totalRecords: active.totalRecords,
+    processedRecords: completed.numberRecordsProcessed,
+    failedRecords: completed.numberRecordsFailed,
+    status: 'complete',
+  });
+}
+
+messageBus.on('DATA_PUSH_ACTIVE_GET', async (message): Promise<MessageResponse> => ({
+  success: true,
+  data: await storage.getActivePushes(),
+  requestId: message.requestId,
+}));
+
+messageBus.on('DATA_PUSH_RESUME', async (message): Promise<MessageResponse> => {
+  try {
+    const { pushId, tabId } = message.payload as { pushId: string; tabId?: number };
+    const active = await storage.getActivePush(pushId);
+    if (!active) throw new Error('Push checkpoint not found.');
+    if (active.strategy !== 'bulk' || !active.bulkJobId) throw new Error('Only server-side Bulk jobs can resume without the original local file.');
+    if (activePushes.has(pushId)) return { success: true, data: { pushId, resumed: false, alreadyRunning: true }, requestId: message.requestId };
+    const effectiveTabId = tabId ?? active.tabId;
+    const org = effectiveTabId
+      ? await auth.ensureValidToken(await auth.loginForTab(effectiveTabId))
+      : await getValidOrg(active.orgId);
+    const abortController = new AbortController();
+    activePushes.set(pushId, { abortController });
+    await storage.updateActivePush(pushId, { status: 'processing', lastError: undefined, tabId: effectiveTabId });
+    resumeBulkPush(active, org, abortController.signal)
+      .catch(error => {
+        storage.updateActivePush(pushId, { status: 'error', lastError: error instanceof Error ? error.message : 'Resume failed' }).catch(() => undefined);
+        messageBus.broadcast('DATA_PUSH_ERROR', { pushId, error: error instanceof Error ? error.message : 'Resume failed' });
+      })
+      .finally(() => activePushes.delete(pushId));
+    return { success: true, data: { pushId, resumed: true }, requestId: message.requestId };
+  } catch (error) {
+    return { success: false, error: { code: 'DATA_PUSH_RESUME_ERROR', message: error instanceof Error ? error.message : 'Failed to resume push' }, requestId: message.requestId };
+  }
+});
 
 async function getValidOrg(orgId: string): Promise<SalesforceOrg> {
   const org = await storage.getOrg(orgId);
@@ -1834,7 +2065,7 @@ messageBus.on('DATA_PUSH_RETRY_FAILED', async (message): Promise<MessageResponse
     const abortController = new AbortController();
     activePushes.set(retryPushId, { abortController });
 
-    storage.setActivePush({
+    await storage.setActivePush({
       id: retryPushId,
       orgId: result.orgId,
       objectName: result.objectName,
@@ -1844,7 +2075,7 @@ messageBus.on('DATA_PUSH_RETRY_FAILED', async (message): Promise<MessageResponse
       failedRecords: 0,
       startedAt,
       status: 'processing',
-    }).catch(() => undefined);
+    });
 
     let org: SalesforceOrg;
     if (tabId) {
@@ -1854,10 +2085,15 @@ messageBus.on('DATA_PUSH_RETRY_FAILED', async (message): Promise<MessageResponse
     }
 
     const useBulk = records.length >= BULK_API_THRESHOLD;
+    await storage.updateActivePush(retryPushId, {
+      tabId,
+      strategy: useBulk ? 'bulk' : 'rest',
+      resumeSupported: useBulk,
+      updatedAt: Date.now(),
+    });
 
     if (useBulk) {
       executeBulkPush(retryPushId, org, { objectName: result.objectName, records, operation: result.operation }, { startedAt, abortSignal: abortController.signal, strategy: 'bulk' })
-        .then(() => storage.updateActivePushStatus(retryPushId, 'complete').catch(() => undefined))
         .catch(() => storage.updateActivePushStatus(retryPushId, 'error').catch(() => undefined))
         .finally(() => activePushes.delete(retryPushId));
     } else {
@@ -1867,7 +2103,6 @@ messageBus.on('DATA_PUSH_RETRY_FAILED', async (message): Promise<MessageResponse
         operation: result.operation,
         externalIdField: originalEntry?.externalIdField,
       }, { startedAt, abortSignal: abortController.signal, strategy: 'rest' })
-        .then(() => storage.updateActivePushStatus(retryPushId, 'complete').catch(() => undefined))
         .catch(() => storage.updateActivePushStatus(retryPushId, 'error').catch(() => undefined))
         .finally(() => activePushes.delete(retryPushId));
     }
@@ -2005,10 +2240,16 @@ async function setScheduleAlarm(id: string): Promise<void> {
     return;
   }
   const minutes = Math.max(1, intervalToMinutes(s.interval));
+  const nextRunAt = Date.now() + minutes * 60 * 1000;
   await chrome.alarms.create(SCHEDULE_ALARM_PREFIX + id, {
     delayInMinutes: minutes,
     periodInMinutes: minutes,
   });
+  await saveSchedules(schedules.map(schedule => schedule.id === id ? {
+    ...schedule,
+    nextRunAt,
+    timeZone: schedule.timeZone ?? 'UTC',
+  } : schedule));
 }
 
 async function clearScheduleAlarm(id: string): Promise<void> {
@@ -2073,11 +2314,15 @@ async function runSchedule(id: string): Promise<void> {
     columns,
     records,
     error: errorMsg,
+    orgId: s.orgId,
+    objectName: s.soql.match(/\bFROM\s+([A-Za-z_][A-Za-z0-9_.]*)/i)?.[1],
   };
 
   // Prune older snapshots for this schedule beyond retention
   const sameSchedule = Object.values(snapshots).filter(x => x.scheduleId === id).sort((a, b) => b.capturedAt - a.capturedAt);
-  const toKeep = new Set(sameSchedule.slice(0, Math.max(1, s.retention)).map(x => x.id));
+  const pinned = sameSchedule.filter(snapshot => snapshot.pinned);
+  const unpinned = sameSchedule.filter(snapshot => !snapshot.pinned).slice(0, Math.max(1, s.retention));
+  const toKeep = new Set([...pinned, ...unpinned].map(x => x.id));
   for (const [key, snap] of Object.entries(snapshots)) {
     if (snap.scheduleId === id && !toKeep.has(key)) delete snapshots[key];
   }
@@ -2092,6 +2337,24 @@ async function runSchedule(id: string): Promise<void> {
     nextRunAt: nextRun,
   };
   await saveSchedules(schedules);
+
+  const runEntry: ScheduleRunHistoryEntry = {
+    id: `run-${id}-${now}`,
+    scheduleId: id,
+    startedAt: now,
+    completedAt: Date.now(),
+    status,
+    recordCount: records.length,
+    error: errorMsg,
+    nextRunAt: nextRun,
+  };
+  const storedRuns = await new Promise<ScheduleRunHistoryEntry[]>(resolve => {
+    chrome.storage.local.get('scheduleRunHistory', result => resolve((result.scheduleRunHistory as ScheduleRunHistoryEntry[]) ?? []));
+  });
+  const nextRuns = [runEntry, ...storedRuns]
+    .sort((a, b) => b.completedAt - a.completedAt)
+    .slice(0, 200);
+  await new Promise<void>(resolve => chrome.storage.local.set({ scheduleRunHistory: nextRuns }, () => resolve()));
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {

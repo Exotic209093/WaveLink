@@ -82,8 +82,9 @@ export function TemplateEditor(props: TemplateEditorProps): VNode {
 
       <div class="wl-row">
         <div>
-          <label style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">Name *</label>
+          <label htmlFor="template-name" style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">Name *</label>
           <input
+            id="template-name"
             class="wl-input"
             type="text"
             placeholder="Template name"
@@ -93,8 +94,9 @@ export function TemplateEditor(props: TemplateEditorProps): VNode {
         </div>
 
         <div>
-          <label style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">Object Name *</label>
+          <label htmlFor="template-object" style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">Object Name *</label>
           <input
+            id="template-object"
             class="wl-input"
             type="text"
             placeholder="e.g. Account, Contact"
@@ -104,8 +106,9 @@ export function TemplateEditor(props: TemplateEditorProps): VNode {
         </div>
 
         <div>
-          <label style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">Description</label>
+          <label htmlFor="template-description" style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">Description</label>
           <input
+            id="template-description"
             class="wl-input"
             type="text"
             placeholder="Brief description"
@@ -115,8 +118,9 @@ export function TemplateEditor(props: TemplateEditorProps): VNode {
         </div>
 
         <div>
-          <label style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">Category</label>
+          <label htmlFor="template-category" style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">Category</label>
           <input
+            id="template-category"
             class="wl-input"
             type="text"
             placeholder="e.g. testing, demo, migration"
@@ -126,8 +130,9 @@ export function TemplateEditor(props: TemplateEditorProps): VNode {
         </div>
 
         <div>
-          <label style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">Field Mappings (JSON)</label>
+          <label htmlFor="template-mappings" style="display:block;margin-bottom:6px;font-weight:900;font-size:12px">Field Mappings (JSON)</label>
           <textarea
+            id="template-mappings"
             class="wl-textarea"
             style="min-height:160px"
             value={mappingsJson}

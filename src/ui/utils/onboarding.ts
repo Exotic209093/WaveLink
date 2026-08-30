@@ -5,13 +5,18 @@
  * Complexity: O(S) for most operations where S=total onboarding steps.
  */
 
+import { APP_ROUTES } from '../app/routes';
+import type { AppRoute } from '../app/routes';
+
 /** A single onboarding tutorial step. */
 export interface OnboardingStep {
   id: string;
   title: string;
   description: string;
-  targetRoute?: string;
+  targetRoute?: AppRoute;
   category: 'getting-started' | 'data-push' | 'query' | 'advanced';
+  /** Opens a bounded, non-sensitive example in the relevant workflow. */
+  example?: 'export' | 'import';
 }
 
 /** All onboarding steps covering core features of WaveLink. */
@@ -21,7 +26,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     id: 'connect-org',
     title: 'Connect Your First Org',
     description: 'Authenticate with a Salesforce org to start working with your data. Navigate to any Salesforce page and open WaveLink to connect.',
-    targetRoute: '/connect',
+    targetRoute: APP_ROUTES.home,
     category: 'getting-started',
   },
   {
@@ -36,14 +41,15 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     id: 'run-query',
     title: 'Run a SOQL Query',
     description: 'Open the Query tab and write your first SOQL query to fetch records from Salesforce. Use the autocomplete to discover fields.',
-    targetRoute: '/query',
+    targetRoute: APP_ROUTES.export,
     category: 'query',
+    example: 'export',
   },
   {
     id: 'export-results',
     title: 'Export Query Results',
     description: 'After running a query, export the results to CSV or Excel format for offline analysis or further processing.',
-    targetRoute: '/query',
+    targetRoute: APP_ROUTES.export,
     category: 'query',
   },
 
@@ -52,21 +58,22 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     id: 'upload-data',
     title: 'Upload Data from a File',
     description: 'Upload a CSV or Excel file to prepare data for pushing to Salesforce. WaveLink will parse and preview your records.',
-    targetRoute: '/push',
+    targetRoute: APP_ROUTES.import,
     category: 'data-push',
+    example: 'import',
   },
   {
     id: 'push-data',
     title: 'Push Data to Salesforce',
     description: 'Map your uploaded fields to Salesforce fields and push records using insert, update, upsert, or delete operations.',
-    targetRoute: '/push',
+    targetRoute: APP_ROUTES.import,
     category: 'data-push',
   },
   {
     id: 'use-templates',
     title: 'Save and Use Data Templates',
     description: 'Save your field mappings and sample data as reusable templates for repeated data push operations.',
-    targetRoute: '/templates',
+    targetRoute: APP_ROUTES.templates,
     category: 'data-push',
   },
 
@@ -75,35 +82,35 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     id: 'use-cleanser',
     title: 'Cleanse Your Data',
     description: 'Use the data cleanser to trim whitespace, fix casing, remove duplicates, and standardize values before pushing.',
-    targetRoute: '/cleanse',
+    targetRoute: APP_ROUTES.advancedCleanse,
     category: 'advanced',
   },
   {
     id: 'generate-test-data',
     title: 'Generate Test Data',
     description: 'Use the test data generator to create realistic fake records based on your object schema for development and testing.',
-    targetRoute: '/generate',
+    targetRoute: APP_ROUTES.advancedTestData,
     category: 'advanced',
   },
   {
     id: 'schema-comparison',
     title: 'Compare Object Schemas',
     description: 'Compare field metadata between two orgs or two objects to identify differences in structure, types, and configuration.',
-    targetRoute: '/schema-diff',
+    targetRoute: APP_ROUTES.advancedSchemaCompare,
     category: 'advanced',
   },
   {
     id: 'use-pipelines',
     title: 'Build a Data Pipeline',
     description: 'Create multi-step transformation pipelines with filters, lookups, aggregations, and joins to process data before pushing.',
-    targetRoute: '/pipelines',
+    targetRoute: APP_ROUTES.advancedPipeline,
     category: 'advanced',
   },
   {
     id: 'detect-duplicates',
     title: 'Detect Duplicate Records',
     description: 'Run duplicate detection on your dataset using exact, fuzzy, or Soundex matching to find and merge duplicate records.',
-    targetRoute: '/duplicates',
+    targetRoute: APP_ROUTES.advancedDuplicates,
     category: 'advanced',
   },
 ];

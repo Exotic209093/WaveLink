@@ -74,7 +74,16 @@ export function QueryFolderTree(props: QueryFolderTreeProps): VNode {
       <div key={folder.id} class="wl-folderNode" data-active={isActive ? 'true' : undefined}>
         <div
           style="display:flex;align-items:center;gap:4px;padding:4px 6px;cursor:pointer"
+          role="button"
+          tabIndex={0}
           onClick={() => onSelect(folder.id)}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onSelect(folder.id);
+            }
+          }}
         >
           {children.length > 0 ? (
             <button
@@ -151,7 +160,16 @@ export function QueryFolderTree(props: QueryFolderTreeProps): VNode {
         class="wl-folderNode"
         data-active={selectedFolderId === null ? 'true' : undefined}
         style="display:flex;align-items:center;gap:4px;padding:4px 6px;cursor:pointer"
+        role="button"
+        tabIndex={0}
         onClick={() => onSelect(null)}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onSelect(null);
+          }
+        }}
       >
         <span style="display:inline-block;width:18px" />
         <span style="flex:1;font-size:12px;font-weight:700">All Queries</span>

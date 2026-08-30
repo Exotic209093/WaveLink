@@ -62,12 +62,39 @@ export function PushHistoryDetail(props: PushHistoryDetailProps): VNode {
     }
   }
 
+  async function exportSummary(): Promise<void> {
+    setBusy(true);
+    try {
+      await exportRecords([{
+        jobId: entry.id,
+        orgId: entry.orgId,
+        object: entry.objectName,
+        operation: entry.operation,
+        strategy: entry.strategy ?? 'auto',
+        totalRecords: entry.totalRecords,
+        successCount: entry.successCount,
+        failureCount: entry.failureCount,
+        startedAt: new Date(entry.startedAt).toISOString(),
+        completedAt: new Date(entry.completedAt).toISOString(),
+      }], ['jobId', 'orgId', 'object', 'operation', 'strategy', 'totalRecords', 'successCount', 'failureCount', 'startedAt', 'completedAt'], {
+        format: 'json',
+        filename: ensureCorrectExtension(`result-${entry.id}`, 'json'),
+        includeMetadata: true,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <div class="wl-modalOverlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Push Details">
-      <div class="wl-modal wl-card" onClick={(e) => e.stopPropagation()} style="max-width:800px">
+    <div class="wl-modalOverlay" role="dialog" aria-modal="true" aria-label="Push Details">
+      <div class="wl-modal wl-card" style="max-width:800px">
         <div class="wl-cardHeader">
           <h2>Push Details</h2>
-          <button class="wl-btn" onClick={onClose}>Close</button>
+          <div class="wl-actions">
+            <button class="wl-btn" onClick={exportSummary} disabled={busy}>Download result</button>
+            <button class="wl-btn" onClick={onClose}>Close</button>
+          </div>
         </div>
 
         <div class="wl-row">

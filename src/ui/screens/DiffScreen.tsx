@@ -10,11 +10,12 @@ import type { VNode } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { DropZone } from '../components/DropZone';
 import { parseAnyFile } from '../utils/fileParse';
-import { diffRecords } from '../utils/dataDiff';
 import type { RecordDiff } from '../utils/dataDiff';
+import { diffBaselineRecords, selectComparisonKey } from '../utils/localDataDiff';
 import type { ExportSnapshot, ScheduledExport } from '../../core/types/storage';
+import { Icon } from '../components/Icon';
 
-const ACCEPT = ['.csv', '.tsv', '.json', '.xlsx', '.xls', '.xml'];
+const ACCEPT = ['.csv', '.tsv', '.json', '.xlsx', '.xml'];
 
 interface Source {
   origin: 'file' | 'snapshot';
@@ -53,7 +54,7 @@ function PickerCard(props: {
         ) : (
           <>
             <DropZone accept={ACCEPT} onDrop={onFile} className="wl-dropZone--lg">
-              <div class="wl-dropZone__icon">📁</div>
+              <div class="wl-dropZone__icon"><Icon name="folder" size={32} /></div>
               <p class="wl-dropZone__title">Drop a file</p>
               <p class="wl-dropZone__hint">CSV · JSON · Excel · XML</p>
             </DropZone>
@@ -68,7 +69,7 @@ function PickerCard(props: {
                       style="cursor:pointer;width:100%;text-align:left;font-family:inherit;color:inherit"
                       onClick={() => onSnapshot(snap, s.name)}
                     >
-                      <div class="wl-activityItem__icon">📦</div>
+                      <div class="wl-activityItem__icon"><Icon name="database" /></div>
                       <div class="wl-activityItem__body">
                         <div class="wl-activityItem__title">{s.name}</div>
                         <div class="wl-activityItem__sub">
@@ -137,11 +138,15 @@ export function DiffScreen(props: { hideHeader?: boolean } = {}): VNode {
     return left.headers.filter(h => rightSet.has(h));
   }, [left, right]);
 
+  useEffect(() => {
+    setKeyField(current => selectComparisonKey(commonHeaders, current));
+  }, [commonHeaders]);
+
   const result = useMemo(() => {
     if (!left || !right || !keyField) return null;
     if (!commonHeaders.includes(keyField)) return null;
     const compareFields = commonHeaders.filter(f => f !== keyField);
-    return diffRecords(left.records, right.records, keyField, compareFields, 'A', 'B', 'records');
+    return diffBaselineRecords(left.records, right.records, keyField, compareFields);
   }, [left, right, keyField, commonHeaders]);
 
   return (
@@ -188,8 +193,9 @@ export function DiffScreen(props: { hideHeader?: boolean } = {}): VNode {
           </div>
           <div class="wl-cardSection">
             <div class="wl-formRow">
-              <label class="wl-formRow__label wl-formRow__label--required">Match records on</label>
+              <label htmlFor="diff-match-field" class="wl-formRow__label wl-formRow__label--required">Match records on</label>
               <select
+                id="diff-match-field"
                 class="wl-select"
                 value={keyField}
                 onChange={(e) => setKeyField((e.currentTarget as HTMLSelectElement).value)}
@@ -234,8 +240,8 @@ export function DiffScreen(props: { hideHeader?: boolean } = {}): VNode {
             </div>
           </div>
 
-          <DiffSection title="Added records" records={result.added} fields={result.fields} side="right" />
-          <DiffSection title="Removed records" records={result.removed} fields={result.fields} side="left" />
+          <DiffSection title="Added records" records={result.added} fields={result.fields} side="comparison" />
+          <DiffSection title="Removed records" records={result.removed} fields={result.fields} side="baseline" />
           <ChangedSection records={result.changed} keyField={result.matchField} />
         </>
       ) : null}
@@ -243,7 +249,7 @@ export function DiffScreen(props: { hideHeader?: boolean } = {}): VNode {
   );
 }
 
-function DiffSection(props: { title: string; records: RecordDiff[]; fields: string[]; side: 'left' | 'right' }): VNode | null {
+function DiffSection(props: { title: string; records: RecordDiff[]; fields: string[]; side: 'baseline' | 'comparison' }): VNode | null {
   const { title, records, fields, side } = props;
   if (records.length === 0) return null;
   return (
@@ -262,7 +268,7 @@ function DiffSection(props: { title: string; records: RecordDiff[]; fields: stri
           </thead>
           <tbody>
             {records.slice(0, 50).map(r => {
-              const rec = side === 'right' ? r.sourceRecord : r.targetRecord;
+              const rec = side === 'baseline' ? r.sourceRecord : r.targetRecord;
               return (
                 <tr key={r.keyValue}>
                   <td class="wl-mono">{r.keyValue}</td>

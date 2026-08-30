@@ -45,6 +45,7 @@ export function OnboardingWizard(props: {
   sf: SfApi;
   onDismiss: () => void;
   onNavigate: (route: string) => void;
+  onOpenExample?: (example: 'export' | 'import') => void;
 }): VNode {
   const { sf, onDismiss, onNavigate } = props;
 
@@ -97,9 +98,9 @@ export function OnboardingWizard(props: {
     }
   }
 
-  /** Navigate to a step's target route and mark it as complete. */
+  /** Open the relevant workflow. Completion remains an explicit user action. */
   function goToFeature(step: OnboardingStep): void {
-    markComplete(step.id);
+    if (step.example) props.onOpenExample?.(step.example);
     if (step.targetRoute) {
       onNavigate(step.targetRoute);
     }
@@ -215,7 +216,7 @@ export function OnboardingWizard(props: {
                     class="wl-btn wl-btnPrimary"
                     onClick={() => goToFeature(currentStep)}
                   >
-                    Go to Feature
+                    {currentStep.example ? 'Open guided example' : 'Open feature'}
                   </button>
                 ) : null}
                 {!completedSteps.includes(currentStep.id) ? (
@@ -223,7 +224,7 @@ export function OnboardingWizard(props: {
                     class="wl-btn"
                     onClick={() => markComplete(currentStep.id)}
                   >
-                    Mark Complete
+                    I completed this
                   </button>
                 ) : null}
               </div>
@@ -243,10 +244,18 @@ export function OnboardingWizard(props: {
                 return (
                   <div
                     key={step.id}
+                    role="button"
+                    tabIndex={0}
                     style={`display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12px;${
                       active ? 'background:rgba(0,166,200,0.10);' : ''
                     }${done ? 'opacity:0.7;' : ''}`}
                     onClick={() => setCurrentStepIndex(idx)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setCurrentStepIndex(idx);
+                      }
+                    }}
                   >
                     <span style={`width:16px;height:16px;border-radius:50%;border:2px solid ${done ? '#4caf50' : 'var(--wl-line)'};display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0`}>
                       {done ? '\u2713' : ''}

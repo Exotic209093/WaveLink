@@ -375,7 +375,7 @@ WaveLink captures partial success. After a push:
 
 **Expected behaviour in MV3:** Chrome terminates idle service workers after 30 seconds of inactivity. This is normal. The background script re-initialises its state from `chrome.storage.local` on each restart.
 
-**Impact:** In-flight state is lost when the worker restarts. For REST pushes, use **Retry Failed**. For Bulk API pushes, the job continues in Salesforce and WaveLink re-syncs on the next poll.
+**Impact:** WaveLink persists non-sensitive checkpoints locally. REST pushes retain completed-batch counts but require the original source file after interruption; Bulk query and ingest jobs retain their Salesforce job IDs and can be resumed from **Jobs & Activity** after reconnecting.
 
 **If restarting too frequently:** This can indicate a JavaScript error in the background script causing a crash loop. Check the service worker console (see below).
 
@@ -418,4 +418,4 @@ When filing a GitHub issue, please include:
 - The object type and approximate record count (for push issues)
 - Service worker console output if relevant (sanitise any sensitive data before sharing)
 
-[Open an issue →](https://github.com/jc-wave/wave-link/issues)
+[Open an issue →](https://github.com/Exotic209093/WaveLink/issues)

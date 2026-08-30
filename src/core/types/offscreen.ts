@@ -25,3 +25,27 @@ export interface OffscreenCaptureResponse {
   records?: Record<string, unknown>[];
   error?: string;
 }
+
+export interface OffscreenBulkPushPayload {
+  pushId: string;
+  jobId: string;
+  instanceUrl: string;
+  accessToken: string;
+  apiVersion: ApiVersion;
+  orgId: string;
+  objectName: string;
+  operation: 'insert' | 'update' | 'upsert' | 'delete';
+  totalRecords: number;
+  startedAt: number;
+  externalIdField?: string;
+}
+
+export interface OffscreenBulkPushRequest {
+  type: 'OFFSCREEN_BULK_PUSH';
+  payload: OffscreenBulkPushPayload;
+}
+
+export interface OffscreenBulkPushResponse {
+  ok: boolean;
+  error?: string;
+}

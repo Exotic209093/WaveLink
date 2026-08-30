@@ -16,7 +16,9 @@
 import { API_BASE_PATH } from '../../core/constants';
 import { SalesforceApiError, NetworkError } from '../../core/errors';
 import type { ApiVersion, BulkJob, BulkJobState } from '../../core/types/salesforce';
+import type { BulkQueryJob } from '../../core/types/salesforce';
 import { sleep } from '../../core/utils';
+import Papa from 'papaparse';
 
 export interface BulkApiConfig {
   instanceUrl: string;
@@ -37,6 +39,12 @@ export interface BulkJobResult {
   sf__Created: string;
   sf__Error: string;
   [key: string]: string;
+}
+
+export interface BulkQueryResultPage {
+  records: Array<Record<string, unknown>>;
+  locator: string | null;
+  numberOfRecords: number;
 }
 
 /**
@@ -191,6 +199,73 @@ export class BulkApiService {
 
     const csvText = await response.text();
     return this.parseCsv(csvText);
+  }
+
+  /** Create an asynchronous Bulk API 2.0 query job. */
+  async createQueryJob(soql: string): Promise<BulkQueryJob> {
+    const response = await this.fetch(this.buildUrl('/jobs/query'), {
+      method: 'POST',
+      headers: this.jsonHeaders(),
+      body: JSON.stringify({
+        operation: 'query',
+        query: soql.replace(/[\r\n]+/g, ' ').trim(),
+        contentType: 'CSV',
+        columnDelimiter: 'COMMA',
+        lineEnding: 'LF',
+      }),
+    });
+    return this.handleResponse<BulkQueryJob>(response);
+  }
+
+  /** Read the current state and processed-record count for a query job. */
+  async getQueryJobStatus(jobId: string): Promise<BulkQueryJob> {
+    const response = await this.fetch(this.buildUrl(`/jobs/query/${encodeURIComponent(jobId)}`), {
+      headers: this.jsonHeaders(),
+    });
+    return this.handleResponse<BulkQueryJob>(response);
+  }
+
+  /** Retrieve one bounded CSV result page; the locator resumes the next page. */
+  async getQueryResults(jobId: string, locator?: string, maxRecords: number = 10_000): Promise<BulkQueryResultPage> {
+    const params = new URLSearchParams({ maxRecords: String(Math.max(1, Math.min(100_000, maxRecords))) });
+    if (locator) params.set('locator', locator);
+    const response = await this.fetch(`${this.buildUrl(`/jobs/query/${encodeURIComponent(jobId)}/results`)}?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${this.config.accessToken}`,
+        'Accept': 'text/csv',
+      },
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new SalesforceApiError(`Failed to retrieve bulk query results: ${body}`, response.status, undefined, { jobId });
+    }
+    const csvText = await response.text();
+    const parsed = Papa.parse<Record<string, unknown>>(csvText, {
+      header: true,
+      delimiter: ',',
+      skipEmptyLines: true,
+      transformHeader: header => header.trim(),
+    });
+    if (parsed.errors.length > 0) {
+      throw new SalesforceApiError(`Invalid CSV returned by Bulk API: ${parsed.errors[0].message}`, 502, 'INVALID_BULK_CSV', { jobId });
+    }
+    const locatorHeader = response.headers.get('Sforce-Locator');
+    const locatorValue = locatorHeader && locatorHeader.toLowerCase() !== 'null' ? locatorHeader : null;
+    return {
+      records: parsed.data,
+      locator: locatorValue,
+      numberOfRecords: Number(response.headers.get('Sforce-NumberOfRecords') ?? parsed.data.length),
+    };
+  }
+
+  /** Abort a query job that is no longer needed. */
+  async abortQueryJob(jobId: string): Promise<BulkQueryJob> {
+    const response = await this.fetch(this.buildUrl(`/jobs/query/${encodeURIComponent(jobId)}`), {
+      method: 'PATCH',
+      headers: this.jsonHeaders(),
+      body: JSON.stringify({ state: 'Aborted' }),
+    });
+    return this.handleResponse<BulkQueryJob>(response);
   }
 
   /**

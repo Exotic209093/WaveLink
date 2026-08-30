@@ -24,8 +24,9 @@ export function OrgPicker(props: {
   return (
     <div class="wl-orgPicker">
       <div style="flex:1">
-        <label class="wl-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px">Source Org</label>
+        <label htmlFor="compare-source-org" class="wl-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px">Source Org</label>
         <select
+          id="compare-source-org"
           class="wl-select"
           style="width:100%"
           value={sourceOrgId ?? ''}
@@ -41,8 +42,9 @@ export function OrgPicker(props: {
       </div>
       <div style="display:flex;align-items:flex-end;padding-bottom:4px;font-size:18px;color:var(--wl-ink-dim)">{'\u2194'}</div>
       <div style="flex:1">
-        <label class="wl-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px">Target Org</label>
+        <label htmlFor="compare-target-org" class="wl-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px">Target Org</label>
         <select
+          id="compare-target-org"
           class="wl-select"
           style="width:100%"
           value={targetOrgId ?? ''}

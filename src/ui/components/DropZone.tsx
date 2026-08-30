@@ -8,6 +8,7 @@
 
 import { h, VNode, ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
+import { Icon } from './Icon';
 
 export interface DropZoneProps {
   accept: string[]; // File extensions (e.g., ['.csv', '.json'])
@@ -127,7 +128,7 @@ export function DropZone(props: DropZoneProps): VNode {
       {isDragging ? (
         <div class="wl-dropZoneOverlay">
           <div class="wl-dropZoneOverlayText">
-            📁 Drop file here
+            <Icon name="folder" size={20} /> Drop file here
           </div>
         </div>
       ) : null}

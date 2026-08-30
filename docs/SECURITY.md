@@ -225,7 +225,7 @@ All dependencies are open source with permissive licenses.
 |---------|---------|---------|---------|
 | `preact` | ^10.27.0 | MIT | UI framework |
 | `papaparse` | ^5.5.2 | MIT | CSV parsing |
-| `xlsx` | ^0.18.5 | Apache 2.0 | Excel import/export |
+| `xlsx` | 0.20.3 official distribution | Apache 2.0 | Excel import/export |
 | `typescript` | ^5.5.0 | Apache 2.0 | Language (dev only) |
 | `webpack` | ^5.93.0 | MIT | Bundler (dev only) |
 | `jest` | ^29.7.0 | MIT | Testing (dev only) |
@@ -235,7 +235,10 @@ No runtime dependencies call external servers. All dependencies are bundled into
 
 ### SheetJS (xlsx) License Note
 
-SheetJS `xlsx` version 0.18.x is distributed under the Apache 2.0 license. Versions 0.19.x and later changed to a dual commercial/community license. WaveLink pins to 0.18.5 to remain on the Apache 2.0 license. Review SheetJS licensing before upgrading.
+WaveLink pins the official SheetJS `xlsx` 0.20.3 distribution tarball. The
+installed package declares Apache-2.0 and includes its license file. The package
+is loaded only for Excel actions; review both licensing and the published audit
+status before any future upgrade.
 
 ---
 
@@ -243,7 +246,7 @@ SheetJS `xlsx` version 0.18.x is distributed under the Apache 2.0 license. Versi
 
 If you discover a security vulnerability in WaveLink, please report it by:
 
-1. Opening a **private** security advisory on GitHub: [Security Advisories](https://github.com/jc-wave/wave-link/security/advisories)
+1. Opening a **private** security advisory on GitHub: [Security Advisories](https://github.com/Exotic209093/WaveLink/security/advisories)
 2. Or open an issue tagged **security** on the GitHub repository
 
 Please include:

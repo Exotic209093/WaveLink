@@ -55,7 +55,7 @@ export function CompareScreen(props: { sf: SfApi; initialMode?: CompareMode }): 
               data-active={mode === 'orgs'}
               onClick={() => setMode('orgs')}
             >
-              Live orgs
+              Copy between orgs
             </button>
           </div>
         </div>

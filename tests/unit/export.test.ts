@@ -15,10 +15,11 @@ import {
   ensureCorrectExtension,
   type ExportFormat,
 } from '../../src/ui/utils/export';
-import { downloadTextFile } from '../../src/ui/utils/download';
+import { downloadBlobParts, downloadTextFile } from '../../src/ui/utils/download';
 import { recordsToExcel } from '../../src/ui/utils/excel';
 
 const mockDownload = downloadTextFile as jest.Mock;
+const mockChunkedDownload = downloadBlobParts as jest.Mock;
 const mockExcel = recordsToExcel as jest.Mock;
 
 const records = [
@@ -29,6 +30,7 @@ const columns = ['Id', 'Name', 'Industry'];
 
 beforeEach(() => {
   mockDownload.mockClear();
+  mockChunkedDownload.mockClear();
   mockExcel.mockClear();
 });
 
@@ -106,6 +108,20 @@ describe('exportRecords', () => {
     exportRecords(records, columns, { format: 'excel', filename: 'a.xlsx', sheetName: 'Accts' });
     expect(mockExcel).toHaveBeenCalledWith(records, columns, 'a.xlsx', 'Accts');
     expect(mockDownload).not.toHaveBeenCalled();
+  });
+
+  it('generates large JSON exports as bounded blob parts', async () => {
+    const large = Array.from({ length: 5_001 }, (_, index) => ({ Id: String(index), Name: `Name ${index}`, Secret: 'hidden' }));
+    await exportRecords(large, ['Id', 'Name'], { format: 'json', filename: 'large.json' });
+    expect(mockDownload).not.toHaveBeenCalled();
+    expect(mockChunkedDownload).toHaveBeenCalledTimes(1);
+    const [filename, parts, mime] = mockChunkedDownload.mock.calls[0] as [string, string[], string];
+    expect(filename).toBe('large.json');
+    expect(mime).toBe('application/json');
+    const parsed = JSON.parse(parts.join(''));
+    expect(parsed).toHaveLength(5_001);
+    expect(parsed[0]).not.toHaveProperty('Secret');
+    expect(parts.length).toBeGreaterThan(3);
   });
 
   it('throws on an unsupported format', async () => {

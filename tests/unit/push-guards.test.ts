@@ -1,4 +1,4 @@
-import { requiresIdFirst, validateIdFirst } from '../../src/ui/utils/pushGuards';
+import { pushConfirmationPhrase, requiresIdFirst, validateIdFirst } from '../../src/ui/utils/pushGuards';
 
 describe('Push Guards', () => {
   test('requiresIdFirst only for update/delete', () => {
@@ -21,6 +21,14 @@ describe('Push Guards', () => {
   test('validateIdFirst ignores insert/upsert', () => {
     expect(validateIdFirst(['Name'], 'insert')).toBeNull();
     expect(validateIdFirst(['External_Id__c'], 'upsert')).toBeNull();
+  });
+
+  test('requires typed confirmation for every production write and all deletes', () => {
+    expect(pushConfirmationPhrase('insert', 3, 'Account', 'production')).toBe('INSERT 3 Account');
+    expect(pushConfirmationPhrase('update', 2, 'Contact', 'production')).toBe('UPDATE 2 Contact');
+    expect(pushConfirmationPhrase('upsert', 1, 'Lead', 'production')).toBe('UPSERT 1 Lead');
+    expect(pushConfirmationPhrase('delete', 4, 'Account', 'sandbox')).toBe('DELETE 4 RECORDS');
+    expect(pushConfirmationPhrase('insert', 3, 'Account', 'sandbox')).toBeNull();
   });
 });
 

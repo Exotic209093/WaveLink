@@ -21,9 +21,9 @@ import { SfApi } from '../api/sf';
 import type { SfContext } from '../api/sf';
 import { AppShell } from '../components/AppShell';
 import type { NavItem } from '../components/AppShell';
-// DataPushScreen is the popup's default view, so it stays eager. The other
-// three tabs are code-split into their own chunks (loaded on first open).
-import { DataPushScreen } from '../screens/DataPushScreen';
+// The compact shell and connection state stay fast; workflow bodies load only
+// after Salesforce context is available and the corresponding tab is shown.
+const DataPushScreen = lazy(() => import(/* webpackChunkName: "popup-push" */ '../screens/DataPushScreen').then(m => ({ default: m.DataPushScreen })));
 const TemplatesScreen = lazy(() => import(/* webpackChunkName: "popup-templates" */ '../screens/TemplatesScreen').then(m => ({ default: m.TemplatesScreen })));
 const PushHistoryScreen = lazy(() => import(/* webpackChunkName: "popup-history" */ '../screens/PushHistoryScreen').then(m => ({ default: m.PushHistoryScreen })));
 const SettingsScreen = lazy(() => import(/* webpackChunkName: "popup-settings" */ '../screens/SettingsScreen').then(m => ({ default: m.SettingsScreen })));
@@ -45,7 +45,7 @@ export function PopupRoot(): VNode {
   const [dataset, setDataset] = useState<{
     sourceRecords: Record<string, unknown>[];
     filename: string;
-    format: 'csv' | 'json';
+    format: 'csv' | 'json' | 'excel' | 'xml';
     headers: string[];
     bytes?: number;
   } | null>(null);

@@ -157,8 +157,9 @@ export function FieldAnalyticsScreen(props: { sf: SfApi; tabId: number }): VNode
         <div class="wl-row">
           <div class="wl-row2">
             <div style="display:flex;flex-direction:column;gap:6px">
-              <label style="font-weight:900;font-size:12px">Object</label>
+              <label htmlFor="analytics-object" style="font-weight:900;font-size:12px">Object</label>
               <input
+                id="analytics-object"
                 class="wl-input"
                 type="text"
                 value={selectedObject || objectSearch}
@@ -172,7 +173,8 @@ export function FieldAnalyticsScreen(props: { sf: SfApi; tabId: number }): VNode
               {objectSearch && !selectedObject ? (
                 <div style="max-height:200px;overflow:auto;border:1px solid var(--wl-line-2);border-radius:var(--wl-radius-sm)">
                   {filteredObjects.slice(0, 50).map((o) => (
-                    <div
+                    <button
+                      type="button"
                       key={o.name}
                       class="wl-qb-objItem"
                       onClick={() => {
@@ -182,7 +184,7 @@ export function FieldAnalyticsScreen(props: { sf: SfApi; tabId: number }): VNode
                     >
                       <span class="wl-mono" style="font-size:12px">{o.name}</span>
                       <span class="wl-muted">{o.label}</span>
-                    </div>
+                    </button>
                   ))}
                   {filteredObjects.length === 0 ? (
                     <div class="wl-muted" style="padding:8px 12px">No matching objects</div>
@@ -192,8 +194,9 @@ export function FieldAnalyticsScreen(props: { sf: SfApi; tabId: number }): VNode
             </div>
 
             <div style="display:flex;flex-direction:column;gap:6px">
-              <label style="font-weight:900;font-size:12px">Sample Size</label>
+              <label htmlFor="analytics-sample-size" style="font-weight:900;font-size:12px">Sample Size</label>
               <input
+                id="analytics-sample-size"
                 class="wl-input wl-countInput"
                 type="number"
                 min="10"

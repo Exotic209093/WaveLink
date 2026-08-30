@@ -134,8 +134,9 @@ export function ExportImportTemplatesScreen(props: {
           </div>
           <div class="wl-cardSection">
             <div class="wl-formRow">
-              <label class="wl-formRow__label wl-formRow__label--required">Name</label>
+              <label htmlFor="export-template-name" class="wl-formRow__label wl-formRow__label--required">Name</label>
               <input
+                id="export-template-name"
                 class="wl-input"
                 value={editing.name}
                 onInput={(e) => setEditing({ ...editing, name: (e.currentTarget as HTMLInputElement).value })}
@@ -143,8 +144,9 @@ export function ExportImportTemplatesScreen(props: {
               />
             </div>
             <div class="wl-formRow">
-              <label class="wl-formRow__label">Description</label>
+              <label htmlFor="export-template-description" class="wl-formRow__label">Description</label>
               <input
+                id="export-template-description"
                 class="wl-input"
                 value={editing.description}
                 onInput={(e) => setEditing({ ...editing, description: (e.currentTarget as HTMLInputElement).value })}
@@ -152,8 +154,9 @@ export function ExportImportTemplatesScreen(props: {
               />
             </div>
             <div class="wl-formRow">
-              <label class="wl-formRow__label wl-formRow__label--required">SOQL query</label>
+              <label htmlFor="export-template-soql" class="wl-formRow__label wl-formRow__label--required">SOQL query</label>
               <textarea
+                id="export-template-soql"
                 class="wl-textarea"
                 value={editing.soql}
                 onInput={(e) => setEditing({ ...editing, soql: (e.currentTarget as HTMLTextAreaElement).value })}
@@ -161,8 +164,8 @@ export function ExportImportTemplatesScreen(props: {
             </div>
             <div class="wl-twoCol">
               <div class="wl-formRow">
-                <label class="wl-formRow__label">Output format</label>
-                <div class="wl-flowTabs" style="margin-bottom:0">
+                <span id="export-template-format-label" class="wl-formRow__label">Output format</span>
+                <div class="wl-flowTabs" role="group" aria-labelledby="export-template-format-label" style="margin-bottom:0">
                   {(['csv', 'json', 'excel', 'xml'] as SavedExportFormat[]).map(f => (
                     <button
                       key={f}
@@ -176,8 +179,9 @@ export function ExportImportTemplatesScreen(props: {
                 </div>
               </div>
               <div class="wl-formRow">
-                <label class="wl-formRow__label">Filename (no extension)</label>
+                <label htmlFor="export-template-filename" class="wl-formRow__label">Filename (no extension)</label>
                 <input
+                  id="export-template-filename"
                   class="wl-input"
                   value={editing.filenameBase}
                   onInput={(e) => setEditing({ ...editing, filenameBase: (e.currentTarget as HTMLInputElement).value })}

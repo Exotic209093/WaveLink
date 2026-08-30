@@ -58,6 +58,30 @@ describe('DataMapper', () => {
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].field).toBe('required_field');
     });
+
+    it('makes blank-cell ignore versus clear behavior explicit', () => {
+      const ignored = mapper.mapRecords([{ email: '' }], [{
+        sourceField: 'email', targetField: 'Email', required: false, blankBehavior: 'ignore',
+      }]);
+      const cleared = mapper.mapRecords([{ email: '' }], [{
+        sourceField: 'email', targetField: 'Email', required: false, blankBehavior: 'clear',
+      }]);
+      expect(ignored.mappedRecords[0]).toEqual({});
+      expect(cleared.mappedRecords[0]).toEqual({ Email: null });
+    });
+
+    it('resolves reference values by external ID or related-record field notation', () => {
+      const external = mapper.mapRecords([{ accountKey: 'ACME-1' }], [{
+        sourceField: 'accountKey', targetField: 'AccountId', required: false,
+        lookup: { mode: 'externalId', relationshipName: 'Account', matchField: 'External_Key__c' },
+      }]);
+      const related = mapper.mapRecords([{ parentName: 'Head Office' }], [{
+        sourceField: 'parentName', targetField: 'Parent__c', required: false,
+        lookup: { mode: 'relatedField', relationshipName: 'Parent__r', matchField: 'Name' },
+      }]);
+      expect(external.mappedRecords[0]).toEqual({ Account: { External_Key__c: 'ACME-1' } });
+      expect(related.mappedRecords[0]).toEqual({ Parent__r: { Name: 'Head Office' } });
+    });
   });
 
   describe('autoMapFields', () => {

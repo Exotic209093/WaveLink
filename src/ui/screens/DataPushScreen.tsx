@@ -32,19 +32,32 @@ import { computePushProgress } from '../utils/pushMetrics';
 import { DryRunPanel } from '../components/DryRunPanel';
 import { simulatePush } from '../utils/pushDryRun';
 import type { DryRunReport } from '../utils/pushDryRun';
-import { buildRetryDataset } from '../utils/pushRetry';
-import { parseCsvFile, parseJsonFile } from '../utils/fileParse';
+import { buildPushOutcomeDatasets, buildRetryDataset } from '../utils/pushRetry';
+import { parseAnyFile } from '../utils/fileParse';
 import { DataMapper } from '../../data/mappers';
 import type { MappingMatchKind } from '../../data/mappers';
 import { DataValidator } from '../../data/validators';
-import type { FieldMapping, TransformationType, DataTemplate } from '../../core/types/storage';
+import type { FieldMapping, TransformationType, DataTemplate, SavedJob } from '../../core/types/storage';
 import type { SObjectField } from '../../core/types/salesforce';
 import { MessageBus } from '../../services/messaging';
 import { TRANSFORM_OPTIONS } from '../utils/transforms';
-import { validateIdFirst } from '../utils/pushGuards';
+import { pushConfirmationPhrase, validateIdFirst } from '../utils/pushGuards';
 import { clampBatchSize, clampThreads } from '../utils/pushOptions';
+import { Icon } from '../components/Icon';
+import { exportRecords } from '../utils/export';
 
 type Strategy = 'auto' | 'rest' | 'bulk';
+type ImportStage = 'upload' | 'configure' | 'mapping' | 'validate' | 'review' | 'run' | 'results';
+
+const IMPORT_STAGES: Array<{ key: ImportStage; label: string }> = [
+  { key: 'upload', label: 'Upload' },
+  { key: 'configure', label: 'Object & operation' },
+  { key: 'mapping', label: 'Mapping' },
+  { key: 'validate', label: 'Clean & validate' },
+  { key: 'review', label: 'Review' },
+  { key: 'run', label: 'Run' },
+  { key: 'results', label: 'Results' },
+];
 
 /** Small pill describing how a header was auto-matched to a field. */
 function matchBadge(kind: MappingMatchKind): { text: string; cls: string } | null {
@@ -70,18 +83,32 @@ function makeEmptyMappings(headers: string[]): FieldMapping[] {
 }
 
 function estimateTooLarge(fileSizeBytes: number, recordCount: number): string | null {
-  if (recordCount > 25_000) return 'Dataset too large (over 25,000 rows). Please split the file or reduce the number of rows.';
-  if (fileSizeBytes > 10 * 1024 * 1024) return 'Dataset too large (over ~10MB). Please split the file or reduce the number of columns.';
+  if (recordCount > 100_000) return 'Dataset exceeds the measured local limit of 100,000 rows. Split the file into smaller jobs.';
+  if (fileSizeBytes > 50 * 1024 * 1024) return 'Dataset exceeds the measured local limit of 50 MB. Split the file into smaller jobs.';
+  return null;
+}
+
+function relationshipNameFor(field: SObjectField): string {
+  if (field.relationshipName) return field.relationshipName;
+  if (field.name.endsWith('__c')) return field.name.replace(/__c$/, '__r');
+  return field.name.replace(/Id$/, '');
+}
+
+function estimateSizeWarning(fileSizeBytes: number, recordCount: number): string | null {
+  if (recordCount > 25_000 || fileSizeBytes > 10 * 1024 * 1024) {
+    return 'Large local dataset: validation and mapping may use substantial memory. Auto API mode will use Bulk API 2.0 for the write.';
+  }
   return null;
 }
 
 export function DataPushScreen(props: {
   sf: SfApi;
   tabId: number;
+  context?: { orgId?: string; instanceUrl?: string; environment?: 'production' | 'sandbox' };
   dataset: {
     sourceRecords: Record<string, unknown>[];
     filename: string;
-    format: 'csv' | 'json';
+    format: 'csv' | 'json' | 'excel' | 'xml';
     headers: string[];
     bytes?: number;
   } | null;
@@ -90,15 +117,30 @@ export function DataPushScreen(props: {
   onDataset: (d: {
     sourceRecords: Record<string, unknown>[];
     filename: string;
-    format: 'csv' | 'json';
+    format: 'csv' | 'json' | 'excel' | 'xml';
     headers: string[];
     bytes?: number;
   } | null) => void;
   onRequestCleanser: () => void;
+  savedJobDraft?: SavedJob;
+  onSavedJobDraftConsumed?: () => void;
 }): VNode {
   const { sf, tabId } = props;
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<ImportStage>(props.dataset ? 'configure' : 'upload');
+  const [furthestStage, setFurthestStage] = useState<number>(props.dataset ? 1 : 0);
+  const [savedJobPreset] = useState<SavedJob | undefined>(props.savedJobDraft);
+
+  useEffect(() => {
+    if (savedJobPreset) props.onSavedJobDraftConsumed?.();
+  }, []);
+
+  function moveToStage(next: ImportStage): void {
+    const index = IMPORT_STAGES.findIndex(item => item.key === next);
+    setStage(next);
+    setFurthestStage(current => Math.max(current, index));
+  }
 
   const [objectName, setObjectName] = useState<string>('Account');
   const [operation, setOperation] = useState<'insert' | 'update' | 'upsert' | 'delete'>('insert');
@@ -122,6 +164,7 @@ export function DataPushScreen(props: {
   const sourceHeaders = props.cleanedHeaders ?? dataset?.headers ?? (sourceRecords[0] ? Object.keys(sourceRecords[0]) : []);
 
   const [mappings, setMappings] = useState<FieldMapping[]>([]);
+  const hasRelationshipLookups = mappings.some(mapping => mapping.lookup && mapping.lookup.mode !== 'id');
   // How each source header was auto-matched (for the "auto"/"guess" hint badges),
   // plus low-confidence suggestions the user can accept with one click.
   const [matchInfo, setMatchInfo] = useState<Record<string, { kind: MappingMatchKind; confidence: number }>>({});
@@ -140,6 +183,17 @@ export function DataPushScreen(props: {
     mappings: FieldMapping[];
   } | null>(null);
   const busRef = useRef<MessageBus | null>(null);
+
+  useEffect(() => {
+    if (!savedJobPreset || savedJobPreset.definition.kind !== 'import') return;
+    if (savedJobPreset.definition.objectName) setObjectName(savedJobPreset.definition.objectName);
+    const savedOperation = savedJobPreset.definition.operation;
+    if (savedOperation && savedOperation !== 'query') setOperation(savedOperation);
+    setExternalIdField(savedJobPreset.definition.externalIdField ?? '');
+    setStrategy(savedJobPreset.definition.api.strategy);
+    if (savedJobPreset.definition.api.batchSize) setBatchSize(savedJobPreset.definition.api.batchSize);
+    if (savedJobPreset.definition.api.concurrency) setThreads(savedJobPreset.definition.api.concurrency);
+  }, [savedJobPreset]);
 
   useEffect(() => {
     busRef.current = new MessageBus('app');
@@ -231,6 +285,18 @@ export function DataPushScreen(props: {
       setValidationErrors(null);
       return;
     }
+    if (savedJobPreset?.definition.mappings?.length) {
+      const bySource = new Map(savedJobPreset.definition.mappings.map(mapping => [mapping.sourceField, mapping]));
+      setMappings(sourceHeaders.map(header => bySource.get(header) ?? {
+        sourceField: header,
+        targetField: '',
+        transformation: 'none',
+        required: false,
+      }));
+      setMatchInfo({});
+      setSuggestions({});
+      return;
+    }
     const mapper = new DataMapper();
     // Score every header; auto-apply confident matches (>= 0.9) and keep the
     // weaker fuzzy hits as one-click suggestions rather than silently applying them.
@@ -259,7 +325,7 @@ export function DataPushScreen(props: {
       } as FieldMapping;
     });
     setMappings(next.length ? next : makeEmptyMappings(sourceHeaders));
-  }, [dataset?.filename, describeFields, sourceHeaders.join('|')]);
+  }, [dataset?.filename, describeFields, sourceHeaders.join('|'), savedJobPreset]);
 
   // Ensure Id mapping is prefilled for update/delete when the source provides an Id column.
   useEffect(() => {
@@ -296,32 +362,21 @@ export function DataPushScreen(props: {
   async function onFileSelected(file: File): Promise<void> {
     try {
       setBusy(true);
-      const isJson = file.name.toLowerCase().endsWith('.json');
-      const isCsv = file.name.toLowerCase().endsWith('.csv');
-      if (!isJson && !isCsv) {
-        setToast({ title: 'Unsupported File', body: 'Upload a .csv or .json file.' });
-        return;
-      }
-      const parsed = isJson ? await parseJsonFile(file) : await parseCsvFile(file);
+      const parsed = await parseAnyFile(file);
       const tooLarge = estimateTooLarge(file.size, parsed.records.length);
-      if (tooLarge) {
-        setToast({ title: 'Too Large', body: tooLarge });
-        props.onDataset({
-          sourceRecords: parsed.records,
-          headers: parsed.headers,
-          filename: file.name,
-          format: isJson ? 'json' : 'csv',
-          bytes: file.size,
-        });
-        return;
-      }
       props.onDataset({
         sourceRecords: parsed.records,
         headers: parsed.headers,
         filename: file.name,
-        format: isJson ? 'json' : 'csv',
+        format: parsed.format,
         bytes: file.size,
       });
+      if (tooLarge) setToast({ title: 'Local Limit Exceeded', body: tooLarge });
+      else {
+        const warning = estimateSizeWarning(file.size, parsed.records.length);
+        if (warning) setToast({ title: 'Large Dataset', body: warning });
+      }
+      moveToStage('configure');
       setToast({ title: 'Loaded', body: `${parsed.records.length} records from ${file.name}` });
     } catch (e) {
       setToast({ title: 'Load Failed', body: e instanceof Error ? e.message : 'Unknown error' });
@@ -339,6 +394,7 @@ export function DataPushScreen(props: {
     setMappingErrors(res.errors);
     setValidationErrors(null);
     setDryRun(null);
+    moveToStage('validate');
   }
 
   function runDryRun(): void {
@@ -347,6 +403,7 @@ export function DataPushScreen(props: {
       externalIdField: operation === 'upsert' ? externalIdField : null,
     });
     setDryRun(report);
+    moveToStage('review');
     setToast({
       title: report.failed === 0 ? 'Dry Run Passed' : 'Dry Run Found Issues',
       body: `${report.ok} of ${report.total} rows would succeed.`,
@@ -360,6 +417,7 @@ export function DataPushScreen(props: {
     if (res.valid) {
       setValidationErrors([]);
       setToast({ title: 'Validation Passed', body: 'No errors found.' });
+      moveToStage('review');
     } else {
       setValidationErrors(res.errors.map(e => ({ field: e.field, message: e.message, value: e.value })));
       setToast({ title: 'Validation Failed', body: `${res.errors.length} errors.` });
@@ -393,6 +451,23 @@ export function DataPushScreen(props: {
     setSaveTemplateOpen(false);
     try {
       await sf.upsertTemplate({ id: `tmpl_${Date.now()}`, name, objectName, fieldMappings: mappings });
+      const now = Date.now();
+      const savedJob: SavedJob = {
+        schemaVersion: 1,
+        id: `job-import-${now}`,
+        name,
+        favorite: false,
+        definition: {
+          kind: 'import', objectName, operation, inputSource: 'local-file', mappings,
+          orgRoles: { target: 'active-org' },
+          externalIdField: operation === 'upsert' ? externalIdField : undefined,
+          api: { strategy, batchSize, concurrency: threads },
+          safety: { dryRun: true, requireProductionConfirmation: true },
+        },
+        version: 1, revisions: [], createdAt: now, updatedAt: now, usageCount: 0,
+      };
+      const stored = await chrome.storage.local.get('savedJobs');
+      await chrome.storage.local.set({ savedJobs: [...((stored.savedJobs as SavedJob[]) ?? []), savedJob] });
       refreshTemplates();
       setToast({ title: 'Saved', body: `Template "${name}" saved.` });
     } catch (e) {
@@ -495,23 +570,102 @@ export function DataPushScreen(props: {
     }
   }
 
+  async function downloadOutcome(kind: 'success' | 'error'): Promise<void> {
+    if (!push || !lastPushConfig) return;
+    setBusy(true);
+    try {
+      const stored = kind === 'success' ? await sf.getDataPushResult(push.pushId) : null;
+      const datasets = buildPushOutcomeDatasets(lastPushConfig.sourceRecords, pushErrors ?? [], stored?.ids ?? []);
+      const selected = datasets[kind];
+      await exportRecords(selected.records, selected.headers, {
+        format: 'csv',
+        filename: `${objectName}-${push.pushId}-${kind}.csv`,
+      });
+      setToast({ title: 'Downloaded', body: `${selected.records.length.toLocaleString()} ${kind} rows.` });
+    } catch (error) {
+      setToast({ title: 'Download Failed', body: error instanceof Error ? error.message : 'Unable to create result file.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const hasDataset = !!dataset;
   const datasetTooLarge = hasDataset ? estimateTooLarge(datasetBytes, sourceRecords.length) : null;
+  const datasetSizeWarning = hasDataset ? estimateSizeWarning(datasetBytes, sourceRecords.length) : null;
   const idFirstError = hasDataset ? validateIdFirst(sourceHeaders, operation) : null;
+  const confirmationPhrase = pushConfirmationPhrase(
+    operation,
+    mappedRecords?.length ?? 0,
+    objectName,
+    props.context?.environment,
+  );
   const isBlocked = !!datasetTooLarge || !!idFirstError;
   const effectiveBatchSizeUi = operation === 'upsert' ? 25 : batchSize;
+  const predictedBulk = !hasRelationshipLookups && (strategy === 'bulk' || (strategy === 'auto' && sourceRecords.length >= 2_000));
+  const likelyApiUsage = predictedBulk
+    ? '1 Bulk ingest job plus status/result requests'
+    : `About ${Math.max(1, Math.ceil(sourceRecords.length / Math.max(1, operation === 'upsert' ? 25 : clampBatchSize(batchSize)))).toLocaleString()} REST batch requests`;
+
+  useEffect(() => {
+    if (!dataset && stage !== 'upload') {
+      setStage('upload');
+      setFurthestStage(0);
+    }
+  }, [dataset, stage]);
+
+  useEffect(() => {
+    if (push?.status === 'processing') moveToStage('run');
+    if (push?.status === 'complete' || push?.status === 'error' || push?.status === 'cancelled') moveToStage('results');
+  }, [push?.status]);
 
   return (
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="wl-card">
+      <nav class="wl-flowSteps" aria-label="Import progress">
+        {IMPORT_STAGES.map((item, index) => {
+          const activeIndex = IMPORT_STAGES.findIndex(candidate => candidate.key === stage);
+          return (
+            <button
+              type="button"
+              key={item.key}
+              class="wl-flowStep"
+              data-active={stage === item.key}
+              data-done={index < activeIndex}
+              aria-current={stage === item.key ? 'step' : undefined}
+              disabled={index > furthestStage}
+              onClick={() => setStage(item.key)}
+            >
+              <span class="wl-flowStep__num">{index + 1}</span>
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {savedJobPreset ? <div class="wl-bannerInfo">Loaded saved job <strong>{savedJobPreset.name}</strong> v{savedJobPreset.version}. Choose a source file; its object, operation, API, and mappings are prefilled.</div> : null}
+
+      {dataset ? (
+        <div class="wl-jobContext" data-environment={props.context?.environment ?? 'unknown'} role="status">
+          <span><strong>File</strong> {dataset.filename}</span>
+          <span><strong>Org</strong> {props.context?.instanceUrl ? new URL(props.context.instanceUrl).hostname : props.context?.orgId ?? 'Selected Salesforce tab'}</span>
+          <span><strong>Environment</strong> {props.context?.environment === 'sandbox' ? 'Sandbox' : props.context?.environment === 'production' ? 'Production' : 'Not detected'}</span>
+          <span><strong>Object</strong> {objectName}</span>
+          <span><strong>Operation</strong> {operation}</span>
+          <span><strong>Records</strong> {sourceRecords.length.toLocaleString()}</span>
+          <span><strong>API</strong> {strategy === 'auto' ? 'Automatic' : strategy.toUpperCase()}</span>
+        </div>
+      ) : null}
+      {dataset && props.context?.environment === 'production' && ['review', 'run', 'results'].includes(stage) ? (
+        <div class="wl-bannerWarning" role="alert"><strong>Production org.</strong> This job targets live Salesforce data. Verify the org, operation, and record count before continuing.</div>
+      ) : null}
+      <div class="wl-card" hidden={stage !== 'configure'}>
         <div class="wl-cardHeader">
-          <h2>Data Push</h2>
+          <h2>Choose target and operation</h2>
           <div class="wl-actions">
             <label class="wl-btn">
-              Upload CSV/JSON
+              Upload data file
               <input
                 type="file"
-                accept=".csv,.json"
+                accept=".csv,.tsv,.json,.xlsx,.xml"
                 style="display:none"
                 onChange={(e) => {
                   const f = (e.currentTarget as HTMLInputElement).files?.[0];
@@ -519,10 +673,7 @@ export function DataPushScreen(props: {
                 }}
               />
             </label>
-            <button class="wl-btn" onClick={props.onRequestCleanser} disabled={!hasDataset}>Open Cleanser</button>
-            <button class="wl-btn" onClick={openLoadTemplate} disabled={!hasDataset}>Load Template</button>
-            <button class="wl-btn" onClick={() => setSaveTemplateOpen(true)} disabled={!hasDataset || mappings.length === 0}>Save Template</button>
-            <button class="wl-buttonDestructive" onClick={() => props.onDataset(null)} disabled={!hasDataset}>Clear</button>
+            <button class="wl-buttonDestructive" onClick={() => { props.onDataset(null); moveToStage('upload'); }} disabled={!hasDataset}>Clear file</button>
           </div>
         </div>
 
@@ -548,7 +699,7 @@ export function DataPushScreen(props: {
                 })
                 .map(o => ({ value: o.name, label: o.label, sublabel: o.name }))}
             />
-            <select class="wl-select" value={operation} onChange={(e) => setOperation((e.currentTarget as HTMLSelectElement).value as never)}>
+            <select aria-label="Import operation" class="wl-select" value={operation} onChange={(e) => setOperation((e.currentTarget as HTMLSelectElement).value as never)}>
               <option value="insert">insert</option>
               <option value="update">update</option>
               <option value="upsert">upsert</option>
@@ -557,13 +708,13 @@ export function DataPushScreen(props: {
           </div>
 
           <div class="wl-row2">
-            <select class="wl-select" value={strategy} onChange={(e) => setStrategy((e.currentTarget as HTMLSelectElement).value as Strategy)}>
+            <select aria-label="API strategy" class="wl-select" value={strategy} onChange={(e) => setStrategy((e.currentTarget as HTMLSelectElement).value as Strategy)}>
               <option value="auto">Auto</option>
               <option value="rest">REST</option>
               <option value="bulk">Bulk</option>
             </select>
             {operation === 'upsert' ? (
-              <select class="wl-select" value={externalIdField} onChange={(e) => setExternalIdField((e.currentTarget as HTMLSelectElement).value)}>
+              <select aria-label="External ID field" class="wl-select" value={externalIdField} onChange={(e) => setExternalIdField((e.currentTarget as HTMLSelectElement).value)}>
                 <option value="">External ID field...</option>
                 {externalIdFields.map(f => <option key={f.name} value={f.name}>{f.label} ({f.name})</option>)}
               </select>
@@ -575,6 +726,7 @@ export function DataPushScreen(props: {
           <div class="wl-row2">
             <input
               class="wl-input"
+              aria-label="REST batch size"
               type="number"
               min={1}
               max={200}
@@ -589,6 +741,7 @@ export function DataPushScreen(props: {
             />
             <input
               class="wl-input"
+              aria-label="REST concurrency"
               type="number"
               min={1}
               max={4}
@@ -611,28 +764,24 @@ export function DataPushScreen(props: {
           ) : null}
 
           {datasetTooLarge ? (
-            <div class="wl-muted" style="color:var(--wl-danger)">
-              {datasetTooLarge} (You can still cleanse/export, but pushing is blocked at large sizes.)
+            <div class="wl-bannerDanger" role="alert">
+              {datasetTooLarge} You can still cleanse or export the loaded data, but writing is blocked.
             </div>
           ) : null}
+          {!datasetTooLarge && datasetSizeWarning ? <div class="wl-bannerWarning">{datasetSizeWarning}</div> : null}
         </div>
       </div>
 
-      <div class="wl-card">
+      <div class="wl-card" hidden={stage !== 'upload' && stage !== 'mapping'}>
         <div class="wl-cardHeader">
-          <h2>Mapping</h2>
-          <div class="wl-actions">
-            <button class="wl-btn" onClick={applyMapping} disabled={!hasDataset || !describeFields || isBlocked}>Apply Mapping</button>
-            <button class="wl-btn" onClick={validate} disabled={!mappedRecords || !describeFields || isBlocked}>Validate</button>
-            <button class="wl-btn" onClick={runDryRun} disabled={!mappedRecords || !describeFields || isBlocked} title="Simulate this push against the schema without writing to the org">Dry Run</button>
-            <button
-              class="wl-buttonBrand"
-              onClick={() => setConfirmOpen(true)}
-              disabled={!mappedRecords || isBlocked || (validationErrors !== null && validationErrors.length > 0) || busy}
-            >
-              ⬆ Review &amp; Push
-            </button>
-          </div>
+          <h2>{stage === 'upload' ? 'Upload your data file' : 'Map source columns'}</h2>
+          {stage === 'mapping' ? (
+            <div class="wl-actions">
+              <button class="wl-buttonText" onClick={props.onRequestCleanser} disabled={!hasDataset}>Clean data</button>
+              <button class="wl-buttonText" onClick={openLoadTemplate} disabled={!hasDataset}>Load mapping</button>
+              <button class="wl-buttonText" onClick={() => setSaveTemplateOpen(true)} disabled={!hasDataset || mappings.length === 0}>Save mapping</button>
+            </div>
+          ) : null}
         </div>
 
         {hasDataset && objectProfiles.length > 0 ? (
@@ -673,6 +822,8 @@ export function DataPushScreen(props: {
                   <th>Source</th>
                   <th>Target</th>
                   <th>Transform</th>
+                  <th>Blank cells</th>
+                  <th>Reference lookup</th>
                   <th>Req</th>
                 </tr>
               </thead>
@@ -694,7 +845,12 @@ export function DataPushScreen(props: {
                         value={m.targetField}
                         onChange={(v) => {
                           const field = targetableFields.find(f => f.name === v);
-                          setMappings(prev => prev.map((p, i) => i === idx ? { ...p, targetField: v, required: field?.required ?? false } : p));
+                          setMappings(prev => prev.map((p, i) => i === idx ? {
+                            ...p,
+                            targetField: v,
+                            required: field?.required ?? false,
+                            lookup: field?.type === 'reference' ? { mode: 'id' } : undefined,
+                          } : p));
                           // A manual choice overrides the auto-hint for this row.
                           setMatchInfo(prev => { const n = { ...prev }; delete n[m.sourceField]; return n; });
                           setSuggestions(prev => { const n = { ...prev }; delete n[m.sourceField]; return n; });
@@ -712,7 +868,12 @@ export function DataPushScreen(props: {
                           onClick={() => {
                             const s = suggestions[m.sourceField];
                             const field = targetableFields.find(f => f.name === s.target);
-                            setMappings(prev => prev.map((p, i) => i === idx ? { ...p, targetField: s.target, required: field?.required ?? false } : p));
+                            setMappings(prev => prev.map((p, i) => i === idx ? {
+                              ...p,
+                              targetField: s.target,
+                              required: field?.required ?? false,
+                              lookup: field?.type === 'reference' ? { mode: 'id' } : undefined,
+                            } : p));
                             setSuggestions(prev => { const n = { ...prev }; delete n[m.sourceField]; return n; });
                           }}
                         >
@@ -732,6 +893,68 @@ export function DataPushScreen(props: {
                         {TRANSFORM_OPTIONS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
                       </select>
                     </td>
+                    <td>
+                      <select
+                        class="wl-select"
+                        aria-label={`Blank-cell behavior for ${m.sourceField}`}
+                        value={m.blankBehavior ?? 'ignore'}
+                        onChange={(event) => {
+                          const blankBehavior = (event.currentTarget as HTMLSelectElement).value as 'ignore' | 'clear';
+                          setMappings(prev => prev.map((item, i) => i === idx ? { ...item, blankBehavior } : item));
+                        }}
+                      >
+                        <option value="ignore">Ignore blank</option>
+                        <option value="clear">Clear field</option>
+                      </select>
+                    </td>
+                    <td>
+                      {(() => {
+                        const field = targetableFields.find(candidate => candidate.name === m.targetField);
+                        if (field?.type !== 'reference') return <span class="wl-muted">Not a reference</span>;
+                        const mode = m.lookup?.mode ?? 'id';
+                        const relationshipName = m.lookup?.relationshipName ?? relationshipNameFor(field);
+                        return <div style="display:flex;flex-direction:column;gap:4px;min-width:180px">
+                          <select
+                            class="wl-select"
+                            aria-label={`Lookup mode for ${m.sourceField}`}
+                            value={mode}
+                            onChange={(event) => {
+                              const nextMode = (event.currentTarget as HTMLSelectElement).value as NonNullable<FieldMapping['lookup']>['mode'];
+                              setMappings(prev => prev.map((item, i) => i === idx ? {
+                                ...item,
+                                lookup: nextMode === 'id'
+                                  ? { mode: 'id' }
+                                  : { mode: nextMode, relationshipName, matchField: item.lookup?.matchField ?? '' },
+                              } : item));
+                            }}
+                          >
+                            <option value="id">Salesforce ID</option>
+                            <option value="externalId">External ID</option>
+                            <option value="relatedField">Related-record field</option>
+                          </select>
+                          {mode !== 'id' ? <>
+                            <input
+                              class="wl-input"
+                              aria-label={`Relationship API name for ${m.sourceField}`}
+                              value={relationshipName}
+                              placeholder="Account or Parent__r"
+                              onInput={(event) => setMappings(prev => prev.map((item, i) => i === idx ? {
+                                ...item, lookup: { ...item.lookup!, relationshipName: (event.currentTarget as HTMLInputElement).value },
+                              } : item))}
+                            />
+                            <input
+                              class="wl-input"
+                              aria-label={`Related match field for ${m.sourceField}`}
+                              value={m.lookup?.matchField ?? ''}
+                              placeholder={mode === 'externalId' ? 'External_Key__c' : 'Name'}
+                              onInput={(event) => setMappings(prev => prev.map((item, i) => i === idx ? {
+                                ...item, lookup: { ...item.lookup!, relationshipName, matchField: (event.currentTarget as HTMLInputElement).value },
+                              } : item))}
+                            />
+                          </> : null}
+                        </div>;
+                      })()}
+                    </td>
                     <td style="text-align:center">{m.required ? 'Yes' : ''}</td>
                   </tr>
                 ))}
@@ -740,16 +963,85 @@ export function DataPushScreen(props: {
           </div>
         ) : (
           <div class="wl-row">
-            <DropZone accept={['.csv', '.json']} onDrop={onFileSelected}>
+            <DropZone accept={['.csv', '.tsv', '.json', '.xlsx', '.xml']} onDrop={onFileSelected}>
               <div style="text-align:center;padding:20px">
-                <div style="font-size:48px;margin-bottom:12px">📂</div>
-                <div style="font-weight:900;font-size:14px;margin-bottom:6px">Drag & Drop CSV or JSON</div>
+                <div style="margin-bottom:12px;color:var(--wl-brand)"><Icon name="folder" size={40} /></div>
+                <div style="font-weight:900;font-size:14px;margin-bottom:6px">Drag and drop CSV, JSON, Excel, or XML</div>
                 <div class="wl-muted">Or click to browse files</div>
               </div>
             </DropZone>
           </div>
         )}
       </div>
+
+      {stage === 'configure' ? (
+        <div class="wl-stageActions">
+          <button class="wl-buttonText" onClick={() => moveToStage('upload')}>Back</button>
+          <button class="wl-buttonBrand" disabled={!hasDataset || !objectName || isBlocked} onClick={() => moveToStage('mapping')}>
+            Continue to mapping
+          </button>
+        </div>
+      ) : null}
+
+      {stage === 'mapping' ? (
+        <div class="wl-stageActions">
+          <button class="wl-buttonText" onClick={() => moveToStage('configure')}>Back</button>
+          <button class="wl-buttonBrand" disabled={!hasDataset || !describeFields || isBlocked} onClick={applyMapping}>
+            Apply mapping and continue
+          </button>
+        </div>
+      ) : null}
+
+      {stage === 'validate' ? (
+        <div class="wl-card">
+          <div class="wl-cardHeader"><h2>Clean and validate</h2></div>
+          <div class="wl-cardSection">
+            <p class="wl-muted">Check mapped values against the target schema before any Salesforce write begins.</p>
+            <div class="wl-actions" style="margin-top:12px">
+              <button class="wl-buttonNeutral" onClick={props.onRequestCleanser}>Open cleaning tools</button>
+              <button class="wl-buttonNeutral" onClick={runDryRun} disabled={!mappedRecords || !describeFields || isBlocked}>Run dry run</button>
+              <button class="wl-buttonBrand" onClick={validate} disabled={!mappedRecords || !describeFields || isBlocked}>Validate and review</button>
+            </div>
+          </div>
+          <div class="wl-stageActions">
+            <button class="wl-buttonText" onClick={() => moveToStage('mapping')}>Back to mapping</button>
+          </div>
+        </div>
+      ) : null}
+
+      {stage === 'review' ? (
+        <div class="wl-card">
+          <div class="wl-cardHeader"><h2>Review impact</h2></div>
+          <div class="wl-cardSection">
+            {props.context?.environment === 'production' ? (
+              <div class="wl-bannerWarning" style="margin-bottom:12px">
+                Production org: this operation can change live Salesforce data. Confirm the target, operation, and record count below.
+              </div>
+            ) : null}
+            <div class="wl-reviewGrid">
+              <div><span>Target object</span><strong>{objectName}</strong></div>
+              <div><span>Operation</span><strong>{operation.toUpperCase()}</strong></div>
+              <div><span>Records</span><strong>{mappedRecords?.length.toLocaleString() ?? 0}</strong></div>
+              <div><span>API mode</span><strong>{hasRelationshipLookups ? 'REST (relationship-safe)' : strategy === 'auto' ? 'Automatic' : strategy.toUpperCase()}</strong></div>
+              <div><span>Validation</span><strong>{validationErrors === null ? 'Not run' : validationErrors.length === 0 ? 'Passed' : `${validationErrors.length} errors`}</strong></div>
+              <div><span>Dry run</span><strong>{dryRun ? `${dryRun.ok}/${dryRun.total} rows pass` : 'Not run'}</strong></div>
+              <div><span>Blank cells</span><strong>{mappings.some(mapping => mapping.blankBehavior === 'clear') ? 'Per-field ignore / clear' : 'Ignore (no field change)'}</strong></div>
+              <div><span>References</span><strong>{mappings.filter(mapping => mapping.lookup && mapping.lookup.mode !== 'id').length} relationship lookups</strong></div>
+              <div><span>Likely API usage</span><strong>{likelyApiUsage}</strong></div>
+            </div>
+          </div>
+          <div class="wl-stageActions">
+            <button class="wl-buttonText" onClick={() => moveToStage('validate')}>Back to validation</button>
+            <button
+              class="wl-buttonBrand"
+              onClick={() => setConfirmOpen(true)}
+              disabled={!mappedRecords || isBlocked || validationErrors === null || validationErrors.length > 0 || busy}
+            >
+              Review confirmation
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {mappingErrors && mappingErrors.length > 0 ? (
         <div class="wl-card">
@@ -844,6 +1136,8 @@ export function DataPushScreen(props: {
               {push.status === 'complete' ? (
                 <>
                   <button class="wl-btn" disabled={busy} onClick={loadPushIds}>View IDs</button>
+                  <button class="wl-buttonNeutral" disabled={busy} onClick={() => downloadOutcome('success')}>Download success file</button>
+                  {push.failed > 0 ? <button class="wl-buttonNeutral" disabled={busy} onClick={() => downloadOutcome('error')}>Download error file</button> : null}
                   <button class="wl-buttonBrand" disabled={busy} onClick={prepareDeletePushFromIds}>Prepare Delete Push</button>
                   {push.failed > 0 && pushErrors && pushErrors.length > 0 ? (
                     <button class="wl-buttonBrand" disabled={busy} onClick={() => setRetryModalOpen(true)}>Retry Failed Rows</button>
@@ -873,11 +1167,11 @@ export function DataPushScreen(props: {
         </div>
       ) : null}
 
-      {operation === 'delete' ? (
+      {confirmationPhrase ? (
         <TypedConfirmModal
           open={confirmOpen}
-          title="Confirm Delete Operation"
-          confirmationPhrase={`DELETE ${mappedRecords ? mappedRecords.length : 0} RECORDS`}
+          title={operation === 'delete' ? 'Confirm Delete Operation' : 'Confirm Production Data Push'}
+          confirmationPhrase={confirmationPhrase}
           busy={busy}
           onCancel={() => setConfirmOpen(false)}
           onConfirm={async () => {
@@ -890,17 +1184,21 @@ export function DataPushScreen(props: {
               setToast({ title: 'Blocked', body: idFirstError });
               return;
             }
+            if (operation === 'upsert' && !externalIdField) {
+              setToast({ title: 'Blocked', body: 'Select an external ID field for upsert.' });
+              return;
+            }
 
             setBusy(true);
             try {
-              const useBulkApi = strategy === 'auto' ? undefined : strategy === 'bulk';
+              const useBulkApi = hasRelationshipLookups ? false : strategy === 'auto' ? undefined : strategy === 'bulk';
               const res = await sf.startDataPush({
                 tabId,
                 objectName,
                 operation,
                 records: mappedRecords,
-                externalIdField: undefined,
-                batchSize: clampBatchSize(batchSize),
+                externalIdField: operation === 'upsert' ? (externalIdField || undefined) : undefined,
+                batchSize: operation === 'upsert' ? undefined : clampBatchSize(batchSize),
                 threads: clampThreads(threads),
                 useBulkApi,
               });
@@ -921,12 +1219,18 @@ export function DataPushScreen(props: {
             }
           }}
         >
-          <div style="font-size:14px;margin-bottom:16px">
-            <div style="font-weight:900;margin-bottom:8px;color:var(--wl-danger)">⚠️ Warning: Permanent Deletion</div>
-            <div class="wl-muted">
-              You are about to <strong>permanently delete {mappedRecords ? mappedRecords.length : 0} records</strong> from <strong>{objectName}</strong> in Salesforce. This action cannot be undone.
+          {operation === 'delete' ? (
+            <div style="font-size:14px;margin-bottom:16px">
+              <div style="font-weight:900;margin-bottom:8px;color:var(--wl-danger)">Warning: Permanent deletion</div>
+              <div class="wl-muted">
+                You are about to <strong>permanently delete {mappedRecords ? mappedRecords.length : 0} records</strong> from <strong>{objectName}</strong> in Salesforce. This action cannot be undone.
+              </div>
             </div>
-          </div>
+          ) : (
+            <div class="wl-bannerWarning" style="margin-bottom:16px">
+              Production guard: verify the target, operation, and record count, then type the exact phrase below before WaveLink can write.
+            </div>
+          )}
           <div class="wl-chipRow">
             <span class="wl-chip"><span style="font-weight:900">Object:</span> {objectName}</span>
             <span class="wl-chip"><span style="font-weight:900">Op:</span> {operation}</span>
@@ -935,7 +1239,12 @@ export function DataPushScreen(props: {
             <span class="wl-chip"><span style="font-weight:900">Batch:</span> {clampBatchSize(batchSize)}</span>
             <span class="wl-chip"><span style="font-weight:900">Threads:</span> {clampThreads(threads)}</span>
           </div>
-          <div class="wl-muted" style="margin-top:8px">Delete safety: the first dataset column header must be "Id".</div>
+          {operation === 'delete' ? (
+            <div class="wl-muted" style="margin-top:8px">Delete safety: the first dataset column header must be "Id".</div>
+          ) : null}
+          {operation === 'upsert' ? (
+            <div class="wl-muted">Upsert requires an External ID field; upsert requests are sent in batches of 25.</div>
+          ) : null}
         </TypedConfirmModal>
       ) : (
         <ConfirmModal
@@ -968,7 +1277,7 @@ export function DataPushScreen(props: {
 
             setBusy(true);
             try {
-              const useBulkApi = strategy === 'auto' ? undefined : strategy === 'bulk';
+              const useBulkApi = hasRelationshipLookups ? false : strategy === 'auto' ? undefined : strategy === 'bulk';
               const res = await sf.startDataPush({
                 tabId,
                 objectName,
@@ -1010,6 +1319,9 @@ export function DataPushScreen(props: {
           {operation === 'upsert' ? (
             <div class="wl-muted">Upsert requires an External ID field; upsert requests are sent in batches of 25 (Composite API limit).</div>
           ) : null}
+          {hasRelationshipLookups ? (
+            <div class="wl-muted">Relationship lookups use REST so nested relationship values are preserved; a Bulk selection is overridden for this run.</div>
+          ) : null}
           {operation === 'update' ? (
             <div class="wl-muted">Update safety: the first dataset column header must be "Id".</div>
           ) : null}
@@ -1045,8 +1357,9 @@ export function DataPushScreen(props: {
         onCancel={() => setLoadTemplate(null)}
         onConfirm={confirmLoadTemplate}
       >
-        <label style="font-weight:900;font-size:12px">Template</label>
+        <label htmlFor="load-push-template" style="font-weight:900;font-size:12px">Template</label>
         <select
+          id="load-push-template"
           class="wl-select"
           value={loadTemplate?.selected ?? ''}
           onChange={(e) => {

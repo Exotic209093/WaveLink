@@ -10,6 +10,7 @@ import type { VNode } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { PushHistoryEntry, ScheduledExport, ExportSnapshot } from '../../core/types/storage';
+import { Icon } from '../components/Icon';
 
 interface HomeScreenProps {
   sf: SfApi;
@@ -104,30 +105,30 @@ export function HomeScreen(props: HomeScreenProps): VNode {
 
       <div class="wl-hubGrid" style="margin-bottom:24px">
         <button class="wl-hubCard" onClick={() => onNavigate('export')}>
-          <div class="wl-hubCard__icon">↗</div>
+          <div class="wl-hubCard__icon"><Icon name="export" /></div>
           <h2 class="wl-hubCard__title">Export</h2>
           <p class="wl-hubCard__desc">
             Pull records out of Salesforce via SOQL. Download as CSV, JSON, Excel, or XML — or pipe directly to another org.
           </p>
-          <span class="wl-hubCard__cta">Start an export →</span>
+          <span class="wl-hubCard__cta">Start an export</span>
         </button>
 
         <button class="wl-hubCard" onClick={() => onNavigate('import')}>
-          <div class="wl-hubCard__icon">↙</div>
+          <div class="wl-hubCard__icon"><Icon name="import" /></div>
           <h2 class="wl-hubCard__title">Import</h2>
           <p class="wl-hubCard__desc">
             Drop a CSV, Excel, or JSON file in. Auto-map fields, validate, and upsert into your org with one-click undo.
           </p>
-          <span class="wl-hubCard__cta">Start an import →</span>
+          <span class="wl-hubCard__cta">Start an import</span>
         </button>
 
         <button class="wl-hubCard" onClick={() => onNavigate('convert')}>
-          <div class="wl-hubCard__icon">⇄</div>
+          <div class="wl-hubCard__icon"><Icon name="convert" /></div>
           <h2 class="wl-hubCard__title">Convert</h2>
           <p class="wl-hubCard__desc">
             Pure offline format conversion — CSV ↔ JSON ↔ Excel ↔ XML. No Salesforce connection required.
           </p>
-          <span class="wl-hubCard__cta">Open converter →</span>
+          <span class="wl-hubCard__cta">Open converter</span>
         </button>
       </div>
 
@@ -136,13 +137,13 @@ export function HomeScreen(props: HomeScreenProps): VNode {
           <div class="wl-cardHeader">
             <h2>Recent activity</h2>
             <div class="wl-actions">
-              <button class="wl-buttonText" onClick={() => onNavigate('advanced/history')}>View all →</button>
+              <button class="wl-buttonText" onClick={() => onNavigate('jobs')}>View all activity</button>
             </div>
           </div>
           <div class="wl-cardSection">
             {activity.length === 0 ? (
               <div class="wl-emptyState">
-                <div class="wl-emptyState__icon">🌊</div>
+                <div class="wl-emptyState__icon"><Icon name="activity" size={28} /></div>
                 <p class="wl-emptyState__title">No activity yet</p>
                 <p class="wl-emptyState__desc">
                   Run your first export or import — recent runs and scheduled snapshots will appear here.
@@ -152,9 +153,7 @@ export function HomeScreen(props: HomeScreenProps): VNode {
               <div class="wl-activityList">
                 {activity.map(a => (
                   <div class="wl-activityItem" key={a.id}>
-                    <div class="wl-activityItem__icon">
-                      {a.kind === 'push' ? '↙' : a.kind === 'schedule' ? '⏱' : '📦'}
-                    </div>
+                    <div class="wl-activityItem__icon"><Icon name={a.kind === 'push' ? 'import' : a.kind === 'schedule' ? 'calendar' : 'database'} size={16} /></div>
                     <div class="wl-activityItem__body">
                       <div class="wl-activityItem__title">{a.title}</div>
                       <div class="wl-activityItem__sub">{a.sub}</div>
@@ -171,7 +170,7 @@ export function HomeScreen(props: HomeScreenProps): VNode {
           <div class="wl-cardHeader">
             <h2>Schedules & snapshots</h2>
             <div class="wl-actions">
-              <button class="wl-buttonText" onClick={() => onNavigate('schedules')}>Manage →</button>
+              <button class="wl-buttonText" onClick={() => onNavigate('schedules')}>Manage schedules</button>
             </div>
           </div>
           <div class="wl-cardSection">
@@ -191,7 +190,7 @@ export function HomeScreen(props: HomeScreenProps): VNode {
               <p class="wl-cardSection__title">Next runs</p>
               {enabledSchedules.slice(0, 3).map(s => (
                 <div class="wl-activityItem" key={s.id} style="margin-bottom:6px">
-                  <div class="wl-activityItem__icon">⏱</div>
+                  <div class="wl-activityItem__icon"><Icon name="calendar" size={16} /></div>
                   <div class="wl-activityItem__body">
                     <div class="wl-activityItem__title">{s.name}</div>
                     <div class="wl-activityItem__sub">
@@ -215,20 +214,6 @@ export function HomeScreen(props: HomeScreenProps): VNode {
         </div>
       </div>
 
-      <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">
-        <button class="wl-buttonNeutral" onClick={() => onNavigate('templates')}>
-          📁 Templates
-        </button>
-        <button class="wl-buttonNeutral" onClick={() => onNavigate('diff')}>
-          🔍 Diff exports
-        </button>
-        <button class="wl-buttonNeutral" onClick={() => onNavigate('schedules')}>
-          ⏱ Schedules
-        </button>
-        <button class="wl-buttonNeutral" onClick={() => onNavigate('advanced/index')}>
-          🧪 Advanced Lab
-        </button>
-      </div>
     </div>
   );
 }

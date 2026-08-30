@@ -8,6 +8,7 @@
 import {
   detectFormat,
   inferHeaders,
+  MAX_INPUT_FILE_BYTES,
   parseJsonFile,
   parseCsvFile,
   parseXmlFile,
@@ -31,7 +32,7 @@ describe('detectFormat', () => {
     expect(detectFormat(file('a.tsv', ''))).toBe('csv');
     expect(detectFormat(file('a.JSON', ''))).toBe('json');
     expect(detectFormat(file('a.xlsx', ''))).toBe('excel');
-    expect(detectFormat(file('a.xls', ''))).toBe('excel');
+    expect(detectFormat(file('a.xls', ''))).toBeNull();
     expect(detectFormat(file('a.xml', ''))).toBe('xml');
   });
 
@@ -109,5 +110,11 @@ describe('parseAnyFile', () => {
 
   it('throws on an unsupported file type', async () => {
     await expect(parseAnyFile(file('a.txt', 'nope'))).rejects.toThrow(/Unsupported file type/);
+  });
+
+  it('rejects oversized input before parsing it', async () => {
+    const oversized = file('large.csv', 'Id\n1');
+    Object.defineProperty(oversized, 'size', { value: MAX_INPUT_FILE_BYTES + 1 });
+    await expect(parseAnyFile(oversized)).rejects.toThrow(/50 MB or smaller/);
   });
 });

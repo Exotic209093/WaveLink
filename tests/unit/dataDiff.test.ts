@@ -4,6 +4,7 @@
  */
 
 import { diffRecords, diffToCsv } from '../../src/ui/utils/dataDiff';
+import { diffBaselineRecords, selectComparisonKey } from '../../src/ui/utils/localDataDiff';
 
 const source = [
   { Id: 'a', Name: 'Acme', Phone: '111' },
@@ -72,5 +73,35 @@ describe('diffToCsv', () => {
     expect(lines[1]).toContain('"x","added"');
     expect(lines[1]).toContain('has ""quote"""'); // doubled quotes
     expect(lines).toHaveLength(2);
+  });
+});
+
+describe('local baseline comparison', () => {
+  it('classifies right-only records as added and left-only records as removed', () => {
+    const baseline = [
+      { Id: '1', Name: 'Acme', Count: 10 },
+      { Id: '2', Name: 'Beta', Count: 20 },
+    ];
+    const comparison = [
+      { Id: '1', Name: 'Acme', Count: 11 },
+      { Id: '3', Name: 'Gamma', Count: 30 },
+    ];
+
+    const diff = diffBaselineRecords(baseline, comparison, 'Id', ['Name', 'Count']);
+
+    expect(diff.added.map(record => record.keyValue)).toEqual(['3']);
+    expect(diff.added[0].targetRecord).toEqual(comparison[1]);
+    expect(diff.removed.map(record => record.keyValue)).toEqual(['2']);
+    expect(diff.removed[0].sourceRecord).toEqual(baseline[1]);
+    expect(diff.changed[0].fieldDiffs.Count).toEqual({ source: 10, target: 11 });
+    expect(diff.summary).toEqual({ total: 3, added: 1, removed: 1, changed: 1 });
+  });
+
+  it('selects and revalidates a usable shared key', () => {
+    expect(selectComparisonKey(['id', 'name'], 'Id')).toBe('id');
+    expect(selectComparisonKey(['ExternalKey', 'Name'], 'Id')).toBe('ExternalKey');
+    expect(selectComparisonKey(['Id', 'Name'], 'Name')).toBe('Name');
+    expect(selectComparisonKey(['ExternalKey', 'Name'], 'Name')).toBe('Name');
+    expect(selectComparisonKey([], 'Id')).toBe('');
   });
 });

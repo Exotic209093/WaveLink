@@ -154,3 +154,15 @@ export type BulkJobState =
   | 'Aborted'
   | 'JobComplete'
   | 'Failed';
+
+/** Bulk API 2.0 asynchronous query job. */
+export interface BulkQueryJob {
+  id: string;
+  operation: 'query' | 'queryAll';
+  state: 'UploadComplete' | 'InProgress' | 'Aborted' | 'JobComplete' | 'Failed';
+  numberRecordsProcessed: number;
+  retries?: number;
+  totalProcessingTime?: number;
+  errorMessage?: string;
+  createdDate: string;
+}

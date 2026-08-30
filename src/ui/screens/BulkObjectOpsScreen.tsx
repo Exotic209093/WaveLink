@@ -213,7 +213,7 @@ export function BulkObjectOpsScreen(props: { sf: SfApi; tabId: number }): VNode 
         <div class="wl-row">
           <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
             <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:12px;font-weight:700">Object</label>
+              <span style="font-size:12px;font-weight:700">Object</span>
               <SearchableSelect
                 ariaLabel="Object for bulk operation"
                 placeholder={loadingObjects ? 'Loading objects...' : objects.length === 0 ? 'No objects found' : 'Select object...'}

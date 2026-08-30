@@ -11,12 +11,12 @@
 
 import type { VNode } from 'preact';
 import { h } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { lazy, Suspense } from 'preact/compat';
 import { SfApi } from '../api/sf';
 import type { SfContext } from '../api/sf';
 import { AppShell } from '../components/AppShell';
-import type { NavItem, NavGroup } from '../components/AppShell';
+import type { NavItem } from '../components/AppShell';
 import { Toast } from '../components/Toast';
 import { parseTabIdFromSearch } from '../../core/utils';
 import type { Theme } from '../utils/theme';
@@ -25,23 +25,16 @@ import { CommandPalette } from '../components/CommandPalette';
 import { UndoHistoryPanel } from '../components/UndoHistoryPanel';
 import { shortcutRegistry } from '../utils/shortcuts';
 import { OnboardingWizard } from '../components/OnboardingWizard';
+import { resolveAppRoute } from './routes';
+import type { ScheduleDraft } from '../utils/scheduleDraft';
+import type { SavedJob } from '../../core/types/storage';
+import { Icon } from '../components/Icon';
 
 // ── Primary flows (new in v0.2) ───────────────────────────────────────
 import { HomeScreen } from '../screens/HomeScreen';
-import { ExportScreen } from '../screens/ExportScreen';
-import { ImportScreen } from '../screens/ImportScreen';
-import { ConvertScreen } from '../screens/ConvertScreen';
-import { ExportImportTemplatesScreen } from '../screens/ExportImportTemplatesScreen';
-import { SchedulesScreen } from '../screens/SchedulesScreen';
-import { CompareScreen } from '../screens/CompareScreen';
-import { AdvancedLabScreen } from '../screens/AdvancedLabScreen';
 
 // ── Eager screens reachable from primary flows ────────────────────────
-// QueryScreen and DataPushScreen are already pulled into the main chunk by
-// ExportScreen / ImportScreen, so importing them statically here is free.
-// SettingsScreen is small and frequently opened, so it stays eager too.
-import { QueryScreen } from '../screens/QueryScreen';
-import { DataPushScreen } from '../screens/DataPushScreen';
+// SettingsScreen is small and frequently opened, so it stays eager.
 import { SettingsScreen } from '../screens/SettingsScreen';
 
 // ── Lazily-loaded Advanced + Migration screens ────────────────────────
@@ -49,6 +42,17 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 // main app chunk keeps the initial load small; each loads on first navigation.
 // Named exports are mapped to the { default } shape lazy() expects, and the
 // webpackChunkName comments give the emitted chunks readable filenames.
+const ExportScreen = lazy(() => import(/* webpackChunkName: "workflow-export" */ '../screens/ExportScreen').then(m => ({ default: m.ExportScreen })));
+const ImportScreen = lazy(() => import(/* webpackChunkName: "workflow-import" */ '../screens/ImportScreen').then(m => ({ default: m.ImportScreen })));
+const ConvertScreen = lazy(() => import(/* webpackChunkName: "workflow-convert" */ '../screens/ConvertScreen').then(m => ({ default: m.ConvertScreen })));
+const SavedJobsScreen = lazy(() => import(/* webpackChunkName: "workflow-templates" */ '../screens/SavedJobsScreen').then(m => ({ default: m.SavedJobsScreen })));
+const SchedulesScreen = lazy(() => import(/* webpackChunkName: "workflow-schedules" */ '../screens/SchedulesScreen').then(m => ({ default: m.SchedulesScreen })));
+const SnapshotCenterScreen = lazy(() => import(/* webpackChunkName: "workflow-snapshots" */ '../screens/SnapshotCenterScreen').then(m => ({ default: m.SnapshotCenterScreen })));
+const CompareScreen = lazy(() => import(/* webpackChunkName: "workflow-compare" */ '../screens/CompareScreen').then(m => ({ default: m.CompareScreen })));
+const JobsActivityScreen = lazy(() => import(/* webpackChunkName: "jobs-activity" */ '../screens/JobsActivityScreen').then(m => ({ default: m.JobsActivityScreen })));
+const AdvancedLabScreen = lazy(() => import(/* webpackChunkName: "advanced-index" */ '../screens/AdvancedLabScreen').then(m => ({ default: m.AdvancedLabScreen })));
+const QueryScreen = lazy(() => import(/* webpackChunkName: "adv-query" */ '../screens/QueryScreen').then(m => ({ default: m.QueryScreen })));
+const DataPushScreen = lazy(() => import(/* webpackChunkName: "adv-push" */ '../screens/DataPushScreen').then(m => ({ default: m.DataPushScreen })));
 const ObjectsScreen = lazy(() => import(/* webpackChunkName: "adv-objects" */ '../screens/ObjectsScreen').then(m => ({ default: m.ObjectsScreen })));
 const RecordInspectorScreen = lazy(() => import(/* webpackChunkName: "adv-inspector" */ '../screens/RecordInspectorScreen').then(m => ({ default: m.RecordInspectorScreen })));
 const ApexRunnerScreen = lazy(() => import(/* webpackChunkName: "adv-apex" */ '../screens/ApexRunnerScreen').then(m => ({ default: m.ApexRunnerScreen })));
@@ -62,20 +66,31 @@ const DuplicateDetectionScreen = lazy(() => import(/* webpackChunkName: "adv-dup
 const PipelineBuilderScreen = lazy(() => import(/* webpackChunkName: "adv-pipeline" */ '../screens/PipelineBuilderScreen').then(m => ({ default: m.PipelineBuilderScreen })));
 const CloneWizardScreen = lazy(() => import(/* webpackChunkName: "adv-clone" */ '../screens/CloneWizardScreen').then(m => ({ default: m.CloneWizardScreen })));
 const DataQualityScorecardScreen = lazy(() => import(/* webpackChunkName: "adv-quality" */ '../screens/DataQualityScorecardScreen').then(m => ({ default: m.DataQualityScorecardScreen })));
+const OrgHealthScreen = lazy(() => import(/* webpackChunkName: "adv-org-health" */ '../screens/OrgHealthScreen').then(m => ({ default: m.OrgHealthScreen })));
 const ApiUsageDashboardScreen = lazy(() => import(/* webpackChunkName: "adv-api-usage" */ '../screens/ApiUsageDashboardScreen').then(m => ({ default: m.ApiUsageDashboardScreen })));
 const BulkObjectOpsScreen = lazy(() => import(/* webpackChunkName: "adv-bulk-ops" */ '../screens/BulkObjectOpsScreen').then(m => ({ default: m.BulkObjectOpsScreen })));
 const RelationshipExplorerScreen = lazy(() => import(/* webpackChunkName: "adv-relationships" */ '../screens/RelationshipExplorerScreen').then(m => ({ default: m.RelationshipExplorerScreen })));
 const HelpScreen = lazy(() => import(/* webpackChunkName: "help" */ '../screens/HelpScreen').then(m => ({ default: m.HelpScreen })));
-const MigrationProjectsScreen = lazy(() => import(/* webpackChunkName: "migration-projects" */ '../screens/MigrationProjectsScreen').then(m => ({ default: m.MigrationProjectsScreen })));
-const MigrationWorkspaceScreen = lazy(() => import(/* webpackChunkName: "migration-workspace" */ '../screens/MigrationWorkspaceScreen').then(m => ({ default: m.MigrationWorkspaceScreen })));
-const MigrationValidationScreen = lazy(() => import(/* webpackChunkName: "migration-validation" */ '../screens/MigrationValidationScreen').then(m => ({ default: m.MigrationValidationScreen })));
-const MigrationReportsScreen = lazy(() => import(/* webpackChunkName: "migration-reports" */ '../screens/MigrationReportsScreen').then(m => ({ default: m.MigrationReportsScreen })));
-const MigrationTemplatesScreen = lazy(() => import(/* webpackChunkName: "migration-templates" */ '../screens/MigrationTemplatesScreen').then(m => ({ default: m.MigrationTemplatesScreen })));
-const IdMapViewerScreen = lazy(() => import(/* webpackChunkName: "migration-idmaps" */ '../screens/IdMapViewerScreen').then(m => ({ default: m.IdMapViewerScreen })));
 
 export function AppRoot(): VNode {
   const sf = useMemo(() => new SfApi('app'), []);
-  const [route, setRoute] = useState<string>('home');
+  const [route, setRouteState] = useState<string>(() => window.location.hash.replace(/^#\/?/, '') || 'home');
+  const setRoute = useCallback((next: string): void => {
+    setRouteState(next);
+    if (window.location.hash !== `#${next}`) {
+      history.pushState({}, '', `${window.location.pathname}${window.location.search}#${next}`);
+    }
+  }, []);
+
+  useEffect(() => {
+    const restoreRoute = () => setRouteState(window.location.hash.replace(/^#\/?/, '') || 'home');
+    window.addEventListener('popstate', restoreRoute);
+    window.addEventListener('hashchange', restoreRoute);
+    return () => {
+      window.removeEventListener('popstate', restoreRoute);
+      window.removeEventListener('hashchange', restoreRoute);
+    };
+  }, []);
 
   const [tabs, setTabs] = useState<Array<{ tabId: number; title?: string; hostname: string }>>([]);
   const [selectedTabId, setSelectedTabId] = useState<number | null>(null);
@@ -96,7 +111,7 @@ export function AppRoot(): VNode {
   const [dataset, setDataset] = useState<{
     sourceRecords: Record<string, unknown>[];
     filename: string;
-    format: 'csv' | 'json';
+    format: 'csv' | 'json' | 'excel' | 'xml';
     headers: string[];
     bytes?: number;
   } | null>(null);
@@ -106,7 +121,9 @@ export function AppRoot(): VNode {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [undoPanelOpen, setUndoPanelOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [scheduleDraft, setScheduleDraft] = useState<ScheduleDraft | undefined>(undefined);
+  const [importJobDraft, setImportJobDraft] = useState<SavedJob | undefined>(undefined);
+  const [exportJobDraft, setExportJobDraft] = useState<SavedJob | undefined>(undefined);
 
   async function refreshTabs(): Promise<void> {
     try {
@@ -235,6 +252,7 @@ export function AppRoot(): VNode {
     <>
       <select
         class="wl-select"
+        aria-label="Salesforce tab"
         style="max-width:340px"
         value={selectedTabId ?? ''}
         onChange={(e) => {
@@ -257,46 +275,18 @@ export function AppRoot(): VNode {
   );
 
   // ── Navigation: primary flows + Advanced Lab group ──────────────────
-  const navGroups: NavGroup[] = [
-    {
-      key: 'core', label: 'Workflow', items: [
-        { key: 'home', label: 'Home' },
-        { key: 'export', label: 'Export' },
-        { key: 'import', label: 'Import' },
-        { key: 'convert', label: 'Convert' },
-      ],
-    },
-    {
-      key: 'migration', label: 'Migration', items: [
-        { key: 'migration/projects', label: 'Migration Projects' },
-        { key: 'migration/validation', label: 'Migration Validation' },
-        { key: 'migration/reports', label: 'Migration Reports' },
-        { key: 'migration/templates', label: 'Migration Templates' },
-        { key: 'migration/idMaps', label: 'ID Maps' },
-      ],
-    },
-    {
-      key: 'extras', label: 'Library', items: [
-        { key: 'templates', label: 'Templates' },
-        { key: 'schedules', label: 'Schedules' },
-        { key: 'diff', label: 'Compare' },
-      ],
-    },
-    {
-      key: 'advanced', label: 'Advanced', items: [
-        { key: 'advanced/index', label: 'Advanced Tools' },
-      ],
-    },
+  const navItems: NavItem[] = [
+    { key: 'home', label: 'Home' },
+    { key: 'export', label: 'Export' },
+    { key: 'import', label: 'Import' },
+    { key: 'convert', label: 'Convert' },
+    { key: 'jobs', label: 'Jobs & Activity', activeRoutes: ['templates', 'schedules', 'snapshots', 'diff', 'copy', 'advanced/history'] },
+    { key: 'advanced/index', label: 'Advanced', activeRoutes: ['advanced'] },
   ];
 
   const pinnedItems: NavItem[] = [
     { key: 'help', label: 'Help' },
     { key: 'settings', label: 'Settings' },
-  ];
-
-  const navItems: NavItem[] = [
-    ...navGroups.flatMap(g => g.items),
-    ...pinnedItems,
   ];
 
   // Advanced tools live behind the hub (not in the sidebar) but stay reachable
@@ -325,8 +315,6 @@ export function AppRoot(): VNode {
     export: true,
     import: true,
     schedules: true,
-    'migration/projects': true,
-    'migration/validation': true,
     'advanced/objects': true,
     'advanced/inspector': true,
     'advanced/apex': true,
@@ -339,51 +327,38 @@ export function AppRoot(): VNode {
     'advanced/pipeline': true,
     'advanced/clone': true,
     'advanced/quality': true,
+    'advanced/orgHealth': true,
     'advanced/apiUsage': true,
     'advanced/bulkOps': true,
     'advanced/relationships': true,
   };
 
-  // Aliases for legacy routes used by HelpScreen / OnboardingWizard / older code paths.
-  const LEGACY_ROUTE_ALIASES: Record<string, string> = {
-    push: 'import',
-    query: 'export',
-    cleanse: 'advanced/cleanse',
-    objects: 'advanced/objects',
-    history: 'advanced/history',
-    clone: 'advanced/clone',
-    duplicates: 'advanced/duplicates',
-    pipeline: 'advanced/pipeline',
-    pipelines: 'advanced/pipeline',
-    quality: 'advanced/quality',
-    apiUsage: 'advanced/apiUsage',
-    bulkOps: 'advanced/bulkOps',
-    relationships: 'advanced/relationships',
-    schemaCompare: 'advanced/schemaCompare',
-    'schema-compare': 'advanced/schemaCompare',
-    fieldAnalytics: 'advanced/fieldAnalytics',
-    'org-health': 'advanced/quality',
-    testData: 'advanced/testData',
-    compare: 'diff',
-    migrationProjects: 'migration/projects',
-    migrationValidation: 'migration/validation',
-    migrationReports: 'migration/reports',
-    migrationTemplates: 'migration/templates',
-    idMaps: 'migration/idMaps',
-  };
-
-  const effectiveRoute = LEGACY_ROUTE_ALIASES[route] ?? route;
-  const needsTab = !selectedTabId && requiresTab[effectiveRoute];
+  const effectiveRoute = resolveAppRoute(route);
+  const needsTab = Boolean(effectiveRoute && !selectedTabId && requiresTab[effectiveRoute]);
 
   function renderScreen(): VNode {
     const route = effectiveRoute; // shadow outer route inside this fn
+
+    if (!route) {
+      return (
+        <div class="wl-card">
+          <div class="wl-cardSection">
+            <div class="wl-emptyState">
+              <p class="wl-emptyState__title">Page not found</p>
+              <p class="wl-emptyState__desc">WaveLink does not recognize the requested destination.</p>
+              <button class="wl-buttonBrand" onClick={() => setRoute('home')}>Return home</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     if (needsTab) {
       return (
         <div class="wl-card">
           <div class="wl-cardSection">
             <div class="wl-emptyState">
-              <div class="wl-emptyState__icon">🌊</div>
+              <div class="wl-emptyState__icon"><Icon name="database" size={36} /></div>
               <p class="wl-emptyState__title">No Salesforce tab detected</p>
               <p class="wl-emptyState__desc">
                 Open a logged-in Salesforce Lightning tab, then click <strong>Refresh</strong> in the top-right.
@@ -400,32 +375,75 @@ export function AppRoot(): VNode {
 
     // ── Core flows ──
     if (route === 'home') return <HomeScreen sf={sf} hasOrg={Boolean(selectedTabId && context)} onNavigate={setRoute} />;
-    if (route === 'export') return <ExportScreen sf={sf} tabId={selectedTabId!} context={context ?? undefined} soql={soql} onSoqlChange={setSoql} onNavigate={setRoute} />;
+    if (route === 'export') return (
+      <ExportScreen
+        sf={sf}
+        tabId={selectedTabId!}
+        context={context ?? undefined}
+        soql={soql}
+        onSoqlChange={setSoql}
+        onNavigate={setRoute}
+        onSchedule={() => {
+          setScheduleDraft({ soql, orgId: context?.orgId });
+          setRoute('schedules');
+        }}
+        savedJobDraft={exportJobDraft}
+        onSavedJobDraftConsumed={() => setExportJobDraft(undefined)}
+      />
+    );
     if (route === 'import') return (
       <ImportScreen
         sf={sf}
         tabId={selectedTabId!}
+        context={context ?? undefined}
         dataset={dataset}
         cleanedRecords={cleaned?.records ?? null}
         cleanedHeaders={cleaned?.headers ?? null}
         onDataset={setDataset}
         onRequestCleanser={() => setRoute('advanced/cleanse')}
-        onNavigate={setRoute}
+        savedJobDraft={importJobDraft}
+        onSavedJobDraftConsumed={() => setImportJobDraft(undefined)}
       />
     );
     if (route === 'convert') return <ConvertScreen />;
-    if (route === 'templates') return <ExportImportTemplatesScreen sf={sf} />;
-    if (route === 'schedules') return <SchedulesScreen sf={sf} />;
+    if (route === 'jobs') return <JobsActivityScreen sf={sf} onNavigate={setRoute} />;
+    if (route === 'templates') return (
+      <SavedJobsScreen
+        sf={sf}
+        onRunExport={(job) => {
+          setSoql(job.definition.query ?? 'SELECT Id, Name FROM Account LIMIT 100');
+          setExportJobDraft(job);
+          setRoute('export');
+        }}
+        onRunImport={(job) => {
+          setImportJobDraft(job);
+          setRoute('import');
+        }}
+        onOpenSchedules={() => setRoute('schedules')}
+      />
+    );
+    if (route === 'schedules') return (
+      <SchedulesScreen
+        sf={sf}
+        draft={scheduleDraft}
+        onDraftConsumed={() => setScheduleDraft(undefined)}
+      />
+    );
+    if (route === 'snapshots') return (
+      <SnapshotCenterScreen
+        sf={sf}
+        tabId={selectedTabId ?? undefined}
+        onOpenSchedules={() => setRoute('schedules')}
+        onCreateImport={(records, headers, filename) => {
+          setDataset({ sourceRecords: records, headers, filename, format: 'json' });
+          setRoute('import');
+        }}
+      />
+    );
     if (route === 'diff') return <CompareScreen sf={sf} />;
+    if (route === 'copy') return <CompareScreen sf={sf} initialMode="orgs" />;
 
     // ── Migration suite (top-level) ──
-    if (route === 'migration/projects' && activeProjectId) return <MigrationWorkspaceScreen sf={sf} tabId={selectedTabId!} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />;
-    if (route === 'migration/projects') return <MigrationProjectsScreen sf={sf} onOpenProject={(id) => setActiveProjectId(id)} />;
-    if (route === 'migration/validation' && activeProjectId) return <MigrationValidationScreen sf={sf} tabId={selectedTabId!} projectId={activeProjectId} onBack={() => setActiveProjectId(null)} />;
-    if (route === 'migration/validation') return <MigrationProjectsScreen sf={sf} onOpenProject={(id) => { setActiveProjectId(id); setRoute('migration/validation'); }} />;
-    if (route === 'migration/reports') return <MigrationReportsScreen sf={sf} />;
-    if (route === 'migration/templates') return <MigrationTemplatesScreen sf={sf} />;
-    if (route === 'migration/idMaps') return <IdMapViewerScreen sf={sf} />;
 
     // ── Advanced hub + tools ──
     if (route === 'advanced/index') return <AdvancedLabScreen onNavigate={setRoute} />;
@@ -466,6 +484,7 @@ export function AppRoot(): VNode {
     if (route === 'advanced/pipeline') return <PipelineBuilderScreen sf={sf} tabId={selectedTabId!} dataset={cleaned ? { records: cleaned.records, headers: cleaned.headers } : null} />;
     if (route === 'advanced/clone') return <CloneWizardScreen sf={sf} tabId={selectedTabId!} />;
     if (route === 'advanced/quality') return <DataQualityScorecardScreen sf={sf} tabId={selectedTabId!} />;
+    if (route === 'advanced/orgHealth') return <OrgHealthScreen sf={sf} tabId={selectedTabId!} />;
     if (route === 'advanced/apiUsage') return <ApiUsageDashboardScreen sf={sf} tabId={selectedTabId!} />;
     if (route === 'advanced/bulkOps') return <BulkObjectOpsScreen sf={sf} tabId={selectedTabId!} />;
     if (route === 'advanced/relationships') return <RelationshipExplorerScreen sf={sf} tabId={selectedTabId!} />;
@@ -474,8 +493,8 @@ export function AppRoot(): VNode {
     if (route === 'help') return <HelpScreen sf={sf} onNavigate={setRoute} />;
     if (route === 'settings') return <SettingsScreen sf={sf} mode="app" />;
 
-    // Fallback
-    return <HomeScreen sf={sf} hasOrg={Boolean(selectedTabId && context)} onNavigate={setRoute} />;
+    // The route resolver and this renderer should remain exhaustive.
+    return <div class="wl-bannerDanger">This WaveLink page is not available.</div>;
   }
 
   return (
@@ -487,9 +506,8 @@ export function AppRoot(): VNode {
         onOrgSwitch={() => refreshTabs()}
         titleRight={titleRight}
         navItems={navItems}
-        navGroups={navGroups}
         pinnedItems={pinnedItems}
-        route={route}
+        route={effectiveRoute ?? route}
         onRouteChange={setRoute}
         theme={theme}
         onThemeChange={handleThemeChange}
@@ -503,7 +521,7 @@ export function AppRoot(): VNode {
             <button class="wl-btn" style="padding:4px 8px;font-size:12px" aria-label="Dismiss storage warning" onClick={() => setStorageDismissed(true)}>✕</button>
           </div>
         ) : null}
-        {effectiveRoute.startsWith('advanced/') && effectiveRoute !== 'advanced/index' ? (
+        {effectiveRoute?.startsWith('advanced/') && effectiveRoute !== 'advanced/index' ? (
           <button
             class="wl-btn"
             style="margin-bottom:12px"
@@ -513,6 +531,7 @@ export function AppRoot(): VNode {
           </button>
         ) : null}
         <Suspense
+          key={effectiveRoute ?? route}
           fallback={
             <div class="wl-card">
               <div class="wl-cardSection">
@@ -527,7 +546,7 @@ export function AppRoot(): VNode {
 
       <CommandPalette
         open={commandPaletteOpen}
-        commands={[...navItems, ...advancedToolItems].map(n => ({
+        commands={[...navItems, ...pinnedItems, ...advancedToolItems].map(n => ({
           id: n.key,
           label: n.label,
           description: `Navigate to ${n.label}`,
@@ -546,6 +565,18 @@ export function AppRoot(): VNode {
             sf.setOnboarding({ dismissedAt: Date.now() }).catch(() => {});
           }}
           onNavigate={(r) => { setRoute(r); setShowOnboarding(false); }}
+          onOpenExample={(example) => {
+            if (example === 'export') {
+              setSoql('SELECT Id, Name, Type FROM Account ORDER BY Name LIMIT 10');
+            } else {
+              const records = [
+                { Name: 'WaveLink Example Alpha', Type: 'Prospect' },
+                { Name: 'WaveLink Example Beta', Type: 'Customer - Direct' },
+              ];
+              setDataset({ sourceRecords: records, headers: ['Name', 'Type'], filename: 'wavelink-safe-example.json', format: 'json' });
+              setCleaned(null);
+            }
+          }}
         />
       ) : null}
 

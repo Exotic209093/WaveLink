@@ -32,8 +32,17 @@ jobs:
         # Treat warnings as failures so the codebase stays at zero lint findings.
         run: npm run lint -- --max-warnings=0
 
-      - name: Test
-        run: npm test
+      - name: Production dependency audit
+        run: npm run audit:prod
+
+      - name: Development dependency audit
+        run: npm run audit:dev
+
+      - name: Test with coverage gates
+        run: npm run test:coverage -- --runInBand
 
       - name: Build
         run: npm run build
+
+      - name: Validate packaged extension
+        run: npm run smoke:package

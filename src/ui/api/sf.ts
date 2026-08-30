@@ -13,8 +13,9 @@
  */
 
 import { MessageBus } from '../../services/messaging';
-import type { SalesforceOrg, SObjectDescribe } from '../../core/types/salesforce';
-import type { UiSettings, SavedQuery, PushHistoryEntry, QueryFolder, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
+import type { SalesforceOrg, SObjectDescribe, BulkQueryJob } from '../../core/types/salesforce';
+import type { BulkQueryResultPage } from '../../services/salesforce/bulk-api';
+import type { UiSettings, SavedQuery, PushHistoryEntry, QueryFolder, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress, ActivePush } from '../../core/types/storage';
 import type { MigrationProject, IdMap, IdMapEntry, MigrationTemplate, MigrationSummaryReport } from '../../core/types/migration';
 import type { DescribeGlobalResult, QueryResult, QueryExplainResult, ExecuteAnonymousResult, RawCallResult } from '../../services/salesforce/api-client';
 import type { DataPushCancelResponse, DataPushResultGetResponse, PushHistoryGetResponse } from '../../core/types/messaging';
@@ -68,6 +69,48 @@ export class SfApi {
       { tabId, nextRecordsUrl },
     );
     if (!res.success || !res.data) throw new Error(res.error?.message ?? 'QueryMore failed');
+    return res.data;
+  }
+
+  async startBulkQuery(soql: string, tabId?: number): Promise<BulkQueryJob> {
+    const res = await this.bus.send<{ tabId?: number; soql: string }, BulkQueryJob>('SF_BULK_QUERY_START', { tabId, soql });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Bulk query failed to start');
+    return res.data;
+  }
+
+  async getBulkQueryStatus(jobId: string, tabId?: number): Promise<BulkQueryJob> {
+    const res = await this.bus.send<{ tabId?: number; jobId: string }, BulkQueryJob>('SF_BULK_QUERY_STATUS', { tabId, jobId });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Bulk query status failed');
+    return res.data;
+  }
+
+  async getBulkQueryResults(jobId: string, locator?: string, tabId?: number): Promise<BulkQueryResultPage> {
+    const res = await this.bus.send<{ tabId?: number; jobId: string; locator?: string; maxRecords: number }, BulkQueryResultPage>(
+      'SF_BULK_QUERY_RESULTS',
+      { tabId, jobId, locator, maxRecords: 10_000 },
+    );
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Bulk query results failed');
+    return res.data;
+  }
+
+  async cancelBulkQuery(jobId: string, tabId?: number): Promise<BulkQueryJob> {
+    const res = await this.bus.send<{ tabId?: number; jobId: string }, BulkQueryJob>('SF_BULK_QUERY_CANCEL', { tabId, jobId });
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Bulk query cancellation failed');
+    return res.data;
+  }
+
+  async listActivePushes(): Promise<ActivePush[]> {
+    const res = await this.bus.send<object, ActivePush[]>('DATA_PUSH_ACTIVE_GET', {});
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to load push checkpoints');
+    return res.data;
+  }
+
+  async resumePush(pushId: string, tabId?: number): Promise<{ pushId: string; resumed: boolean; alreadyRunning?: boolean }> {
+    const res = await this.bus.send<{ pushId: string; tabId?: number }, { pushId: string; resumed: boolean; alreadyRunning?: boolean }>(
+      'DATA_PUSH_RESUME',
+      { pushId, tabId },
+    );
+    if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Failed to resume push');
     return res.data;
   }
 

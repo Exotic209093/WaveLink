@@ -17,6 +17,7 @@ import { useMemo, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import { ONBOARDING_STEPS } from '../utils/onboarding';
 import { OnboardingWizard } from '../components/OnboardingWizard';
+import { APP_ROUTES } from '../app/routes';
 
 /** Help category definitions with descriptions. */
 const HELP_CATEGORIES: Array<{
@@ -141,6 +142,7 @@ export function HelpScreen(props: {
           <input
             class="wl-input"
             type="text"
+            aria-label="Search help topics"
             value={search}
             onInput={(e) => setSearch((e.currentTarget as HTMLInputElement).value)}
             placeholder="Search help topics..."
@@ -165,9 +167,11 @@ export function HelpScreen(props: {
               {topics.length > 0 ? (
                 <div style="display:flex;flex-direction:column;gap:4px">
                   {topics.map((topic, idx) => (
-                    <div
+                    <button
+                      type="button"
                       key={`${cat.name}-${idx}`}
-                      style="display:flex;align-items:flex-start;gap:6px;padding:4px 0;cursor:pointer"
+                      disabled={!topic.route}
+                      style="display:flex;align-items:flex-start;gap:6px;padding:4px 0;cursor:pointer;border:0;background:transparent;width:100%;font:inherit;color:inherit;text-align:left"
                       onClick={() => topic.route && onNavigate(topic.route)}
                     >
                       <span style="color:var(--wl-accent);font-weight:800;font-size:12px;flex-shrink:0;margin-top:1px">
@@ -179,7 +183,7 @@ export function HelpScreen(props: {
                         </div>
                         <div class="wl-muted" style="font-size:11px">{topic.description}</div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               ) : (
@@ -197,15 +201,15 @@ export function HelpScreen(props: {
         </div>
         <div class="wl-row" style="gap:8px">
           <div class="wl-actions" style="flex-wrap:wrap">
-            <button class="wl-btn" onClick={() => onNavigate('settings')}>Settings</button>
-            <button class="wl-btn" onClick={() => onNavigate('objects')}>Objects</button>
-            <button class="wl-btn" onClick={() => onNavigate('query')}>Query</button>
-            <button class="wl-btn" onClick={() => onNavigate('push')}>Data Push</button>
-            <button class="wl-btn" onClick={() => onNavigate('templates')}>Templates</button>
-            <button class="wl-btn" onClick={() => onNavigate('pipelines')}>Pipelines</button>
-            <button class="wl-btn" onClick={() => onNavigate('org-health')}>Org Health</button>
-            <button class="wl-btn" onClick={() => onNavigate('schema-compare')}>Schema Compare</button>
-            <button class="wl-btn" onClick={() => onNavigate('relationships')}>Relationships</button>
+            <button class="wl-btn" onClick={() => onNavigate(APP_ROUTES.settings)}>Settings</button>
+            <button class="wl-btn" onClick={() => onNavigate(APP_ROUTES.advancedObjects)}>Objects</button>
+            <button class="wl-btn" onClick={() => onNavigate(APP_ROUTES.export)}>Query</button>
+            <button class="wl-btn" onClick={() => onNavigate(APP_ROUTES.import)}>Data Push</button>
+            <button class="wl-btn" onClick={() => onNavigate(APP_ROUTES.templates)}>Templates</button>
+            <button class="wl-btn" onClick={() => onNavigate(APP_ROUTES.advancedPipeline)}>Pipelines</button>
+            <button class="wl-btn" onClick={() => onNavigate(APP_ROUTES.advancedOrgHealth)}>Org Health</button>
+            <button class="wl-btn" onClick={() => onNavigate(APP_ROUTES.advancedSchemaCompare)}>Schema Compare</button>
+            <button class="wl-btn" onClick={() => onNavigate(APP_ROUTES.advancedRelationships)}>Relationships</button>
           </div>
         </div>
       </div>

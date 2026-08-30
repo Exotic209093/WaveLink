@@ -3,7 +3,7 @@ import CopyWebpackPlugin from 'copy-webpack-plugin';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import type { Configuration } from 'webpack';
 
-const config: Configuration = {
+const config = (_env: unknown, argv: { mode?: string }): Configuration => ({
   entry: {
     background: path.resolve(__dirname, 'src/background/index.ts'),
     popup: path.resolve(__dirname, 'src/popup/index.tsx'),
@@ -26,7 +26,15 @@ const config: Configuration = {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
+        use: {
+          loader: 'ts-loader',
+          options: {
+            compilerOptions: {
+              declaration: false,
+              declarationMap: false,
+            },
+          },
+        },
         exclude: /node_modules/,
       },
       {
@@ -71,7 +79,16 @@ const config: Configuration = {
   optimization: {
     splitChunks: false,
   },
-  devtool: process.env.NODE_ENV === 'production' ? false : 'cheap-module-source-map',
-};
+  // Startup entrypoints must stay under 220 KiB. The guided-workflow UI keeps
+  // the app around 185 KiB and the popup around 214 KiB. The isolated SheetJS mini build is
+  // allowed up to 260 KiB (currently ~250 KiB) and loads only for XLSX actions.
+  performance: {
+    hints: 'error',
+    maxEntrypointSize: 220 * 1024,
+    maxAssetSize: 260 * 1024,
+    assetFilter: (filename) => filename.endsWith('.js'),
+  },
+  devtool: argv.mode === 'production' ? false : 'cheap-module-source-map',
+});
 
 export default config;

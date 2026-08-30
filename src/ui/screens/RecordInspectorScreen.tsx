@@ -12,6 +12,7 @@
  */
 
 import type { VNode } from 'preact';
+import { Icon } from '../components/Icon';
 import { h, Fragment } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
@@ -310,7 +311,7 @@ export function RecordInspectorScreen(props: { sf: SfApi; tabId: number; initial
 
   function renderValueCell(r: FieldRow): VNode {
     const parentBtn = r.type === 'reference' && looksLikeId(r.value) ? (
-      <button class="wl-btn" style="margin-left:6px;padding:0 5px;font-size:10px" title="Inspect parent record" onClick={() => { setRecordId(r.value as string); inspect(r.value as string); }}>🔍</button>
+      <button class="wl-btn" style="margin-left:6px;padding:0 5px;font-size:10px" title="Inspect parent record" onClick={() => { setRecordId(r.value as string); inspect(r.value as string); }}><Icon name="search" size={13} /></button>
     ) : null;
 
     if (r.updateable) {

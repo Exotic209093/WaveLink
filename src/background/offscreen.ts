@@ -11,7 +11,7 @@
  * underlying feature.
  */
 
-import type { OffscreenCapturePayload, OffscreenCaptureResponse } from '../core/types/offscreen';
+import type { OffscreenBulkPushPayload, OffscreenBulkPushResponse, OffscreenCapturePayload, OffscreenCaptureResponse } from '../core/types/offscreen';
 
 interface OffscreenApi {
   hasDocument?: () => Promise<boolean>;
@@ -93,4 +93,12 @@ export async function captureViaOffscreen(payload: OffscreenCapturePayload): Pro
     }
   }
   throw lastError instanceof Error ? lastError : new Error('offscreen capture failed');
+}
+
+/** Delegate Bulk ingest polling/finalization to the persistent offscreen context. */
+export async function runBulkPushViaOffscreen(payload: OffscreenBulkPushPayload): Promise<void> {
+  const ready = await ensureOffscreenDocument();
+  if (!ready) throw new Error('offscreen document unavailable');
+  const res = (await chrome.runtime.sendMessage({ type: 'OFFSCREEN_BULK_PUSH', payload })) as OffscreenBulkPushResponse | undefined;
+  if (!res?.ok) throw new Error(res?.error ?? 'offscreen bulk push failed');
 }

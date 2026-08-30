@@ -220,13 +220,20 @@ export class SalesforceApiClient {
 
   /** Execute an SObject Collection update (up to 200 records) */
   async collectionUpdate(
+    objectName: string,
     records: Array<{ Id: string; [key: string]: unknown }>,
     allOrNone: boolean = false,
     options: { signal?: AbortSignal } = {},
   ): Promise<SalesforceRecordResult[]> {
     return this.request<SalesforceRecordResult[]>('/composite/sobjects', {
       method: 'PATCH',
-      body: { allOrNone, records },
+      body: {
+        allOrNone,
+        records: records.map(record => ({
+          attributes: { type: objectName },
+          ...record,
+        })),
+      },
       signal: options.signal,
     });
   }

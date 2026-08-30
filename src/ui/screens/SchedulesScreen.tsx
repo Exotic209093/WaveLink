@@ -9,9 +9,13 @@ import { h } from 'preact';
 import type { VNode } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
-import type { ScheduledExport, ExportSnapshot, ScheduleInterval, SavedExportFormat } from '../../core/types/storage';
+import type { ScheduledExport, ExportSnapshot, ScheduleInterval, SavedExportFormat, ScheduleRunHistoryEntry } from '../../core/types/storage';
 import type { SalesforceOrg } from '../../core/types/salesforce';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { createNewScheduleForm } from '../utils/scheduleDraft';
+import type { ScheduleDraft } from '../utils/scheduleDraft';
+import { forecastSnapshotStorage, formatStorageSize } from '../utils/scheduleForecast';
+import { Icon } from '../components/Icon';
 
 interface FormState {
   id?: string;
@@ -22,17 +26,15 @@ interface FormState {
   intervalKind: 'minutes' | 'hours' | 'days';
   intervalValue: number;
   retention: number;
+  timeZone: string;
 }
 
-const EMPTY_FORM: FormState = {
-  name: '',
-  soql: 'SELECT Id, Name FROM Account LIMIT 100',
-  orgId: '',
-  format: 'csv',
-  intervalKind: 'hours',
-  intervalValue: 6,
-  retention: 10,
-};
+const TIME_ZONES = Array.from(new Set([
+  Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  'UTC', 'Europe/London', 'Europe/Paris', 'America/New_York', 'America/Chicago',
+  'America/Denver', 'America/Los_Angeles', 'Asia/Kolkata', 'Asia/Singapore',
+  'Asia/Tokyo', 'Australia/Sydney',
+]));
 
 function intervalToMinutes(i: ScheduleInterval): number {
   switch (i.kind) {
@@ -50,14 +52,14 @@ function formatInterval(i: ScheduleInterval): string {
   }
 }
 
-function formatRelative(ms?: number): string {
+export function formatRelative(ms?: number): string {
   if (!ms) return '—';
   const diff = ms - Date.now();
   const abs = Math.abs(diff);
   const past = diff < 0;
+  if (abs < 60_000) return 'just now';
   let txt: string;
-  if (abs < 60_000) txt = 'just now';
-  else if (abs < 3_600_000) txt = `${Math.round(abs / 60_000)}m`;
+  if (abs < 3_600_000) txt = `${Math.round(abs / 60_000)}m`;
   else if (abs < 86_400_000) txt = `${Math.round(abs / 3_600_000)}h`;
   else txt = `${Math.round(abs / 86_400_000)}d`;
   return past ? `${txt} ago` : `in ${txt}`;
@@ -65,20 +67,24 @@ function formatRelative(ms?: number): string {
 
 function uid(): string { return `sched-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
 
-export function SchedulesScreen(props: { sf: SfApi }): VNode {
+export function SchedulesScreen(props: { sf: SfApi; draft?: ScheduleDraft; onDraftConsumed?: () => void }): VNode {
   const [schedules, setSchedules] = useState<ScheduledExport[]>([]);
   const [snapshots, setSnapshots] = useState<Record<string, ExportSnapshot>>({});
   const [orgs, setOrgs] = useState<SalesforceOrg[]>([]);
-  const [editing, setEditing] = useState<FormState | null>(null);
+  const [editing, setEditing] = useState<FormState | null>(() => props.draft ? createNewScheduleForm(props.draft) : null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ScheduledExport | null>(null);
+  const [runHistory, setRunHistory] = useState<ScheduleRunHistoryEntry[]>([]);
+  const [storageUsage, setStorageUsage] = useState({ bytesInUse: 0, quota: 10 * 1024 * 1024 });
 
   async function reload(): Promise<void> {
-    chrome.storage.local.get(['scheduledExports', 'exportSnapshots'], (r) => {
+    chrome.storage.local.get(['scheduledExports', 'exportSnapshots', 'scheduleRunHistory'], (r) => {
       setSchedules((r.scheduledExports as ScheduledExport[]) ?? []);
       setSnapshots((r.exportSnapshots as Record<string, ExportSnapshot>) ?? {});
+      setRunHistory((r.scheduleRunHistory as ScheduleRunHistoryEntry[]) ?? []);
     });
+    props.sf.getStorageUsage().then(setStorageUsage).catch(() => undefined);
     try {
       const list = await props.sf.listOrgs();
       setOrgs(list.orgs);
@@ -87,7 +93,10 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
     }
   }
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => {
+    reload();
+    if (props.draft) props.onDraftConsumed?.();
+  }, []);
 
   async function persist(next: ScheduledExport[]): Promise<void> {
     await new Promise<void>((res) => chrome.storage.local.set({ scheduledExports: next }, () => res()));
@@ -127,6 +136,7 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
       lastRunStatus: existing?.lastRunStatus,
       lastRunError: existing?.lastRunError,
       nextRunAt: now + intervalToMinutes(interval) * 60 * 1000,
+      timeZone: editing.timeZone,
     };
 
     const next = isNew ? [...schedules, sched] : schedules.map(s => s.id === id ? sched : s);
@@ -187,6 +197,13 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
     return map;
   }, [snapshots]);
 
+  const storageForecast = editing ? forecastSnapshotStorage(
+    snapshots,
+    editing.id,
+    editing.retention,
+    storageUsage.bytesInUse,
+  ) : null;
+
   return (
     <div>
       <div class="wl-pageHeader">
@@ -199,7 +216,7 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
         </div>
         <div class="wl-pageHeader__actions">
           {!editing ? (
-            <button class="wl-buttonBrand" onClick={() => setEditing({ ...EMPTY_FORM, orgId: orgs[0]?.orgId ?? '' })}>
+            <button class="wl-buttonBrand" onClick={() => setEditing(createNewScheduleForm(undefined, orgs[0]?.orgId ?? ''))}>
               + New schedule
             </button>
           ) : null}
@@ -214,8 +231,9 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
           </div>
           <div class="wl-cardSection">
             <div class="wl-formRow">
-              <label class="wl-formRow__label wl-formRow__label--required">Name</label>
+              <label htmlFor="schedule-name" class="wl-formRow__label wl-formRow__label--required">Name</label>
               <input
+                id="schedule-name"
                 class="wl-input"
                 value={editing.name}
                 onInput={(e) => setEditing({ ...editing, name: (e.currentTarget as HTMLInputElement).value })}
@@ -225,8 +243,9 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
 
             <div class="wl-twoCol">
               <div class="wl-formRow">
-                <label class="wl-formRow__label wl-formRow__label--required">Target org</label>
+                <label htmlFor="schedule-org" class="wl-formRow__label wl-formRow__label--required">Target org</label>
                 <select
+                  id="schedule-org"
                   class="wl-select"
                   value={editing.orgId}
                   onChange={(e) => setEditing({ ...editing, orgId: (e.currentTarget as HTMLSelectElement).value })}
@@ -242,8 +261,8 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
               </div>
 
               <div class="wl-formRow">
-                <label class="wl-formRow__label">Output format</label>
-                <div class="wl-flowTabs" style="margin-bottom:0">
+                <span id="schedule-format-label" class="wl-formRow__label">Output format</span>
+                <div class="wl-flowTabs" role="group" aria-labelledby="schedule-format-label" style="margin-bottom:0">
                   {(['csv', 'json', 'excel', 'xml'] as SavedExportFormat[]).map(f => (
                     <button
                       key={f}
@@ -259,8 +278,9 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
             </div>
 
             <div class="wl-formRow">
-              <label class="wl-formRow__label wl-formRow__label--required">SOQL query</label>
+              <label htmlFor="schedule-soql" class="wl-formRow__label wl-formRow__label--required">SOQL query</label>
               <textarea
+                id="schedule-soql"
                 class="wl-textarea"
                 value={editing.soql}
                 onInput={(e) => setEditing({ ...editing, soql: (e.currentTarget as HTMLTextAreaElement).value })}
@@ -269,9 +289,10 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
 
             <div class="wl-twoCol">
               <div class="wl-formRow">
-                <label class="wl-formRow__label wl-formRow__label--required">Interval</label>
+                <span class="wl-formRow__label wl-formRow__label--required">Interval</span>
                 <div style="display:flex;gap:8px">
                   <input
+                    aria-label="Interval value"
                     class="wl-input"
                     type="number"
                     min={1}
@@ -280,6 +301,7 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
                     style="max-width:120px"
                   />
                   <select
+                    aria-label="Interval unit"
                     class="wl-select"
                     value={editing.intervalKind}
                     onChange={(e) => setEditing({ ...editing, intervalKind: (e.currentTarget as HTMLSelectElement).value as FormState['intervalKind'] })}
@@ -293,8 +315,9 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
               </div>
 
               <div class="wl-formRow">
-                <label class="wl-formRow__label">Retention</label>
+                <label htmlFor="schedule-retention" class="wl-formRow__label">Retention</label>
                 <input
+                  id="schedule-retention"
                   class="wl-input"
                   type="number"
                   min={1}
@@ -303,7 +326,27 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
                   style="max-width:120px"
                 />
                 <span class="wl-formRow__hint">Keep this many recent snapshots; older snapshots are deleted.</span>
+                {storageForecast ? (
+                  <div class={storageForecast.projectedTotalBytes > storageUsage.quota * 0.85 ? 'wl-bannerWarning' : 'wl-bannerInfo'} style="margin-top:8px">
+                    Projected retention: <strong>{formatStorageSize(storageForecast.projectedScheduleBytes)}</strong> for this schedule;
+                    {' '}about <strong>{formatStorageSize(storageForecast.projectedTotalBytes)}</strong> total of {formatStorageSize(storageUsage.quota)}.
+                    {' '}Estimate is {storageForecast.confidence === 'measured' ? 'based on existing snapshots' : 'a pre-run baseline'}.
+                  </div>
+                ) : null}
               </div>
+            </div>
+
+            <div class="wl-formRow">
+              <label htmlFor="schedule-timezone" class="wl-formRow__label">Schedule time zone</label>
+              <select
+                id="schedule-timezone"
+                class="wl-select"
+                value={editing.timeZone}
+                onChange={(event) => setEditing({ ...editing, timeZone: (event.currentTarget as HTMLSelectElement).value })}
+              >
+                {TIME_ZONES.map(zone => <option value={zone} key={zone}>{zone}</option>)}
+              </select>
+              <span class="wl-formRow__hint">Used for exact next-run previews and run-history timestamps.</span>
             </div>
 
             {error ? <div class="wl-bannerDanger">{error}</div> : null}
@@ -319,7 +362,7 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
       {schedules.length === 0 && !editing ? (
         <div class="wl-card">
           <div class="wl-emptyState">
-            <div class="wl-emptyState__icon">⏱</div>
+            <div class="wl-emptyState__icon"><Icon name="calendar" size={32} /></div>
             <p class="wl-emptyState__title">No schedules yet</p>
             <p class="wl-emptyState__desc">
               Schedule a SOQL query to run on a cadence. Each run stores a snapshot locally that you can download or diff.
@@ -346,10 +389,10 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
               </div>
               <div class="wl-actions">
                 <button class="wl-buttonNeutral" onClick={() => runNow(s)} disabled={busyId === s.id}>
-                  {busyId === s.id ? 'Running…' : '▶ Run now'}
+                  {busyId === s.id ? 'Running…' : <><Icon name="play" size={15} /> Run now</>}
                 </button>
                 <button class="wl-buttonNeutral" onClick={() => toggleEnabled(s)}>
-                  {s.enabled ? '⏸ Pause' : '▶ Resume'}
+                  <Icon name={s.enabled ? 'pause' : 'play'} size={15} /> {s.enabled ? 'Pause' : 'Resume'}
                 </button>
                 <button class="wl-buttonNeutral" onClick={() => setEditing({
                   id: s.id,
@@ -361,6 +404,7 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
                   intervalValue: s.interval.kind === 'minutes' ? s.interval.minutes :
                                  s.interval.kind === 'hours' ? s.interval.hours : s.interval.days,
                   retention: s.retention,
+                  timeZone: s.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC',
                 })}>Edit</button>
                 <button class="wl-buttonDestructive" onClick={() => setPendingDelete(s)}>Delete</button>
               </div>
@@ -373,7 +417,7 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
                 </div>
                 <div>
                   <div class="wl-cardSection__title">Next run</div>
-                  <div style="font-size:13px">{s.enabled ? formatRelative(s.nextRunAt) : 'Paused'}</div>
+                  <div style="font-size:13px">{s.enabled ? `${formatRelative(s.nextRunAt)} · ${s.nextRunAt ? new Date(s.nextRunAt).toLocaleString([], { timeZone: s.timeZone ?? 'UTC' }) : 'pending'} (${s.timeZone ?? 'UTC'})` : 'Paused'}</div>
                 </div>
                 <div>
                   <div class="wl-cardSection__title">Snapshots</div>
@@ -396,7 +440,7 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
                 <div class="wl-activityList">
                   {snaps.slice(0, 5).map(snap => (
                     <div class="wl-activityItem" key={snap.id}>
-                      <div class="wl-activityItem__icon">📦</div>
+                      <div class="wl-activityItem__icon"><Icon name="database" size={16} /></div>
                       <div class="wl-activityItem__body">
                         <div class="wl-activityItem__title">
                           {new Date(snap.capturedAt).toLocaleString()}
@@ -404,6 +448,22 @@ export function SchedulesScreen(props: { sf: SfApi }): VNode {
                         <div class="wl-activityItem__sub">
                           {snap.error ? `Error: ${snap.error}` : `${snap.recordCount.toLocaleString()} records · ${snap.columns.length} columns`}
                         </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {runHistory.some(run => run.scheduleId === s.id) ? (
+              <div class="wl-cardSection">
+                <div class="wl-cardSection__title">Run history</div>
+                <div class="wl-activityList">
+                  {runHistory.filter(run => run.scheduleId === s.id).slice(0, 5).map(run => (
+                    <div class="wl-activityItem" key={run.id}>
+                      <span class="wl-statusDot" data-status={run.status === 'success' ? 'success' : 'danger'} aria-hidden="true" />
+                      <div class="wl-activityItem__body">
+                        <div class="wl-activityItem__title">{run.status === 'success' ? `${run.recordCount.toLocaleString()} records captured` : 'Run failed — reconnect required'}</div>
+                        <div class="wl-activityItem__sub">{new Date(run.completedAt).toLocaleString([], { timeZone: s.timeZone ?? 'UTC' })}{run.error ? ` · ${run.error}` : ''}</div>
                       </div>
                     </div>
                   ))}

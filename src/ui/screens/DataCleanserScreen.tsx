@@ -72,14 +72,14 @@ export function DataCleanserScreen(props: {
   dataset: {
     sourceRecords: Record<string, unknown>[];
     filename: string;
-    format: 'csv' | 'json';
+    format: 'csv' | 'json' | 'excel' | 'xml';
     headers: string[];
     bytes?: number;
   } | null;
   onDataset: (d: {
     sourceRecords: Record<string, unknown>[];
     filename: string;
-    format: 'csv' | 'json';
+    format: 'csv' | 'json' | 'excel' | 'xml';
     headers: string[];
     bytes?: number;
   }) => void;

@@ -8,7 +8,12 @@
  */
 
 export function downloadTextFile(filename: string, content: string, contentType: string): void {
-  const blob = new Blob([content], { type: contentType });
+  downloadBlobParts(filename, [content], contentType);
+}
+
+/** Build a download from bounded generated chunks instead of one giant string. */
+export function downloadBlobParts(filename: string, parts: BlobPart[], contentType: string): void {
+  const blob = new Blob(parts, { type: contentType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

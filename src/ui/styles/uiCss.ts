@@ -445,6 +445,11 @@ export const uiCss = `
 }
 
 .wl-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.wl-card[aria-labelledby="activity-heading"] .wl-cardSection > .wl-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  width: 100%;
+}
 
 .wl-btn {
   border: 1px solid var(--wl-line);
@@ -1740,6 +1745,11 @@ export const uiCss = `
   --wl-card-section-border: var(--wl-line-2);
   --wl-table-row-hover: rgba(2, 132, 168, 0.05);
   --wl-table-stripe: rgba(2, 132, 168, 0.025);
+  --wl-surface-base: #f5f8fb;
+  --wl-surface-raised: #ffffff;
+  --wl-surface-subtle: #f8fafc;
+  --wl-focus-ring: 0 0 0 3px rgba(2, 132, 168, 0.28);
+  --wl-elevation-1: 0 1px 3px rgba(7, 32, 51, 0.08);
 }
 
 :host[data-theme="dark"], :root[data-theme="dark"] {
@@ -1758,6 +1768,11 @@ export const uiCss = `
   --wl-page-header-bg: rgba(17, 41, 62, 0.65);
   --wl-table-row-hover: rgba(86, 200, 232, 0.07);
   --wl-table-stripe: rgba(86, 200, 232, 0.035);
+  --wl-surface-base: #091b2a;
+  --wl-surface-raised: #11293e;
+  --wl-surface-subtle: #0d2234;
+  --wl-focus-ring: 0 0 0 3px rgba(86, 200, 232, 0.32);
+  --wl-elevation-1: 0 1px 3px rgba(0, 0, 0, 0.34);
 }
 
 /* ── Page header (SLDS-shaped) ── */
@@ -1767,13 +1782,11 @@ export const uiCss = `
   justify-content: space-between;
   gap: var(--wl-space-4);
   padding: var(--wl-space-4) var(--wl-space-5);
-  background: var(--wl-page-header-bg);
-  backdrop-filter: blur(14px);
+  background: var(--wl-surface-raised);
   border: 1px solid var(--wl-page-header-border);
   border-radius: var(--wl-radius);
   margin-bottom: var(--wl-space-4);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.04);
-  animation: wl-rise 420ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  box-shadow: var(--wl-elevation-1);
 }
 .wl-pageHeader__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .wl-pageHeader__eyebrow {
@@ -1823,20 +1836,21 @@ export const uiCss = `
 /* ── Button hierarchy ── */
 .wl-buttonBrand {
   border: 1px solid var(--wl-brand);
-  background: linear-gradient(135deg, var(--wl-brand), var(--wl-accent-2));
+  background: var(--wl-brand);
   color: var(--wl-brand-fg);
   padding: 9px 16px;
   border-radius: 10px;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
+  min-height: 36px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
-  box-shadow: 0 4px 14px rgba(2, 132, 168, 0.22);
+  box-shadow: none;
 }
-.wl-buttonBrand:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(2, 132, 168, 0.32); filter: saturate(1.1); }
+.wl-buttonBrand:hover { background: var(--wl-brand-hover); }
 .wl-buttonBrand:active { transform: translateY(0); }
 .wl-buttonBrand:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
@@ -1847,7 +1861,8 @@ export const uiCss = `
   padding: 9px 16px;
   border-radius: 10px;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
+  min-height: 36px;
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
 }
@@ -1967,26 +1982,20 @@ export const uiCss = `
   padding: var(--wl-space-5);
   border: 1px solid var(--wl-line-2);
   border-radius: var(--wl-radius);
-  background:
-    radial-gradient(360px 200px at 90% -10%, var(--wl-brand-soft), transparent 60%),
-    rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.05);
+  background: var(--wl-surface-raised);
+  box-shadow: var(--wl-elevation-1);
   cursor: pointer;
   text-align: left;
   font-family: inherit;
   color: inherit;
-  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  transition: box-shadow 160ms ease, border-color 160ms ease;
 }
 :root[data-theme="dark"] .wl-hubCard {
-  background:
-    radial-gradient(360px 200px at 90% -10%, var(--wl-brand-soft), transparent 60%),
-    rgba(17, 41, 62, 0.72);
+  background: var(--wl-surface-raised);
 }
 .wl-hubCard:hover {
-  transform: translateY(-3px);
   border-color: var(--wl-brand);
-  box-shadow: 0 18px 42px rgba(2, 132, 168, 0.18);
+  box-shadow: 0 3px 10px rgba(2, 132, 168, 0.12);
 }
 .wl-hubCard__icon {
   width: 44px;
@@ -1996,9 +2005,9 @@ export const uiCss = `
   align-items: center;
   justify-content: center;
   font-size: 22px;
-  background: linear-gradient(135deg, var(--wl-brand), var(--wl-accent-2));
-  color: #fff;
-  box-shadow: 0 6px 16px rgba(2, 132, 168, 0.30);
+  background: var(--wl-brand-soft);
+  color: var(--wl-brand);
+  box-shadow: none;
 }
 .wl-hubCard__title { font-size: 16px; font-weight: 800; letter-spacing: -0.2px; margin: 0; }
 .wl-hubCard__desc { font-size: 13px; color: var(--wl-ink-dim); margin: 0; line-height: 1.45; }
@@ -2063,10 +2072,100 @@ export const uiCss = `
 }
 .wl-flowStep[data-active="true"] .wl-flowStep__num { background: var(--wl-brand); color: #fff; }
 .wl-flowStep[data-done="true"] .wl-flowStep__num { background: var(--wl-success-2); color: #fff; }
+.wl-flowStep:disabled { cursor: not-allowed; opacity: 0.48; }
 .wl-flowStep__sep {
   flex: 0 0 18px;
   height: 1px;
   background: var(--wl-line-2);
+}
+
+.wl-jobContext {
+  position: sticky;
+  top: 104px;
+  z-index: 3;
+  display: flex;
+  gap: var(--wl-space-4);
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border: 1px solid var(--wl-line);
+  border-radius: 10px;
+  background: var(--wl-surface-raised);
+  box-shadow: var(--wl-elevation-1);
+  color: var(--wl-ink-dim);
+  font-size: 12px;
+}
+.wl-jobContext strong { color: var(--wl-ink); margin-right: 4px; }
+.wl-jobContext[data-environment="production"] {
+  border-color: rgba(183, 110, 0, 0.42);
+  box-shadow: inset 3px 0 0 var(--wl-warning-2), var(--wl-elevation-1);
+}
+
+.wl-stageActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wl-space-3);
+  padding: var(--wl-space-3) var(--wl-space-4);
+  border-top: 1px solid var(--wl-line-2);
+  background: var(--wl-surface-subtle);
+}
+
+.wl-reviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--wl-space-3);
+}
+.wl-reviewGrid > div { display: flex; flex-direction: column; gap: 3px; }
+.wl-reviewGrid span { color: var(--wl-ink-dim); font-size: 12px; }
+.wl-reviewGrid strong { font-size: 14px; }
+
+.wl-queryTabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--wl-line);
+  margin-bottom: var(--wl-space-3);
+}
+.wl-queryTabWrap { display: inline-flex; align-items: center; border: 1px solid var(--wl-line); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--wl-surface-subtle); }
+.wl-queryTab { min-height: 36px; padding: 7px 10px 7px 12px; border: 0; background: transparent; color: var(--wl-ink-dim); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.wl-queryTab[aria-selected="true"] { color: var(--wl-brand); background: var(--wl-surface-raised); }
+.wl-queryTabClose { width: 28px; min-height: 36px; border: 0; background: transparent; color: var(--wl-ink-dim); cursor: pointer; }
+.wl-queryTabClose:disabled { opacity: 0.25; cursor: default; }
+.wl-queryTabAdd { min-height: 36px; padding: 7px 12px; border: 0; background: transparent; color: var(--wl-brand); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.wl-queryTabRename { width: 140px; min-height: 34px; padding: 5px 8px; border: 0; border-radius: 7px 0 0 0; background: var(--wl-surface-raised); color: var(--wl-ink); font: inherit; }
+
+.wl-parameterGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--wl-space-3);
+  padding: var(--wl-space-3);
+  border: 1px solid var(--wl-line-2);
+  border-radius: 10px;
+  background: var(--wl-surface-subtle);
+}
+.wl-parameterGrid label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 700; }
+.wl-parameterGrid p { grid-column: 1 / -1; margin: 0; }
+
+/* Guided UI shell: flatter surfaces and a compact single-row desktop header. */
+.wl-app { background: var(--wl-surface-base); animation: none; }
+.wl-srOnly { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.wl-searchField { display: flex; align-items: center; gap: 8px; color: var(--wl-ink-dim); }
+.wl-searchField .wl-input { flex: 1 1 auto; }
+:root[data-theme="dark"] .wl-app { background: var(--wl-surface-base); }
+.wl-topbar { background: var(--wl-surface-raised); backdrop-filter: none; }
+.wl-topbar > .wl-actions { flex: 1 1 auto; flex-wrap: nowrap; justify-content: flex-end; align-items: center; }
+.wl-card { background: var(--wl-surface-raised); backdrop-filter: none; box-shadow: var(--wl-elevation-1); animation: none; }
+:root[data-theme="dark"] .wl-card,
+:root[data-theme="dark"] .wl-pane { background: var(--wl-surface-raised); backdrop-filter: none; }
+.wl-topNav { background: var(--wl-surface-raised); backdrop-filter: none; }
+
+@media (max-width: 760px) {
+  .wl-topbar { align-items: center; flex-wrap: wrap; padding: 10px 14px; }
+  .wl-topbar .wl-brand { flex: 1 1 auto; }
+  .wl-topbar > .wl-actions { flex: 1 0 100%; flex-wrap: nowrap; }
+  .wl-topbar > .wl-actions .wl-select { width: auto; min-width: 0; flex: 1 1 auto; }
 }
 
 /* ── Recent activity list ── */
@@ -2097,6 +2196,27 @@ export const uiCss = `
 .wl-activityItem__title { font-size: 13px; font-weight: 700; color: var(--wl-ink); }
 .wl-activityItem__sub { font-size: 11px; color: var(--wl-ink-dim); margin-top: 2px; }
 .wl-activityItem__time { font-size: 11px; color: var(--wl-ink-dim); white-space: nowrap; }
+.wl-statusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--wl-ink-dim);
+}
+.wl-statusDot[data-status="success"] { background: var(--wl-success-2); }
+.wl-statusDot[data-status="warning"] { background: var(--wl-warning-2); }
+.wl-statusDot[data-status="danger"] { background: var(--wl-error); }
+
+.wl-topNavBtn,
+.wl-navGroupBtn,
+.wl-subNavBtn,
+.wl-panelTab { min-height: 36px; }
+
+.wl-hubCard:focus-visible,
+.wl-topNavBtn:focus-visible,
+.wl-buttonBrand:focus-visible,
+.wl-buttonNeutral:focus-visible,
+.wl-buttonText:focus-visible { outline: none; box-shadow: var(--wl-focus-ring); }
 
 /* ── Section grid (two-column layout used by Export/Import/Diff) ── */
 .wl-twoCol {

@@ -29,6 +29,7 @@ export function CommandPalette(props: {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   /** Filter commands using fuzzy matching. O(C). */
   const filtered = fuzzyFilter(commands, query, (cmd) => `${cmd.label} ${cmd.description}`);
@@ -36,12 +37,16 @@ export function CommandPalette(props: {
   // Focus input when palette opens and reset state
   useEffect(() => {
     if (open) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
       setQuery('');
       setActiveIndex(0);
       // Defer focus to next frame so the DOM is ready
       requestAnimationFrame(() => {
         inputRef.current?.focus();
       });
+    } else if (previousFocusRef.current?.isConnected) {
+      previousFocusRef.current.focus();
+      previousFocusRef.current = null;
     }
   }, [open]);
 
@@ -76,31 +81,58 @@ export function CommandPalette(props: {
         e.preventDefault();
         onClose();
         break;
+      case 'Tab':
+        // The input is the palette's only tab stop; keep focus inside the modal.
+        e.preventDefault();
+        inputRef.current?.focus();
+        break;
     }
   };
 
   return (
-    <div class="wl-commandPaletteBackdrop" onClick={onClose}>
-      <div class="wl-commandPalette" onClick={(e) => e.stopPropagation()}>
+    <div class="wl-commandPaletteBackdrop">
+      <div
+        class="wl-commandPalette"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
+      >
         <input
           ref={inputRef}
           class="wl-input"
           type="text"
+          role="combobox"
+          aria-label="Search commands"
+          aria-expanded="true"
+          aria-controls="wl-command-list"
+          aria-activedescendant={filtered[activeIndex] ? `wl-command-${filtered[activeIndex].id}` : undefined}
+          autocomplete="off"
           placeholder="Type a command..."
           value={query}
           onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
           onKeyDown={handleKeyDown}
         />
-        <div class="wl-commandList">
+        <div id="wl-command-list" class="wl-commandList" role="listbox" aria-label="Commands">
           {filtered.map((cmd, i) => (
             <div
               key={cmd.id}
+              id={`wl-command-${cmd.id}`}
               class="wl-commandItem"
+              role="option"
+              tabIndex={-1}
+              aria-selected={i === activeIndex}
               data-active={i === activeIndex ? 'true' : undefined}
               onMouseEnter={() => setActiveIndex(i)}
               onClick={() => {
                 cmd.action();
                 onClose();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  cmd.action();
+                  onClose();
+                }
               }}
             >
               <div class="wl-commandItemLeft">

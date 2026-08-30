@@ -196,8 +196,9 @@ export function TestDataGeneratorScreen(props: { sf: SfApi; tabId: number }): VN
         <div class="wl-row">
           <div class="wl-row2">
             <div style="display:flex;flex-direction:column;gap:6px">
-              <label style="font-weight:900;font-size:12px">Object</label>
+              <label htmlFor="test-data-object" style="font-weight:900;font-size:12px">Object</label>
               <input
+                id="test-data-object"
                 class="wl-input"
                 type="text"
                 value={selectedObject || objectSearch}
@@ -211,7 +212,8 @@ export function TestDataGeneratorScreen(props: { sf: SfApi; tabId: number }): VN
               {objectSearch && !selectedObject ? (
                 <div style="max-height:200px;overflow:auto;border:1px solid var(--wl-line-2);border-radius:var(--wl-radius-sm)">
                   {filteredObjects.slice(0, 50).map((o) => (
-                    <div
+                    <button
+                      type="button"
                       key={o.name}
                       class="wl-qb-objItem"
                       onClick={() => {
@@ -221,7 +223,7 @@ export function TestDataGeneratorScreen(props: { sf: SfApi; tabId: number }): VN
                     >
                       <span class="wl-mono" style="font-size:12px">{o.name}</span>
                       <span class="wl-muted">{o.label}</span>
-                    </div>
+                    </button>
                   ))}
                   {filteredObjects.length === 0 ? (
                     <div class="wl-muted" style="padding:8px 12px">No matching objects</div>
@@ -232,8 +234,9 @@ export function TestDataGeneratorScreen(props: { sf: SfApi; tabId: number }): VN
 
             <div style="display:flex;gap:12px">
               <div style="display:flex;flex-direction:column;gap:6px">
-                <label style="font-weight:900;font-size:12px">Count</label>
+                <label htmlFor="test-data-count" style="font-weight:900;font-size:12px">Count</label>
                 <input
+                  id="test-data-count"
                   class="wl-input wl-countInput"
                   type="number"
                   min="1"
@@ -243,8 +246,9 @@ export function TestDataGeneratorScreen(props: { sf: SfApi; tabId: number }): VN
                 />
               </div>
               <div style="display:flex;flex-direction:column;gap:6px">
-                <label style="font-weight:900;font-size:12px">Seed (optional)</label>
+                <label htmlFor="test-data-seed" style="font-weight:900;font-size:12px">Seed (optional)</label>
                 <input
+                  id="test-data-seed"
                   class="wl-input wl-countInput"
                   type="text"
                   placeholder="Any integer"

@@ -78,9 +78,17 @@ export function QueryHistory(props: {
         {metrics.map((m: QueryMetric) => (
           <div
             key={m.id}
+            role="button"
+            tabIndex={0}
             class="wl-queryRow"
             style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--wl-line-2)"
             onClick={() => onLoadQuery(m.soql)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onLoadQuery(m.soql);
+              }
+            }}
           >
             <div style="flex:1;min-width:0;overflow:hidden">
               <div class="wl-mono" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">

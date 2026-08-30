@@ -57,14 +57,15 @@ export function ObjectSelector(props: {
           {open && filtered.length > 0 && (
             <div class="wl-qb-objList">
               {filtered.map(o => (
-                <div
+                <button
+                  type="button"
                   key={o.name}
                   class="wl-qb-objItem"
                   onMouseDown={(e) => { e.preventDefault(); select(o.name); }}
                 >
                   <span class="wl-mono">{o.name}</span>
                   <span class="wl-muted">{o.label}</span>
-                </div>
+                </button>
               ))}
             </div>
           )}

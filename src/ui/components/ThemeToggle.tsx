@@ -10,6 +10,8 @@ import { h, VNode } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import type { Theme, ResolvedTheme } from '../utils/theme';
 import { resolveTheme, applyTheme, watchSystemTheme } from '../utils/theme';
+import { Icon } from './Icon';
+import type { IconName } from './Icon';
 
 export interface ThemeToggleProps {
   initialTheme?: Theme;
@@ -18,15 +20,15 @@ export interface ThemeToggleProps {
 }
 
 const THEME_LABELS: Record<Theme, string> = {
-  light: '☀️ Light',
-  dark: '🌙 Dark',
-  auto: '🔄 Auto',
+  light: 'Light',
+  dark: 'Dark',
+  auto: 'Use system theme',
 };
 
-const THEME_ICONS: Record<Theme, string> = {
-  light: '☀️',
-  dark: '🌙',
-  auto: '🔄',
+const THEME_ICONS: Record<Theme, IconName> = {
+  light: 'sun',
+  dark: 'moon',
+  auto: 'refresh',
 };
 
 export function ThemeToggle(props: ThemeToggleProps): VNode {
@@ -61,10 +63,12 @@ export function ThemeToggle(props: ThemeToggleProps): VNode {
     <button
       class="wl-btn"
       onClick={cycleTheme}
+      aria-label={`Theme: ${THEME_LABELS[currentTheme]}. Change theme`}
       title={`Current theme: ${THEME_LABELS[currentTheme]}. Click to cycle.`}
       style={{ minWidth: compact ? 'auto' : '120px' }}
     >
-      {compact ? THEME_ICONS[currentTheme] : THEME_LABELS[currentTheme]}
+      <Icon name={THEME_ICONS[currentTheme]} size={16} />
+      {compact ? null : THEME_LABELS[currentTheme]}
     </button>
   );
 }

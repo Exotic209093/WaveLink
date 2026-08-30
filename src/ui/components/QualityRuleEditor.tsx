@@ -84,8 +84,9 @@ export function QualityRuleEditor(props: QualityRuleEditorProps): VNode {
       case 'format':
         return (
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:12px;font-weight:700">Regex Pattern</label>
+            <label htmlFor={`quality-${rule.id}-pattern`} style="font-size:12px;font-weight:700">Regex Pattern</label>
             <input
+              id={`quality-${rule.id}-pattern`}
               class="wl-input"
               type="text"
               value={(rule.config.pattern as string) ?? ''}
@@ -100,8 +101,9 @@ export function QualityRuleEditor(props: QualityRuleEditorProps): VNode {
         return (
           <div style="display:flex;gap:8px;align-items:flex-end">
             <div style="flex:1;display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:12px;font-weight:700">Min</label>
+              <label htmlFor={`quality-${rule.id}-min`} style="font-size:12px;font-weight:700">Min</label>
               <input
+                id={`quality-${rule.id}-min`}
                 class="wl-input"
                 type="number"
                 value={(rule.config.min as number) ?? ''}
@@ -113,8 +115,9 @@ export function QualityRuleEditor(props: QualityRuleEditorProps): VNode {
               />
             </div>
             <div style="flex:1;display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:12px;font-weight:700">Max</label>
+              <label htmlFor={`quality-${rule.id}-max`} style="font-size:12px;font-weight:700">Max</label>
               <input
+                id={`quality-${rule.id}-max`}
                 class="wl-input"
                 type="number"
                 value={(rule.config.max as number) ?? ''}
@@ -131,8 +134,9 @@ export function QualityRuleEditor(props: QualityRuleEditorProps): VNode {
       case 'picklist':
         return (
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:12px;font-weight:700">Allowed Values (comma-separated)</label>
+            <label htmlFor={`quality-${rule.id}-values`} style="font-size:12px;font-weight:700">Allowed Values (comma-separated)</label>
             <input
+              id={`quality-${rule.id}-values`}
               class="wl-input"
               type="text"
               value={((rule.config.values as string[]) ?? []).join(', ')}
@@ -149,8 +153,9 @@ export function QualityRuleEditor(props: QualityRuleEditorProps): VNode {
       case 'custom':
         return (
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:12px;font-weight:700">Expression</label>
+            <label htmlFor={`quality-${rule.id}-expression`} style="font-size:12px;font-weight:700">Expression</label>
             <input
+              id={`quality-${rule.id}-expression`}
               class="wl-input"
               type="text"
               value={(rule.config.expression as string) ?? ''}
@@ -192,8 +197,9 @@ export function QualityRuleEditor(props: QualityRuleEditorProps): VNode {
         >
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <div style="flex:1;min-width:140px;display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--wl-ink-dim)">Field</label>
+              <label htmlFor={`quality-${rule.id}-field`} style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--wl-ink-dim)">Field</label>
               <select
+                id={`quality-${rule.id}-field`}
                 class="wl-select"
                 value={rule.field}
                 onChange={(e) => updateRule(index, { field: (e.currentTarget as HTMLSelectElement).value })}
@@ -208,8 +214,9 @@ export function QualityRuleEditor(props: QualityRuleEditorProps): VNode {
             </div>
 
             <div style="flex:1;min-width:120px;display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--wl-ink-dim)">Type</label>
+              <label htmlFor={`quality-${rule.id}-type`} style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--wl-ink-dim)">Type</label>
               <select
+                id={`quality-${rule.id}-type`}
                 class="wl-select"
                 value={rule.type}
                 onChange={(e) => updateRule(index, { type: (e.currentTarget as HTMLSelectElement).value as QualityRule['type'] })}
@@ -221,8 +228,9 @@ export function QualityRuleEditor(props: QualityRuleEditorProps): VNode {
             </div>
 
             <div style="flex:0 0 100px;display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--wl-ink-dim)">Severity</label>
+              <label htmlFor={`quality-${rule.id}-severity`} style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--wl-ink-dim)">Severity</label>
               <select
+                id={`quality-${rule.id}-severity`}
                 class="wl-select"
                 value={rule.severity}
                 onChange={(e) => updateRule(index, { severity: (e.currentTarget as HTMLSelectElement).value as QualityRule['severity'] })}
@@ -244,8 +252,9 @@ export function QualityRuleEditor(props: QualityRuleEditorProps): VNode {
           </div>
 
           <div style="display:flex;flex-direction:column;gap:4px">
-            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--wl-ink-dim)">Message</label>
+            <label htmlFor={`quality-${rule.id}-message`} style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--wl-ink-dim)">Message</label>
             <input
+              id={`quality-${rule.id}-message`}
               class="wl-input"
               type="text"
               value={rule.message}

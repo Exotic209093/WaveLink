@@ -200,5 +200,5 @@ Initial public release. All features below shipped in v0.1.0.
 
 ---
 
-[Unreleased]: https://github.com/jc-wave/wave-link/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/jc-wave/wave-link/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Exotic209093/WaveLink/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.1.0

@@ -14,6 +14,7 @@ import { Toast } from '../components/Toast';
 import { diffRecords, diffToCsv } from '../utils/dataDiff';
 import type { DataDiffResult } from '../utils/dataDiff';
 import { downloadTextFile } from '../utils/download';
+import { TypedConfirmModal } from '../components/TypedConfirmModal';
 
 interface ObjectOption {
   name: string;
@@ -51,6 +52,7 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
   const [comparing, setComparing] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
 
   async function loadCommonObjects(): Promise<void> {
@@ -175,6 +177,7 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
         externalIdField: isExternalId ? matchField : undefined,
       });
       setToast({ title: 'Sync Started', body: `${recordsToSync.length} records being pushed to target org` });
+      setReviewOpen(false);
     } catch (e) {
       setToast({ title: 'Sync Failed', body: e instanceof Error ? e.message : 'Unknown error' });
     }
@@ -194,7 +197,7 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
       <div class="wl-card">
         {props.hideHeader ? null : (
           <div class="wl-cardHeader">
-            <h2>Data Comparison</h2>
+            <h2>Copy between orgs</h2>
           </div>
         )}
 
@@ -223,7 +226,7 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
           <div style="margin-top:12px">
             <div class="wl-row" style="gap:12px;flex-wrap:wrap">
               <div style="flex:1;min-width:200px">
-                <label class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">OBJECT</label>
+                <span class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">OBJECT</span>
                 <SearchableSelect
                   ariaLabel="Object to compare"
                   placeholder="Select object..."
@@ -236,7 +239,7 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
                 />
               </div>
               <div style="flex:1;min-width:200px">
-                <label class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">MATCH BY</label>
+                <span class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">MATCH BY</span>
                 <SearchableSelect
                   ariaLabel="Field to match records by"
                   placeholder="Select field..."
@@ -249,9 +252,9 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
 
             {commonFields.length > 0 && !loadingFields ? (
               <div style="margin-top:12px">
-                <label class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">
+                <div class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">
                   COMPARE FIELDS ({selectedFields.size}/{commonFields.length})
-                </label>
+                </div>
                 <div style="max-height:160px;overflow-y:auto;border:1px solid var(--wl-line);border-radius:var(--wl-radius-sm);padding:6px">
                   {commonFields.filter(f => f.name !== matchField).map(f => (
                     <label key={f.name} style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px;cursor:pointer">
@@ -277,12 +280,12 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
 
             <div class="wl-row" style="gap:12px;margin-top:12px;flex-wrap:wrap">
               <div style="flex:2;min-width:200px">
-                <label class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">WHERE (optional)</label>
-                <input class="wl-input" style="width:100%" placeholder="e.g. CreatedDate = TODAY" value={whereClause} onInput={(e) => setWhereClause((e.currentTarget as HTMLInputElement).value)} />
+                <label htmlFor="comparison-where" class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">WHERE (optional)</label>
+                <input id="comparison-where" class="wl-input" style="width:100%" placeholder="e.g. CreatedDate = TODAY" value={whereClause} onInput={(e) => setWhereClause((e.currentTarget as HTMLInputElement).value)} />
               </div>
               <div style="min-width:120px">
-                <label class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">LIMIT</label>
-                <input class="wl-input" style="width:100%" type="number" min={1} max={10000} value={recordLimit} onInput={(e) => setRecordLimit(parseInt((e.currentTarget as HTMLInputElement).value, 10) || 2000)} />
+                <label htmlFor="comparison-limit" class="wl-muted" style="font-size:11px;font-weight:700;display:block;margin-bottom:4px">LIMIT</label>
+                <input id="comparison-limit" class="wl-input" style="width:100%" type="number" min={1} max={10000} value={recordLimit} onInput={(e) => setRecordLimit(parseInt((e.currentTarget as HTMLInputElement).value, 10) || 2000)} />
               </div>
             </div>
 
@@ -309,9 +312,9 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
                 class="wl-btn wl-btnPrimary"
                 style="font-size:12px"
                 disabled={selectedKeys.size === 0 || syncing}
-                onClick={syncToTarget}
+                onClick={() => setReviewOpen(true)}
               >
-                {syncing ? 'Syncing...' : `Sync ${selectedKeys.size} to Target`}
+                {syncing ? 'Copying...' : `Review ${selectedKeys.size} for Copy`}
               </button>
             </div>
           </div>
@@ -340,6 +343,19 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
       ) : null}
 
       {toast ? <Toast title={toast.title} onClose={() => setToast(null)}>{toast.body}</Toast> : null}
+      <TypedConfirmModal
+        open={reviewOpen}
+        title="Confirm copy to target org"
+        confirmationPhrase="COPY"
+        busy={syncing}
+        onCancel={() => setReviewOpen(false)}
+        onConfirm={syncToTarget}
+      >
+        <div>
+          <p><strong>Dry-run comparison complete.</strong> {selectedKeys.size} selected {objectName} records will be written to target org <span class="wl-mono">{targetOrgId}</span>.</p>
+          <p class="wl-muted">This controlled workflow copies one object at a time, removes Salesforce system fields, and uses upsert only when the match field is an External ID. It does not promise dependency migration or automatic rollback across objects.</p>
+        </div>
+      </TypedConfirmModal>
     </div>
   );
 }

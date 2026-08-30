@@ -529,8 +529,9 @@ export function RelationshipExplorerScreen(props: {
           <div class="wl-row2">
             {/* Object selector */}
             <div style="display:flex;flex-direction:column;gap:6px;position:relative">
-              <label style="font-weight:900;font-size:12px">Root Object</label>
+              <label htmlFor="relationship-root-object" style="font-weight:900;font-size:12px">Root Object</label>
               <input
+                id="relationship-root-object"
                 class="wl-input"
                 type="text"
                 value={rootObject || objSearch}
@@ -547,14 +548,15 @@ export function RelationshipExplorerScreen(props: {
               {objSearch && !rootObject ? (
                 <div style="position:absolute;top:100%;left:0;right:0;z-index:50;max-height:200px;overflow:auto;border:1px solid var(--wl-line);border-radius:var(--wl-radius-sm);background:rgba(255,255,255,0.96);box-shadow:0 8px 24px rgba(0,0,0,0.10);margin-top:2px">
                   {filteredObjects.slice(0, 40).map((o) => (
-                    <div
+                    <button
+                      type="button"
                       key={o.name}
                       class="wl-qb-objItem"
                       onClick={() => { setRootObject(o.name); setObjSearch(''); }}
                     >
                       <span class="wl-mono" style="font-size:12px">{o.name}</span>
                       <span class="wl-muted">{o.label}</span>
-                    </div>
+                    </button>
                   ))}
                   {filteredObjects.length === 0 ? (
                     <div class="wl-muted" style="padding:8px 12px">No matching objects</div>
@@ -565,8 +567,9 @@ export function RelationshipExplorerScreen(props: {
 
             {/* Depth control */}
             <div style="display:flex;flex-direction:column;gap:6px">
-              <label style="font-weight:900;font-size:12px">Depth (1-4)</label>
+              <label htmlFor="relationship-depth" style="font-weight:900;font-size:12px">Depth (1-4)</label>
               <input
+                id="relationship-depth"
                 class="wl-input"
                 type="number"
                 min={1}
