@@ -1,8 +1,226 @@
 # WaveLink Product Roadmap
 
-> Last updated: 2026-08-30<br>
+> Last updated: 2026-08-31<br>
 > Prepared release: **v0.6.0**; current Chrome Web Store release: **v0.2.0**<br>
 > Product direction: **a fast, local-first Salesforce data workspace for safely exporting, importing, comparing, scheduling, and repeating data jobs**
+
+## Road to 1.0 (2026-08-31 audit)
+
+A full-project test pass on 2026-08-31 at commit `74cf21b` found the automated
+gates all green — TypeScript, ESLint, `npm test` (499 tests / 49 suites), the
+production build, the Manifest V3 package smoke, and both dependency audits (0
+high/critical) all pass. The gap is in what those tests **don't** cover: the
+write path, the scheduling runtime, and export/compare fidelity. A hands-on run
+of the packaged 0.6.0 UI in a Chrome-API harness plus a five-way adversarial
+code review surfaced **46 issues**, several data-corrupting.
+
+The most serious findings — verified in code, several reproduced live:
+
+- **Undo never runs.** Both undo entry points omit `tabId`/`orgId`; the
+  background rejects the call and the error is swallowed ([#42](https://github.com/Exotic209093/WaveLink/issues/42)).
+- **Copy between orgs writes into the source org** and never builds its ID map ([#43](https://github.com/Exotic209093/WaveLink/issues/43)).
+- **A stale cleansed dataset silently replaces a newly uploaded import file** ([#44](https://github.com/Exotic209093/WaveLink/issues/44)).
+- **Bulk import drops whole columns** and silently no-ops blank-means-clear ([#45](https://github.com/Exotic209093/WaveLink/issues/45)); retry re-sends succeeded rows and the error file blames the wrong rows ([#46](https://github.com/Exotic209093/WaveLink/issues/46), [#47](https://github.com/Exotic209093/WaveLink/issues/47)).
+- **The production typed-confirmation gate is absent on the Advanced → Data Push route** ([#48](https://github.com/Exotic209093/WaveLink/issues/48)).
+- **Every service-worker wake resets all schedule alarms**, so schedules drift and can never fire; snapshots can silently exceed the 10 MB quota while runs report success ([#54](https://github.com/Exotic209093/WaveLink/issues/54), [#56](https://github.com/Exotic209093/WaveLink/issues/56)).
+- **Session tokens are persisted unencrypted** and the REST explorer can attach the Bearer token to arbitrary URLs ([#64](https://github.com/Exotic209093/WaveLink/issues/64), [#65](https://github.com/Exotic209093/WaveLink/issues/65)).
+
+The 46 issues ([#40](https://github.com/Exotic209093/WaveLink/issues/40),
+[#42–#87](https://github.com/Exotic209093/WaveLink/issues)) are grouped into four
+milestones. **1.0 is the trust release: no known write-path data-corruption
+defect, schedules that survive worker restarts, honest security posture, and the
+UI screens under interaction-test coverage.**
+
+| Milestone | Theme | Scope |
+|---|---|---|
+| **v0.7.0 — Data you can trust** | Write-path correctness | Undo, Copy between orgs, bulk CSV semantics, retry/error-file index integrity, per-row bulk errors, the production-gate bypass, clone remapping, lookup-validation deadlock, compare-copy duplicates, import date shift, POST retry idempotency ([#42–53](https://github.com/Exotic209093/WaveLink/issues), [#83](https://github.com/Exotic209093/WaveLink/issues/83)) |
+| **v0.8.0 — Reliable automation** | MV3 runtime | Alarm-reset drift, stale schedule/snapshot writes, quota-blind snapshots, the interrupted-push race, cancel-after-restart, poll-cap false failures, duplicate history, mid-job token refresh, timezone, checkpoint pruning ([#54–63](https://github.com/Exotic209093/WaveLink/issues)) |
+| **v0.9.0 — Security & data fidelity** | Tokens + output fidelity | Token storage/leaks, CSV formula injection, `ORG_LIST` token exposure, handler gating; nested-attribute leakage, 14-column truncation, snapshot `[object Object]`, CSV BOM, 50-row column sampling, cross-org snapshot compare, saved-job resurrection, workspace org leak, diff/convert round-trip loss ([#64–82](https://github.com/Exotic209093/WaveLink/issues)) |
+| **v1.0.0 — Trust release** | Polish + honesty + coverage | Global Ctrl+Z hijack, legacy blocking tutorial, SECURITY.md/CHANGELOG honesty, and interaction-test coverage for every navigable screen ([#40](https://github.com/Exotic209093/WaveLink/issues/40), [#84–87](https://github.com/Exotic209093/WaveLink/issues)) |
+
+### 1.0 release gate
+
+- No open write-path data-corruption defect (all v0.7.0 issues closed with regression tests).
+- A schedule set once fires on time across worker restarts and browser close/reopen; a moderate snapshot either persists or fails loudly (v0.8.0 verified against a real org).
+- No session token on disk in cleartext; no path attaches credentials to a non-Salesforce origin; exports neutralize formula injection (v0.9.0).
+- Every navigable screen has at least one interaction test with mocked Chrome/Salesforce boundaries, and every defect above has a regression test ([#40](https://github.com/Exotic209093/WaveLink/issues/40)).
+- Store-facing docs (SECURITY.md, PRIVACY.md, CHANGELOG) match the code.
+
+### How this pass was run
+
+The UI was exercised outside a packaged extension by serving the production
+`dist/` build with an in-memory `chrome.*` shim (storage, runtime messaging,
+tabs, alarms, downloads) and canned Salesforce responses, then driving every
+navigable screen and the four export formats through a browser-automation
+harness. Findings were confirmed against source before filing; live-reproduced
+items are labelled as such in their issue. The harness was scratch-only and left
+no repository changes.
+
+## Beyond 1.0 — the road to 3.0
+
+> Added 2026-08-31. Context: roughly 15 active users, and the public Chrome Web
+> Store listing is still v0.2.0 — the constraint today is awareness, not proven
+> demand. 1.0 buys trust; the arc below turns trust into users and then, only
+> with evidence, into scope. Each phase has an **entry gate**; a phase whose
+> gate is unmet does not start, and GitHub milestones are created only when a
+> gate is met. The demand log in [`docs/demand-research.md`](docs/demand-research.md)
+> remains the source of truth for evidence.
+
+### v1.1 — Relaunch and listen
+
+**Goal:** turn the trust release into users. Marketing was deliberately held
+back until the write path was safe; this phase spends the one first impression.
+
+- Publish 1.0 to the Chrome Web Store with a rebuilt listing: keywords
+  ("backup", "data loader", "export"), current screenshots, and a 30-second
+  demo video.
+- Lead positioning with the backup wedge: **free, local, scheduled Salesforce
+  backups with snapshot diff** — the one capability the dominant free
+  competitor lacks and the paid alternatives price for enterprises.
+- One-off distribution with compounding search residue: an honest "I built
+  this" post on r/salesforce, a SalesforceBen pitch, awesome-salesforce list
+  submissions, Salesforce StackExchange answers where genuinely relevant, and a
+  README with GIFs plus a fair comparison table against Inspector Reloaded,
+  Jetstream, and Data Loader.
+- Ask the existing users for honest store reviews once 1.0 ships; add an
+  opt-in feedback link in Help and the local diagnostics bundle (promoted from
+  Later) so bug reports never need customer data.
+- Start a weekly metrics log: store installs/uninstalls, review velocity,
+  GitHub traffic and stars. No telemetry — store and repo stats only.
+
+**Release gate:** listing at 1.x with refreshed assets; ten or more honest
+reviews; feedback channel live; four consecutive weekly metric entries.
+
+### v1.5 — Own the backup wedge
+
+**Entry gate:** relaunch complete and schedules/snapshots holding in the field
+— no new critical schedule or snapshot defect for one full release cycle.
+
+- Scheduled **backup profiles**: one profile covering multiple objects with
+  shared cadence and retention.
+- Move snapshot storage out of the 10 MB `chrome.storage` quota (IndexedDB or
+  OPFS, with an explicit `unlimitedStorage` decision) and keep retention
+  forecasting measured rather than estimated.
+- **Restore**: snapshot diff → reviewed import with per-field selection, and a
+  one-record "restore to snapshot state" action.
+- Sensitive-field detection and masking on export (promoted from Later — it
+  deepens the local-first differentiator rather than widening the tool belt).
+- A backup-health surface: last good snapshot per object, loud failure alerts.
+
+**Release gate:** weekly backups of several objects configurable in under three
+minutes; a deleted/modified record restored against a real org; masking
+verified on a real export; no silent snapshot failure mode remains.
+
+### v2.0 — The connected data workspace
+
+**Entry gate:** sustained growth (on the order of hundreds of weekly actives)
+plus repeated inbound requests recorded in the demand log. Without both, stay
+on 1.x — this is the same discipline that produced the v0.6 migration decision.
+
+- Revisit that v0.6 decision with evidence: relationship-aware, resumable
+  cross-org migration done properly — dependency ordering, persistent ID maps,
+  per-object retry, reverse-order rollback, verification counts.
+- Google Sheets as an import/export source.
+- SOSL and Salesforce GraphQL query modes.
+- Shareable job configurations with secrets and record data stripped.
+
+The major version is justified by the scope change (single-job tool →
+multi-object, multi-org workflows) and the storage-schema migration it needs.
+
+### v2.1 — Scale-out hardening
+
+The ".1 after the major," on the same philosophy as v0.7: a full adversarial
+audit and correctness pass over everything 2.0 introduced **before** promoting
+it in the listing. Measured large-migration envelopes, enforced performance
+budgets for the new surfaces, and a real-org regression matrix for the
+migration suite. No new features ship in this release.
+
+### v2.5 — Reach
+
+Independent items, each with its own evidence gate rather than a shared one:
+
+- **Edge and Firefox ports** — once Chrome behavior is stable and the demand
+  shows up in reviews/issues.
+- **Sandbox seeding recipes** with deterministic generated data.
+- **Permission and field-level-security preflight reports.**
+- **Team features exploration** (shared job libraries) — only with concrete
+  multi-seat demand, and never via cloud sync of customer data.
+
+> The phases from here to 3.0 are directional: further out means less detail
+> on purpose. Each still carries an entry gate, and none is a commitment until
+> a dated roadmap decision promotes it.
+
+### v2.6 — Parity and stability
+
+The hardening release for reach, on the x.1 pattern (v0.7, v2.1): no new
+features. One shared test matrix across every shipped browser; per-browser
+quirks (storage quotas, alarm behavior, offscreen equivalents) measured and
+documented; the release/packaging pipeline produces every target from one
+build. **Release gate:** the full real-org validation matrix passes on every
+shipped browser, not just Chrome.
+
+### v2.7 — Always-on backups
+
+**Entry gate:** the backup wedge is the demonstrated reason users install
+(reviews/requests say so), and missed-while-closed runs are a recorded top
+complaint.
+
+The browser-extension ceiling is that `chrome.alarms` cannot fire with the
+browser closed. This phase breaks that ceiling without breaking local-first:
+
+- An optional **native companion** (native messaging host + OS scheduled
+  task) that runs scheduled backup jobs with the browser closed and writes
+  snapshots to user-chosen local folders.
+- Same core job definitions — the extension and companion execute one format.
+- Companion is strictly opt-in, separately installed, and auditable; the
+  extension remains fully functional without it.
+
+**Release gate:** a schedule created in the extension runs on time with the
+browser closed; snapshots land in the chosen folder; uninstalling the
+companion leaves the extension exactly as before.
+
+### v2.8 — Governance
+
+**Entry gate:** inbound demand from admins responsible for compliance
+(masking, audit, retention requests in the demand log).
+
+- Masking **policies**: reusable sensitive-field rules applied across export,
+  backup, and sharing — not per-export toggles.
+- Permission/FLS preflight grown into a reviewable report suite.
+- Local audit exports: who-ran-what job histories exportable for review.
+- Retention policies per backup profile with measured storage forecasting.
+
+**Release gate:** a masked export provably contains no unmasked sensitive
+field; audit exports round-trip through Compare like any other data.
+
+### v3.0 — One local core, many surfaces
+
+**Entry gate:** thousands of weekly actives, companion adoption from v2.7,
+and sustained inbound demand for use outside the browser. This is the next
+major because it changes what WaveLink *is*, not just what it does.
+
+- Extract the job engine (query, push, snapshot, diff, saved jobs) into one
+  core shared by every surface.
+- **Surfaces:** the browser extensions, the native companion, and a thin CLI
+  for scripted/CI use — same job files, same results format everywhere.
+- Shareable, versioned job libraries (secrets and data stripped) as the
+  team story — configurations travel, customer data never does.
+- The 3.0 audit: a v0.7-style adversarial pass over the extracted core before
+  any surface ships on it.
+
+**Release gate:** one job definition runs identically from extension,
+companion, and CLI against a real org; the core has its own test suite and
+measured envelopes; local-first holds — no server, no account, no customer
+data leaving the device.
+
+### Principles that survive every phase
+
+- **Evidence-gated:** no phase starts before its entry gate; the demand log
+  decides, not enthusiasm.
+- **Trust before reach:** any recurrence of write-path data corruption pauses
+  feature work for a v0.7-style correctness release.
+- **Local-first is non-negotiable:** customer data never leaves the device,
+  including in any future team features.
 
 ## Product focus
 
@@ -75,6 +293,13 @@ Implementation snapshot on 2026-08-30 after the roadmap build:
 | Release evidence | Maintainer-authorized dev-box walkthrough complete; five redacted 1280x800 Web Store screenshots captured from the packaged build |
 
 ## Implementation status
+
+> **Correction (2026-08-31):** the 0.6.0 phases below were built, but the audit
+> above shows several are not defect-free as "Complete" implies — Undo (v0.5)
+> does not execute, schedules (v0.4) reset on every worker wake, and the
+> production write gate (v0.2.1) is bypassable via one route. The "None"
+> evidence-needed entries are superseded by the v0.7.0–v1.0.0 milestones; treat
+> those phases as feature-complete but not yet trustworthy pending 1.0.
 
 | Roadmap phase | Engineering status | Evidence still needed before release |
 |---|---|---|
@@ -385,6 +610,12 @@ rollback. The larger migration navigation surface has been removed.
 
 ## Later — Differentiation
 
+> **2026-08-31:** most of this list is now sequenced, with entry gates, in
+> [Beyond 1.0 — the road to 3.0](#beyond-10--the-road-to-30):
+> diagnostics bundle → v1.1; backup profiles, masking → v1.5; Sheets,
+> SOSL/GraphQL, shareable configs → v2.0; seeding, FLS preflight, browser
+> ports → v2.5. The list is kept for reference.
+
 Consider these only after the earlier release gates are met and user demand is
 validated:
 
@@ -452,6 +683,10 @@ reviews can use opt-in feedback, structured manual tests, and local diagnostics.
 4. Add **v0.5 Repeatable data workflows** once the job model is stable.
 5. Use real user demand to choose the scope of **v0.6 Migration**.
 6. Pull Later items forward only when they support validated workflows.
+7. Fix the audit findings through **v0.7–v0.9** and ship the **v1.0 trust
+   release** (see [Road to 1.0](#road-to-10-2026-08-31-audit)).
+8. Relaunch and grow through the **1.x arc**, then let evidence gates decide
+   entry into the **2.x arc and 3.0** (see [Beyond 1.0](#beyond-10--the-road-to-30)).
 
 ## Market reference points
 
