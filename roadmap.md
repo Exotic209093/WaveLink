@@ -38,6 +38,109 @@ UI screens under interaction-test coverage.**
 | **v0.9.0 — Security & data fidelity** | Tokens + output fidelity | Token storage/leaks, CSV formula injection, `ORG_LIST` token exposure, handler gating; nested-attribute leakage, 14-column truncation, snapshot `[object Object]`, CSV BOM, 50-row column sampling, cross-org snapshot compare, saved-job resurrection, workspace org leak, diff/convert round-trip loss ([#64–82](https://github.com/Exotic209093/WaveLink/issues)) |
 | **v1.0.0 — Trust release** | Polish + honesty + coverage | Global Ctrl+Z hijack, legacy blocking tutorial, SECURITY.md/CHANGELOG honesty, and interaction-test coverage for every navigable screen ([#40](https://github.com/Exotic209093/WaveLink/issues/40), [#84–87](https://github.com/Exotic209093/WaveLink/issues)) |
 
+### Milestone execution detail
+
+Rules that apply to every milestone below: work one milestone at a time; every
+fix lands with a regression test that fails without it; any fix touching a
+Salesforce **write** path is additionally verified against a real dev org per
+[`docs/release-validation.md`](docs/release-validation.md); no store release
+ships from a milestone that still has open issues.
+
+**v0.7.0 — Data you can trust** (13 issues)
+
+1. *Results plumbing first.* [#47](https://github.com/Exotic209093/WaveLink/issues/47)
+   (per-row bulk results with input-index mapping) is the foundation — the
+   fixes for [#46](https://github.com/Exotic209093/WaveLink/issues/46) (index
+   shifting) and [#49](https://github.com/Exotic209093/WaveLink/issues/49)
+   (clone ID zip) need the same row-identity mapping, so build it once.
+2. *Restore the broken features:*
+   [#42](https://github.com/Exotic209093/WaveLink/issues/42) Undo (with the
+   typed delete gate), [#43](https://github.com/Exotic209093/WaveLink/issues/43)
+   Copy between orgs, [#50](https://github.com/Exotic209093/WaveLink/issues/50)
+   lookup-validation deadlock.
+3. *Close the write-semantics holes:*
+   [#45](https://github.com/Exotic209093/WaveLink/issues/45) bulk CSV
+   union-headers + `#N/A`, [#83](https://github.com/Exotic209093/WaveLink/issues/83)
+   POST retry idempotency, [#53](https://github.com/Exotic209093/WaveLink/issues/53)
+   date parsing.
+4. *State and gates:* [#44](https://github.com/Exotic209093/WaveLink/issues/44)
+   cleansed-dataset override, [#51](https://github.com/Exotic209093/WaveLink/issues/51)
+   retry-state invalidation, [#48](https://github.com/Exotic209093/WaveLink/issues/48)
+   production gate on the Advanced route,
+   [#52](https://github.com/Exotic209093/WaveLink/issues/52) compare-copy
+   update-vs-insert.
+
+Definition of done: the real-org matrix re-run passes including undo, copy
+between orgs, a >2,000-row bulk import with induced failures, and retry — with
+row-level results verified against the org.
+
+**v0.8.0 — Reliable automation** (10 issues)
+
+1. *Alarm lifecycle rewrite* — [#54](https://github.com/Exotic209093/WaveLink/issues/54)
+   and [#62](https://github.com/Exotic209093/WaveLink/issues/62) together:
+   create-if-absent on wake, missed-run catch-up, and either real time-of-day
+   anchoring or removal of the timezone picker.
+2. *Storage discipline* — [#55](https://github.com/Exotic209093/WaveLink/issues/55)
+   patch-by-id write-backs, [#56](https://github.com/Exotic209093/WaveLink/issues/56)
+   promise-form writes with an explicit quota policy and per-snapshot keys,
+   [#63](https://github.com/Exotic209093/WaveLink/issues/63) checkpoint pruning.
+3. *Job lifecycle* — [#57](https://github.com/Exotic209093/WaveLink/issues/57)
+   heartbeat-aware interruption marking,
+   [#58](https://github.com/Exotic209093/WaveLink/issues/58) checkpoint-backed
+   cancel, [#59](https://github.com/Exotic209093/WaveLink/issues/59)
+   resumable poll timeout, [#60](https://github.com/Exotic209093/WaveLink/issues/60)
+   transport-only offscreen fallback,
+   [#61](https://github.com/Exotic209093/WaveLink/issues/61) mid-job token
+   refresh.
+
+Definition of done: new test suites exist for alarm scheduling and
+quota-failure paths (both had **zero** coverage in the audit); a
+worker-termination test kills the worker at adversarial moments without
+corrupting or duplicating any job; a schedule fires correctly across browser
+restart on a real machine.
+
+**v0.9.0 — Security & data fidelity** (19 issues)
+
+1. *Token hygiene* — [#64](https://github.com/Exotic209093/WaveLink/issues/64)
+   session-only tokens, [#65](https://github.com/Exotic209093/WaveLink/issues/65)
+   origin-restricted rawCall, [#67](https://github.com/Exotic209093/WaveLink/issues/67)
+   token-free `ORG_LIST`, [#68](https://github.com/Exotic209093/WaveLink/issues/68)
+   handler gating. Landing #64/#65 also flips the corresponding
+   `docs/SECURITY.md` caveats back to clean claims.
+2. *Export fidelity* — [#69](https://github.com/Exotic209093/WaveLink/issues/69)–[#73](https://github.com/Exotic209093/WaveLink/issues/73),
+   [#79](https://github.com/Exotic209093/WaveLink/issues/79)–[#81](https://github.com/Exotic209093/WaveLink/issues/81),
+   plus [#66](https://github.com/Exotic209093/WaveLink/issues/66) formula-injection
+   neutralization — verified by **golden-file tests** that compare exact output
+   bytes for a fixture org across all four formats, REST and Bulk.
+3. *Cross-org and state correctness* — [#74](https://github.com/Exotic209093/WaveLink/issues/74)
+   snapshot-org pinning, [#75](https://github.com/Exotic209093/WaveLink/issues/75)
+   saved-job tombstones, [#76](https://github.com/Exotic209093/WaveLink/issues/76)
+   workspace org isolation, [#82](https://github.com/Exotic209093/WaveLink/issues/82)
+   activity linking.
+4. *Diff and convert* — [#77](https://github.com/Exotic209093/WaveLink/issues/77),
+   [#78](https://github.com/Exotic209093/WaveLink/issues/78) — verified by
+   round-trip property tests (CSV↔JSON↔Excel↔XML preserve values, types, and
+   row counts on adversarial fixtures).
+
+Definition of done: no token in `chrome.storage.local`; no code path attaches
+credentials to a non-org origin; golden-file and round-trip suites green.
+
+**v1.0.0 — Trust release** (5 issues)
+
+- [#84](https://github.com/Exotic209093/WaveLink/issues/84) shortcut/input
+  isolation and [#85](https://github.com/Exotic209093/WaveLink/issues/85)
+  tutorial replacement — the two first-run papercuts.
+- [#86](https://github.com/Exotic209093/WaveLink/issues/86)/[#87](https://github.com/Exotic209093/WaveLink/issues/87)
+  docs honesty (repo-hygiene portions addressed 2026-08-31; the remaining claim
+  flips ride on #64/#65).
+- [#40](https://github.com/Exotic209093/WaveLink/issues/40) coverage: at least
+  one interaction test per navigable screen with mocked Chrome/Salesforce
+  boundaries, plus a regression test for every defect fixed in v0.7–v0.9;
+  raise and enforce the CI coverage thresholds to the level the suite then
+  actually achieves.
+- Release engineering: refreshed store assets from the 1.0 build, the full
+  real-org walkthrough, and the relaunch checklist staged for v1.1.
+
 ### 1.0 release gate
 
 - No open write-path data-corruption defect (all v0.7.0 issues closed with regression tests).

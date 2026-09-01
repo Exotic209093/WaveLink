@@ -9,3 +9,4 @@ coverage/
 *.zip
 *.crx
 .idea/
+.claude/settings.local.json

@@ -1,0 +1,72 @@
+name: Bug report
+description: Something in WaveLink doesn't work as documented or expected.
+title: "[Area] Short description of the defect"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **Never include Salesforce record data,
+        session tokens, or org identifiers** — redact screenshots and
+        queries before attaching them. If you believe the issue is a
+        security vulnerability, use the
+        [private reporting channel](https://github.com/Exotic209093/WaveLink/security/advisories/new)
+        instead of this form.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: |
+        1. Went to Export, ran a SOQL query…
+        2. Clicked Export → CSV…
+        3. Expected … but got …
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Export / Query
+        - Import / Data Push
+        - Convert
+        - Compare
+        - Schedules / Snapshots
+        - Saved Jobs / Activity
+        - Copy between orgs
+        - Advanced tools
+        - Popup / in-page panel
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: WaveLink version
+      description: Shown at the bottom of Settings, or on chrome://extensions.
+      placeholder: "0.6.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and OS
+      placeholder: "Chrome 146 on Windows 11"
+    validations:
+      required: true
+  - type: dropdown
+    id: org-type
+    attributes:
+      label: Org type
+      options:
+        - Sandbox / Developer Edition
+        - Production
+        - Not org-related
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Console errors (F12), redacted screenshots, approximate record counts, file formats involved.

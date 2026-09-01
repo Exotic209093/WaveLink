@@ -1,3 +1,5 @@
+> **Historical document.** This audit predates the v0.6.0 rework and describes superseded behavior. It is preserved for project history; see [roadmap.md](../../roadmap.md) for current status.
+
 # WaveLink Product Audit — 2026-06-08
 
 > Previous audit: 2026-04-27. Since then WaveLink shipped **v0.2.0**, repositioned

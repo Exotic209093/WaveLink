@@ -1,3 +1,5 @@
+> **Historical document.** This audit predates the v0.6.0 rework and describes superseded behavior. It is preserved for project history; see [roadmap.md](../../roadmap.md) for current status.
+
 # WaveLink Product Audit — 2026-04-27
 
 > Previous audit: 2026-03-02. Roadmap last updated: 2026-03-22. 56 days have elapsed; Migration Phases 1–3 (5bb6511, b014564) and a SOQL builder overhaul (a87c3a9) shipped in that window.

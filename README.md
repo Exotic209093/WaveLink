@@ -1,8 +1,12 @@
 # WaveLink — Fast Salesforce Data Export & Import
 
+[![CI](https://github.com/Exotic209093/WaveLink/actions/workflows/ci.yml/badge.svg)](https://github.com/Exotic209093/WaveLink/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-WaveLink-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/wavelink/ccknhhibbedolfnbgnenomdohlmojblo)
+
 Get data in and out of Salesforce right from your browser — query records out to CSV/JSON/Excel/XML, push files in via REST or Bulk API, schedule recurring snapshots, and diff exports side by side. Everything runs locally; nothing leaves your device except calls to your own Salesforce orgs.
 
-> **Available now on the Chrome Web Store** — search for **WaveLink** and click **Add to Chrome**.
+> **[Add WaveLink to Chrome →](https://chromewebstore.google.com/detail/wavelink/ccknhhibbedolfnbgnenomdohlmojblo)**
 
 ---
 
@@ -95,19 +99,29 @@ Search for **WaveLink** in the Chrome Web Store and click **Add to Chrome**.
 
 ## Privacy
 
-WaveLink stores all data locally on your device using `chrome.storage.local`. No data is sent to any server other than your Salesforce orgs. No analytics, telemetry, or crash reporting is collected. See the full [Privacy Policy](public/privacy.html).
+WaveLink stores all data locally on your device using `chrome.storage.local`. No data is sent to any server other than your Salesforce orgs. No analytics, telemetry, or crash reporting is collected. See the full [Privacy Policy](PRIVACY.md).
+
+---
+
+## Roadmap
+
+Development is planned and tracked in the open: see [roadmap.md](roadmap.md)
+for the current audit status, the v0.7 → v1.0 trust milestones, and the
+evidence-gated arc through 3.0. Work in progress lives on the
+[issue tracker](https://github.com/Exotic209093/WaveLink/issues) under
+[milestones](https://github.com/Exotic209093/WaveLink/milestones).
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines on pull requests, coding style, and how to run tests.
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines on pull requests, coding style, and how to run tests. All participation is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 
 ## Security
 
-To report a security vulnerability, please open a private security advisory on GitHub. See [SECURITY.md](docs/SECURITY.md) for details.
+To report a security vulnerability, please use the private reporting channel described in [SECURITY.md](SECURITY.md). The full security architecture and local-data inventory are documented in [docs/SECURITY.md](docs/SECURITY.md).
 
 ---
 
