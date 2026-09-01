@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a new capability or an improvement to an existing workflow.
+title: "[Area] Short description of the request"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        WaveLink's roadmap is **evidence-gated** — real recurring workflows
+        move features forward (see
+        [roadmap.md](https://github.com/Exotic209093/WaveLink/blob/main/roadmap.md)).
+        The more concrete your workflow, the stronger the case.
+  - type: textarea
+    id: workflow
+    attributes:
+      label: The recurring workflow or problem
+      description: What are you trying to do, how often, and what do you do today instead?
+      placeholder: |
+        Every Monday I need to …. Today I work around it by …, which takes …
+        and risks ….
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What should WaveLink do? Keep it at the level of the user's job, not implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other tools or approaches you tried, and why they fall short.

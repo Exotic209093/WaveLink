@@ -27,9 +27,9 @@
 |----------|--------|
 | Data sent to third-party servers | **Never** |
 | Data sent outside your Salesforce org | **Never** |
-| Credentials stored in plaintext | **No** — tokens are stored in `chrome.storage.local` (Chrome's encrypted profile store) |
+| Credentials stored in plaintext | **Currently yes** — session tokens are persisted in `chrome.storage.local`, which is **not encrypted at rest** (readable from the profile directory). Moving tokens to session-only storage is tracked in [#64](https://github.com/Exotic209093/WaveLink/issues/64) |
 | OAuth connected app required | **No** — uses existing browser session |
-| Network requests outside Salesforce domains | **None** |
+| Network requests outside Salesforce domains | **None by design**, with one known exception: the Advanced REST explorer currently accepts absolute URLs and would attach the session token to them. Restricting it to the connected org's origin is tracked in [#65](https://github.com/Exotic209093/WaveLink/issues/65) |
 | Content Security Policy | Strict (`script-src 'self'; object-src 'self'`) |
 | Manifest V3 | **Yes** — no persistent background page, no remote code loading |
 
@@ -72,16 +72,23 @@ All WaveLink data is stored in **`chrome.storage.local`**:
 
 ### Data stored
 
+Key names below match `STORAGE_KEYS` in `src/core/constants/index.ts` plus the
+schedule keys written directly by the background worker.
+
 | Data | Location | Sensitive? | Notes |
 |------|----------|-----------|-------|
-| Salesforce session token (`sid`) | `chrome.storage.local → wl_orgs[].accessToken` | **Yes** | Equivalent to being logged in; cleared on org removal |
-| Org metadata (ID, instance URL, label) | `chrome.storage.local → wl_orgs` | Low | No credentials |
-| Saved SOQL queries | `chrome.storage.local → wl_queries` | Low | Query text only; no result data |
-| Push history | `chrome.storage.local → wl_history` | Medium | Includes record counts and error messages, no record payloads |
-| Undo transactions | `chrome.storage.local → wl_undo_txns` | **High** | Contains actual Salesforce record IDs for rollback |
-| Data templates | `chrome.storage.local → wl_templates` | Low | Field mapping config only |
-| Schema cache | `chrome.storage.local → wl_schema_cache` | Low | Public field metadata |
-| User settings | `chrome.storage.local → wl_settings` | None | Theme, shortcuts, etc. |
+| Salesforce session token (`sid`) | `chrome.storage.local → orgs[].accessToken` (also mirrored to `chrome.storage.session → activeTokens`) | **Yes** | Equivalent to being logged in; cleared on org removal. Removing the persistent copy is tracked in [#64](https://github.com/Exotic209093/WaveLink/issues/64) |
+| Org metadata (ID, instance URL, label) | `chrome.storage.local → orgs`, `activeOrgId` | Low | — |
+| Saved SOQL queries and folders | `chrome.storage.local → savedQueries`, `queryFolders` | Low | Query text only; no result data |
+| Push history and results | `chrome.storage.local → pushHistory`, `pushResults` | Medium | Record counts and error messages |
+| Push checkpoints | `chrome.storage.local → activePushes` | Medium | Durable job state for resume |
+| Undo transactions | `chrome.storage.local → pushTransactions` | **High** | Salesforce record IDs for rollback |
+| **Scheduled-export snapshots** | `chrome.storage.local → exportSnapshots` | **High** | Contains **full record payloads** captured by schedules; subject to retention settings |
+| Schedules and run history | `chrome.storage.local → scheduledExports`, `scheduleRunHistory` | Medium | Includes the SOQL text of scheduled queries |
+| Data templates, pipelines, rule sets | `chrome.storage.local → dataTemplates`, `pipelines`, `qualityRuleSets` | Low | Mapping/cleansing config only |
+| Migration projects, ID maps, reports | `chrome.storage.local → migrationProjects`, `idMaps`, `migrationTemplates`, `migrationReports` | Medium | Record IDs and mapping metadata |
+| Schema cache | `chrome.storage.local → schemaCache` | Low | Field metadata |
+| User settings and onboarding | `chrome.storage.local → uiSettings`, `onboarding` | None | Theme, shortcuts, etc. |
 
 ### Undo Transaction Data
 
