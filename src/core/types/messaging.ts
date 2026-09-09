@@ -3,6 +3,8 @@
  * Defines the contract between background, popup, and content scripts.
  */
 
+import type { MigrationProject, IdMapEntry, MigrationSummaryReport } from './migration';
+
 /** All message types in the extension */
 export type MessageType =
   // Auth messages
@@ -122,31 +124,7 @@ export type MessageType =
   // Offscreen document token refresh (Issue #61)
   | 'OFFSCREEN_TOKEN_REFRESH';
 
-/** Base message shape */
-export interface ExtensionMessage<T extends MessageType = MessageType, P = unknown> {
-  type: T;
-  payload: P;
-  requestId: string;
-  timestamp: number;
-  source: MessageSource;
-}
-
-/** Where a message originates from */
-export type MessageSource = 'popup' | 'background' | 'content' | 'app';
-
-/** Response wrapper */
-export interface MessageResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: MessageError;
-  requestId: string;
-}
-
-export interface MessageError {
-  code: string;
-  message: string;
-  details?: unknown;
-}
+// ── Payload Interfaces ────────────────────────────────────────────────
 
 /** Auth message payloads */
 export interface AuthInitiatePayload {
@@ -191,11 +169,13 @@ export interface DataPushStartPayload {
 
 export interface DataPushProgressPayload {
   pushId: string;
-  totalRecords: number;
-  processedRecords: number;
-  failedRecords: number;
-  status: 'processing' | 'complete' | 'error' | 'cancelled';
+  totalRecords?: number;
+  processedRecords?: number;
+  failedRecords?: number;
+  status?: 'processing' | 'complete' | 'error' | 'cancelled';
   errors?: Array<{ recordIndex: number; message: string }>;
+  /** Single error message for DATA_PUSH_ERROR broadcasts. */
+  error?: string;
 }
 
 export interface DataPushCancelPayload {
@@ -247,7 +227,361 @@ export interface SchemaDescribeSObjectPayload {
   objectName: string;
 }
 
-/** Message handler type */
+// ── Inline Payload Types (previously cast-only in handlers) ───────────
+
+export interface SfQueryRunPayload {
+  tabId?: number;
+  soql: string;
+}
+
+export interface SfQueryMorePayload {
+  tabId?: number;
+  nextRecordsUrl: string;
+}
+
+export interface SfBulkQueryStartPayload {
+  tabId?: number;
+  soql: string;
+}
+
+export interface SfBulkQueryStatusPayload {
+  tabId?: number;
+  jobId: string;
+}
+
+export interface SfBulkQueryResultsPayload {
+  tabId?: number;
+  jobId: string;
+  locator?: string;
+  maxRecords?: number;
+}
+
+export interface SfBulkQueryCancelPayload {
+  tabId?: number;
+  jobId: string;
+}
+
+export interface SfToolingQueryRunPayload {
+  tabId?: number;
+  soql: string;
+}
+
+export interface SfToolingQueryMorePayload {
+  tabId?: number;
+  nextRecordsUrl: string;
+}
+
+export interface SfDescribeGlobalPayload {
+  tabId?: number;
+}
+
+export interface SfDescribeSObjectPayload {
+  tabId?: number;
+  objectName: string;
+}
+
+export interface SfUpdateRecordPayload {
+  tabId?: number;
+  objectName: string;
+  recordId: string;
+  fields: Record<string, unknown>;
+}
+
+export interface SfCreateRecordPayload {
+  tabId?: number;
+  objectName: string;
+  fields: Record<string, unknown>;
+}
+
+export interface SfDeleteRecordPayload {
+  tabId?: number;
+  objectName: string;
+  recordId: string;
+}
+
+export interface SfLimitsGetPayload {
+  tabId?: number;
+}
+
+export interface SfExecuteAnonymousPayload {
+  tabId?: number;
+  apexBody: string;
+}
+
+export interface SfApiRequestPayload {
+  tabId?: number;
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
+  path: string;
+  body?: unknown;
+  rawText?: boolean;
+}
+
+export interface SfQueryExplainPayload {
+  tabId?: number;
+  soql: string;
+}
+
+export interface SfContextGetPayload {
+  tabId?: number;
+}
+
+export interface SfTabsListPayload {
+  [key: string]: never;
+}
+
+export interface UiSettingsSetPayload {
+  [key: string]: unknown;
+}
+
+export interface SavedQueryUpsertPayload {
+  id: string;
+  name: string;
+  soql: string;
+}
+
+export interface IdOnlyPayload {
+  id: string;
+}
+
+export interface QueryFolderUpsertPayload {
+  id: string;
+  name: string;
+  parentId?: string;
+}
+
+export interface OnboardingSetPayload {
+  completedSteps?: string[];
+  dismissedAt?: number;
+  lastSeenVersion?: string;
+}
+
+export interface OrgSwitchPayload {
+  orgId: string;
+}
+
+export interface OrgConnectTabPayload {
+  tabId: number;
+}
+
+export interface OrgRefreshPayload {
+  orgId: string;
+}
+
+export interface OrgUpdatePayload {
+  orgId: string;
+  nickname?: string;
+}
+
+export interface CrossOrgQueryPayload {
+  orgId: string;
+  soql: string;
+}
+
+export interface CrossOrgDescribePayload {
+  orgId: string;
+  objectName?: string;
+}
+
+export interface DataPushResumePayload {
+  pushId: string;
+  tabId?: number;
+}
+
+export interface DataPushRetryFailedPayload {
+  pushId: string;
+  tabId?: number;
+}
+
+export interface OpenFullAppPayload {
+  tabId?: number;
+}
+
+export interface PanelTogglePayload {
+  [key: string]: never;
+}
+
+export interface SchemaCacheClearPayload {
+  orgId?: string;
+}
+
+export type MigrationProjectUpsertPayload =
+  & Pick<MigrationProject, 'id' | 'name' | 'sourceOrgId' | 'targetOrgId'>
+  & Partial<Omit<MigrationProject, 'id' | 'name' | 'sourceOrgId' | 'targetOrgId' | 'createdAt' | 'updatedAt'>>;
+
+export interface IdMapCreatePayload {
+  id: string;
+  name: string;
+  sourceOrgId: string;
+  targetOrgId: string;
+}
+
+export interface IdMapAddEntriesPayload {
+  mapId: string;
+  entries: IdMapEntry[];
+}
+
+export interface MigrationTemplateUpsertPayload {
+  id: string;
+  name: string;
+  [key: string]: unknown;
+}
+
+export type MigrationReportSavePayload = MigrationSummaryReport;
+
+export interface MigrationReportGetPayload {
+  runId: string;
+}
+
+export interface MigrationReportDeletePayload {
+  runId: string;
+}
+
+// ── Payload Map ───────────────────────────────────────────────────────
+
+/** Maps each MessageType to its expected payload shape. */
+export interface PayloadMap {
+  AUTH_INITIATE: AuthInitiatePayload;
+  AUTH_CALLBACK: unknown;
+  AUTH_REFRESH: unknown;
+  AUTH_LOGOUT: { orgId?: string };
+  AUTH_STATUS: AuthStatusPayload;
+
+  ORG_DETECT: OrgDetectPayload;
+  ORG_INFO: Record<string, never>;
+  ORG_LIST: Record<string, never>;
+  ORG_SWITCH: OrgSwitchPayload;
+  ORG_CONNECT_TAB: OrgConnectTabPayload;
+  ORG_REFRESH: OrgRefreshPayload;
+  ORG_UPDATE: OrgUpdatePayload;
+
+  CROSS_ORG_QUERY: CrossOrgQueryPayload;
+  CROSS_ORG_DESCRIBE: CrossOrgDescribePayload;
+
+  DATA_PUSH_START: DataPushStartPayload;
+  DATA_PUSH_PROGRESS: DataPushProgressPayload;
+  DATA_PUSH_COMPLETE: DataPushProgressPayload;
+  DATA_PUSH_ERROR: DataPushProgressPayload;
+  DATA_PUSH_CANCEL: DataPushCancelPayload;
+  DATA_PUSH_RESULT_GET: DataPushResultGetPayload;
+  DATA_PUSH_RETRY_FAILED: DataPushRetryFailedPayload;
+  DATA_PUSH_ACTIVE_GET: Record<string, never>;
+  DATA_PUSH_RESUME: DataPushResumePayload;
+  PUSH_HISTORY_GET: Record<string, never>;
+
+  SCHEMA_DESCRIBE: SchemaDescribePayload;
+  SCHEMA_DESCRIBE_SOBJECT: SchemaDescribeSObjectPayload;
+
+  STORAGE_GET: { key: string };
+  STORAGE_SET: { key: string; value: unknown };
+  STORAGE_REMOVE: { key: string };
+
+  SF_TABS_LIST: SfTabsListPayload;
+  SF_CONTEXT_GET: SfContextGetPayload;
+  SF_QUERY_RUN: SfQueryRunPayload;
+  SF_QUERY_MORE: SfQueryMorePayload;
+  SF_BULK_QUERY_START: SfBulkQueryStartPayload;
+  SF_BULK_QUERY_STATUS: SfBulkQueryStatusPayload;
+  SF_BULK_QUERY_RESULTS: SfBulkQueryResultsPayload;
+  SF_BULK_QUERY_CANCEL: SfBulkQueryCancelPayload;
+  SF_EXECUTE_ANONYMOUS: SfExecuteAnonymousPayload;
+  SF_API_REQUEST: SfApiRequestPayload;
+  SF_TOOLING_QUERY_RUN: SfToolingQueryRunPayload;
+  SF_TOOLING_QUERY_MORE: SfToolingQueryMorePayload;
+  SF_DESCRIBE_GLOBAL: SfDescribeGlobalPayload;
+  SF_DESCRIBE_SOBJECT: SfDescribeSObjectPayload;
+  SF_UPDATE_RECORD: SfUpdateRecordPayload;
+  SF_CREATE_RECORD: SfCreateRecordPayload;
+  SF_DELETE_RECORD: SfDeleteRecordPayload;
+  SF_LIMITS_GET: SfLimitsGetPayload;
+  SF_QUERY_EXPLAIN: SfQueryExplainPayload;
+
+  PANEL_TOGGLE: PanelTogglePayload;
+  OPEN_FULL_APP: OpenFullAppPayload;
+  UI_SETTINGS_GET: Record<string, never>;
+  UI_SETTINGS_SET: UiSettingsSetPayload;
+  SAVED_QUERIES_LIST: Record<string, never>;
+  SAVED_QUERIES_UPSERT: SavedQueryUpsertPayload;
+  SAVED_QUERIES_DELETE: IdOnlyPayload;
+
+  QUERY_FOLDERS_GET: Record<string, never>;
+  QUERY_FOLDERS_UPSERT: QueryFolderUpsertPayload;
+  QUERY_FOLDERS_DELETE: IdOnlyPayload;
+
+  TEMPLATES_LIST: Record<string, never>;
+  TEMPLATES_UPSERT: Record<string, unknown>;
+  TEMPLATES_DELETE: IdOnlyPayload;
+
+  TRANSACTIONS_GET: Record<string, never>;
+  TRANSACTIONS_CLEAR: IdOnlyPayload;
+
+  PIPELINES_LIST: Record<string, never>;
+  PIPELINES_UPSERT: Record<string, unknown>;
+  PIPELINES_DELETE: IdOnlyPayload;
+
+  QUALITY_RULES_LIST: Record<string, never>;
+  QUALITY_RULES_UPSERT: Record<string, unknown>;
+  QUALITY_RULES_DELETE: IdOnlyPayload;
+
+  SCHEMA_CACHE_CLEAR: SchemaCacheClearPayload;
+
+  STORAGE_USAGE_GET: Record<string, never>;
+  STORAGE_PURGE_OLD: Record<string, never>;
+
+  DATA_EXPORT: Record<string, never>;
+  DATA_IMPORT: Record<string, unknown>;
+
+  ONBOARDING_GET: Record<string, never>;
+  ONBOARDING_SET: OnboardingSetPayload;
+
+  MIGRATION_PROJECTS_LIST: Record<string, never>;
+  MIGRATION_PROJECTS_GET: IdOnlyPayload;
+  MIGRATION_PROJECTS_UPSERT: MigrationProjectUpsertPayload;
+  MIGRATION_PROJECTS_DELETE: IdOnlyPayload;
+
+  ID_MAPS_LIST: Record<string, never>;
+  ID_MAPS_GET: IdOnlyPayload;
+  ID_MAPS_CREATE: IdMapCreatePayload;
+  ID_MAPS_ADD_ENTRIES: IdMapAddEntriesPayload;
+  ID_MAPS_DELETE: IdOnlyPayload;
+  ID_MAPS_EXPORT: IdOnlyPayload;
+
+  MIGRATION_TEMPLATES_LIST: Record<string, never>;
+  MIGRATION_TEMPLATES_UPSERT: MigrationTemplateUpsertPayload;
+  MIGRATION_TEMPLATES_DELETE: IdOnlyPayload;
+
+  MIGRATION_REPORTS_LIST: Record<string, never>;
+  MIGRATION_REPORTS_GET: MigrationReportGetPayload;
+  MIGRATION_REPORTS_SAVE: MigrationReportSavePayload;
+  MIGRATION_REPORTS_DELETE: MigrationReportDeletePayload;
+}
+
+/** Base message shape — payload type is derived from the message type via PayloadMap. */
+export interface ExtensionMessage<T extends MessageType = MessageType> {
+  type: T;
+  payload: PayloadMap[T];
+  requestId: string;
+  timestamp: number;
+  source: MessageSource;
+}
+
+/** Where a message originates from */
+export type MessageSource = 'popup' | 'background' | 'content' | 'app';
+
+/** Response wrapper */
+export interface MessageResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: MessageError;
+  requestId: string;
+}
+
+export interface MessageError {
+  code: string;
+  message: string;
+  details?: unknown;
+}
+
+/** Message handler type — payload is inferred from T via PayloadMap. */
 export type MessageHandler<T extends MessageType = MessageType> = (
   message: ExtensionMessage<T>,
   sender: chrome.runtime.MessageSender,
