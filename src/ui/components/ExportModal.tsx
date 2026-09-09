@@ -15,6 +15,7 @@ export interface ExportModalProps {
   open: boolean;
   records: Record<string, unknown>[];
   columns: string[];
+  selectedColumns?: string[];
   defaultFilename?: string;
   preferences?: ExportPreferences;
   onPreferencesChange?: (preferences: ExportPreferences) => void;
@@ -34,16 +35,18 @@ export function ExportModal(props: ExportModalProps): VNode | null {
   const [filename, setFilename] = useState<string>(defaultFilename);
   const [sheetName, setSheetName] = useState<string>(props.preferences?.sheetName ?? 'Sheet1');
   const [includeMetadata, setIncludeMetadata] = useState<boolean>(props.preferences?.includeMetadata ?? false);
-  const [selectedColumns, setSelectedColumns] = useState<Set<string>>(new Set(columns));
+  const [selectedColumns, setSelectedColumns] = useState<Set<string>>(new Set(props.selectedColumns ?? columns));
   const [showColumnPicker, setShowColumnPicker] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setSelectedColumns(new Set(columns));
+    setSelectedColumns(new Set(props.selectedColumns ?? columns));
     setFormat(props.preferences?.format ?? 'csv');
     setSheetName(props.preferences?.sheetName ?? 'Sheet1');
     setIncludeMetadata(props.preferences?.includeMetadata ?? false);
-  }, [open, columns, props.preferences?.format, props.preferences?.sheetName, props.preferences?.includeMetadata]);
+    setError(null);
+  }, [open, columns, props.selectedColumns, props.preferences?.format, props.preferences?.sheetName, props.preferences?.includeMetadata]);
 
   function updatePreferences(next: Partial<ExportPreferences>): void {
     props.onPreferencesChange?.({ format, sheetName, includeMetadata, ...next });
@@ -52,17 +55,39 @@ export function ExportModal(props: ExportModalProps): VNode | null {
   if (!open) return null;
 
   const handleExport = async () => {
+    setError(null);
+
+    // Validate Excel sheet name: max 31 chars, no : \ / ? * [ ]
+    if (format === 'excel') {
+      const invalidChars = /[:\\/?*\[\]]/;
+      if (!sheetName.trim()) {
+        setError('Sheet name cannot be empty.');
+        return;
+      }
+      if (sheetName.length > 31) {
+        setError('Sheet name must be 31 characters or fewer.');
+        return;
+      }
+      if (invalidChars.test(sheetName)) {
+        setError('Sheet name cannot contain : \\ / ? * [ ]');
+        return;
+      }
+    }
+
     const finalFilename = ensureCorrectExtension(filename, format);
     const columnsToExport = Array.from(selectedColumns);
 
-    await exportRecords(records, columnsToExport, {
-      format,
-      filename: finalFilename,
-      sheetName: format === 'excel' ? sheetName : undefined,
-      includeMetadata: format === 'json' ? includeMetadata : undefined,
-    });
-
-    onClose();
+    try {
+      await exportRecords(records, columnsToExport, {
+        format,
+        filename: finalFilename,
+        sheetName: format === 'excel' ? sheetName : undefined,
+        includeMetadata: format === 'json' ? includeMetadata : undefined,
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   const toggleColumn = (column: string) => {
@@ -216,6 +241,12 @@ export function ExportModal(props: ExportModalProps): VNode | null {
               </div>
             )}
           </div>
+
+          {error ? (
+            <div role="alert" style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:13px">
+              {error}
+            </div>
+          ) : null}
 
           <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--wl-line-2)">
             <button class="wl-btn" onClick={onClose}>Cancel</button>

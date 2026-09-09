@@ -697,7 +697,8 @@ export function QueryScreen(props: {
       <ExportModal
         open={exportOpen}
         records={flatRecords}
-        columns={selectedColumns.length ? selectedColumns : columns}
+        columns={columns}
+        selectedColumns={selectedColumns.length ? selectedColumns : columns}
         defaultFilename={`wavelink-query-${Date.now()}`}
         preferences={props.exportPreferences}
         onPreferencesChange={props.onExportPreferencesChange}

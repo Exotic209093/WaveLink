@@ -50,18 +50,28 @@ export async function queryAllRecords(
 }
 
 /**
- * Derives the set of column names present across the first `sampleSize` records,
- * excluding Salesforce's `attributes` envelope. Stable order of first appearance.
+ * Derives the set of column names present across all loaded records,
+ * excluding Salesforce's `attributes` envelope at any nesting level.
+ * Stable order of first appearance.
  */
-export function deriveColumns(records: Record<string, unknown>[], sampleSize = 50): string[] {
+export function deriveColumns(records: Record<string, unknown>[]): string[] {
   const cols: string[] = [];
   const seen = new Set<string>();
-  for (const record of records.slice(0, sampleSize)) {
-    for (const key of Object.keys(record)) {
-      if (key === 'attributes' || seen.has(key)) continue;
-      seen.add(key);
-      cols.push(key);
-    }
+  for (const record of records) {
+    collectKeys(record, '', seen, cols);
   }
   return cols;
+}
+
+function collectKeys(value: unknown, prefix: string, seen: Set<string>, cols: string[]): void {
+  if (value === null || value === undefined || typeof value !== 'object' || Array.isArray(value)) return;
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (k === 'attributes') continue;
+    const fullKey = prefix ? `${prefix}.${k}` : k;
+    if (!seen.has(fullKey)) {
+      seen.add(fullKey);
+      cols.push(fullKey);
+    }
+    collectKeys(v, fullKey, seen, cols);
+  }
 }
