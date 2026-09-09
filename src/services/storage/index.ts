@@ -16,10 +16,25 @@
  */
 
 import { StorageError } from '../../core/errors';
-import { STORAGE_KEYS, MAX_PUSH_HISTORY, MAX_UNDO_ENTRIES } from '../../core/constants';
+import { STORAGE_KEYS, MAX_PUSH_HISTORY, MAX_UNDO_ENTRIES, SCHEMA_CACHE_TTL } from '../../core/constants';
 import type { LocalStorageSchema, SessionStorageSchema, PushHistoryEntry, PushResult, ActivePush, SavedQuery, QueryFolder, UiSettings, DataTemplate, PushTransaction, Pipeline, QualityRuleSet, OnboardingProgress } from '../../core/types/storage';
 import type { MigrationProject, IdMap, IdMapEntry, MigrationTemplate, MigrationSummaryReport } from '../../core/types/migration';
 import type { SalesforceOrg } from '../../core/types/salesforce';
+
+/** Maximum number of schema cache entries before LRU eviction kicks in. */
+const MAX_SCHEMA_CACHE_ENTRIES = 50;
+
+/** Terminal active-push statuses eligible for automatic pruning. */
+const TERMINAL_PUSH_STATUSES = new Set<ActivePush['status']>(['complete', 'error', 'cancelled']);
+
+/** Age threshold (ms) for pruning terminal active-push checkpoints. */
+const ACTIVE_PUSH_PRUNE_AGE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+
+/** Fraction of quota at which pre-write eviction is triggered. */
+const QUOTA_EVICTION_THRESHOLD = 0.85;
+
+/** Target fraction of quota to free during emergency eviction. */
+const QUOTA_EVICTION_TARGET = 0.7;
 
 /**
  * StorageService abstracts chrome.storage operations with type safety.
@@ -614,17 +629,53 @@ export class StorageService {
     return { imported };
   }
 
-  /** Cache schema data */
+  /** Cache schema data with LRU eviction when entry count exceeds cap. */
   async setCachedSchema(orgId: string, objectName: string, data: unknown, ttl: number): Promise<void> {
     const cache = await this.getLocal<LocalStorageSchema['schemaCache']>(STORAGE_KEYS.SCHEMA_CACHE) ?? {};
-    cache[`${orgId}:${objectName}`] = {
+    const key = `${orgId}:${objectName}`;
+    cache[key] = {
       objectName,
       orgId,
       data,
       cachedAt: Date.now(),
       ttl,
     };
+
+    // Evict expired entries first (lazy sweep).
+    const now = Date.now();
+    for (const [k, entry] of Object.entries(cache)) {
+      if (now > entry.cachedAt + entry.ttl) delete cache[k];
+    }
+
+    // LRU eviction: drop oldest-accessed entries when over cap.
+    const keys = Object.keys(cache);
+    if (keys.length > MAX_SCHEMA_CACHE_ENTRIES) {
+      const sorted = keys.sort((a, b) => cache[a].cachedAt - cache[b].cachedAt);
+      const toRemove = sorted.slice(0, keys.length - MAX_SCHEMA_CACHE_ENTRIES);
+      for (const k of toRemove) delete cache[k];
+    }
+
     await this.setLocal(STORAGE_KEYS.SCHEMA_CACHE, cache);
+  }
+
+  /**
+   * Prune terminal active-push checkpoints older than ACTIVE_PUSH_PRUNE_AGE_MS.
+   * Intended to be called on service-worker startup alongside markInterruptedPushes.
+   */
+  async pruneTerminalPushes(): Promise<number> {
+    const all = await this.getActivePushMap();
+    const cutoff = Date.now() - ACTIVE_PUSH_PRUNE_AGE_MS;
+    let pruned = 0;
+    for (const [id, push] of Object.entries(all)) {
+      if (TERMINAL_PUSH_STATUSES.has(push.status) && (push.updatedAt ?? push.startedAt) < cutoff) {
+        delete all[id];
+        pruned++;
+      }
+    }
+    if (pruned > 0) {
+      await this.setLocal(STORAGE_KEYS.ACTIVE_PUSHES, all);
+    }
+    return pruned;
   }
 
   // ── Session Storage (ephemeral) ─────────────────────────────────
@@ -771,12 +822,76 @@ export class StorageService {
 
   private async setLocal(key: string, value: unknown): Promise<void> {
     try {
+      // Pre-write quota check: if usage exceeds threshold, attempt eviction.
+      const usage = await this.getStorageUsage();
+      if (usage.bytesInUse > usage.quota * QUOTA_EVICTION_THRESHOLD) {
+        await this.evictForQuota(usage.quota);
+      }
       await chrome.storage.local.set({ [key]: value });
     } catch (error) {
+      // Handle QUOTA_EXCEEDED specifically: attempt emergency eviction and retry once.
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('QUOTA_BYTES') || msg.includes('quota')) {
+        try {
+          await this.evictForQuota(10 * 1024 * 1024);
+          await chrome.storage.local.set({ [key]: value });
+          return;
+        } catch {
+          // Fall through to original error below.
+        }
+      }
       throw new StorageError(
         `Failed to write to local storage: ${key}`,
         error,
       );
+    }
+  }
+
+  /**
+   * Emergency eviction: clear schema cache entries and old push history until
+   * usage drops below QUOTA_EVICTION_TARGET * quota.
+   */
+  private async evictForQuota(quota: number): Promise<void> {
+    const target = quota * QUOTA_EVICTION_TARGET;
+
+    // 1. Clear expired schema cache entries first.
+    const cache = await this.getLocal<LocalStorageSchema['schemaCache']>(STORAGE_KEYS.SCHEMA_CACHE) ?? {};
+    const now = Date.now();
+    let changed = false;
+    for (const [k, entry] of Object.entries(cache)) {
+      if (now > entry.cachedAt + entry.ttl) {
+        delete cache[k];
+        changed = true;
+      }
+    }
+    if (changed) await chrome.storage.local.set({ [STORAGE_KEYS.SCHEMA_CACHE]: cache });
+
+    let usage = await chrome.storage.local.getBytesInUse(null);
+    if (usage <= target) return;
+
+    // 2. Drop oldest schema cache entries (up to half).
+    const keys = Object.keys(cache);
+    if (keys.length > 0) {
+      const sorted = keys.sort((a, b) => cache[a].cachedAt - cache[b].cachedAt);
+      const toRemove = sorted.slice(0, Math.ceil(sorted.length / 2));
+      for (const k of toRemove) delete cache[k];
+      await chrome.storage.local.set({ [STORAGE_KEYS.SCHEMA_CACHE]: cache });
+    }
+
+    usage = await chrome.storage.local.getBytesInUse(null);
+    if (usage <= target) return;
+
+    // 3. Prune terminal active pushes.
+    await this.pruneTerminalPushes();
+
+    usage = await chrome.storage.local.getBytesInUse(null);
+    if (usage <= target) return;
+
+    // 4. Truncate push history to most recent 20 entries.
+    const history = await this.getPushHistory();
+    if (history.length > 20) {
+      history.length = 20;
+      await chrome.storage.local.set({ [STORAGE_KEYS.PUSH_HISTORY]: history });
     }
   }
 
