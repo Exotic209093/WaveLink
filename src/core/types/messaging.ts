@@ -118,7 +118,9 @@ export type MessageType =
   | 'MIGRATION_REPORTS_LIST'
   | 'MIGRATION_REPORTS_GET'
   | 'MIGRATION_REPORTS_SAVE'
-  | 'MIGRATION_REPORTS_DELETE';
+  | 'MIGRATION_REPORTS_DELETE'
+  // Offscreen document token refresh (Issue #61)
+  | 'OFFSCREEN_TOKEN_REFRESH';
 
 /** Base message shape */
 export interface ExtensionMessage<T extends MessageType = MessageType, P = unknown> {

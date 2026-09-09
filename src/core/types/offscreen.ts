@@ -49,3 +49,19 @@ export interface OffscreenBulkPushResponse {
   ok: boolean;
   error?: string;
 }
+
+/** Token refresh request sent from offscreen document to service worker (Issue #61). */
+export interface OffscreenTokenRefreshRequest {
+  type: 'OFFSCREEN_TOKEN_REFRESH';
+  payload: {
+    orgId?: string;
+    instanceUrl?: string;
+  };
+}
+
+/** Token refresh response from service worker to offscreen document. */
+export interface OffscreenTokenRefreshResponse {
+  success: boolean;
+  data?: { accessToken: string };
+  error?: { code: string; message: string };
+}

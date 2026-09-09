@@ -136,6 +136,49 @@ messageBus.on('AUTH_LOGOUT', async (message): Promise<MessageResponse> => {
   }
 });
 
+// ── Offscreen Token Refresh (Issue #61) ──────────────────────────────
+messageBus.on('OFFSCREEN_TOKEN_REFRESH', async (message): Promise<MessageResponse> => {
+  try {
+    const { orgId, instanceUrl } = message.payload as { orgId?: string; instanceUrl?: string };
+
+    // Prefer stored org lookup (covers popup/scheduled flows).
+    if (orgId) {
+      const refreshed = await getValidOrg(orgId);
+      return { success: true, data: { accessToken: refreshed.accessToken }, requestId: message.requestId };
+    }
+
+    // Fallback: re-derive from active tab cookies when only instanceUrl is known.
+    if (instanceUrl) {
+      const tabs = await chrome.tabs.query({ url: `${instanceUrl}/*` });
+      for (const tab of tabs) {
+        if (!tab.id) continue;
+        try {
+          const org = await auth.loginForTab(tab.id);
+          const refreshed = await auth.ensureValidToken(org);
+          return { success: true, data: { accessToken: refreshed.accessToken }, requestId: message.requestId };
+        } catch {
+          // Try next matching tab.
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: { code: 'TOKEN_REFRESH_FAILED', message: 'Unable to refresh access token for offscreen document.' },
+      requestId: message.requestId,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        code: 'TOKEN_REFRESH_ERROR',
+        message: error instanceof Error ? error.message : 'Token refresh failed',
+      },
+      requestId: message.requestId,
+    };
+  }
+});
+
 // ── Inspector-Style Salesforce Handlers ──────────────────────────────
 
 function getTargetTabId(payload: unknown, sender: chrome.runtime.MessageSender): number {
