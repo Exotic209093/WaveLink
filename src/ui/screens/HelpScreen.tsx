@@ -31,9 +31,9 @@ const HELP_CATEGORIES: Array<{
     filter: (s) => s.category === 'getting-started',
   },
   {
-    name: 'Data Push',
+    name: 'Import',
     description: 'Upload files, map fields, push records, and review push history.',
-    filter: (s) => s.category === 'data-push',
+    filter: (s) => s.category === 'import',
   },
   {
     name: 'Query & Objects',
