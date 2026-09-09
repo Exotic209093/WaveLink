@@ -69,7 +69,19 @@ export function JobsActivityScreen(props: { sf: SfApi; onNavigate: (route: strin
   const scheduleById = useMemo(() => new Map(schedules.map(schedule => [schedule.id, schedule])), [schedules]);
   const snapshotByRun = useMemo(() => {
     const values = Object.values(snapshots);
-    return new Map(scheduleRuns.map(run => [run.id, values.find(snapshot => snapshot.scheduleId === run.scheduleId && Math.abs(snapshot.capturedAt - run.completedAt) < 60_000)?.id]));
+    return new Map(scheduleRuns.map(run => {
+      let bestId: string | undefined;
+      let bestDelta = Infinity;
+      for (const snapshot of values) {
+        if (snapshot.scheduleId !== run.scheduleId) continue;
+        const delta = Math.abs(snapshot.capturedAt - run.startedAt);
+        if (delta < bestDelta) {
+          bestDelta = delta;
+          bestId = snapshot.id;
+        }
+      }
+      return [run.id, bestId];
+    }));
   }, [snapshots, scheduleRuns]);
 
   const activity = useMemo<ActivityRow[]>(() => {
