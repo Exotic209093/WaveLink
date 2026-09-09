@@ -219,13 +219,13 @@ export interface PushTransaction {
 /** Step types for transformation pipelines */
 export type PipelineStepType = 'filter' | 'transform' | 'lookup' | 'aggregate' | 'join';
 
-/** Single step in a transformation pipeline */
-export interface PipelineStep {
-  id: string;
-  type: PipelineStepType;
-  label: string;
-  config: Record<string, unknown>;
-}
+/** Single step in a transformation pipeline (discriminated union by type) */
+export type PipelineStep =
+  | { id: string; label: string; type: 'filter'; config: Record<string, unknown> }
+  | { id: string; label: string; type: 'transform'; config: Record<string, unknown> }
+  | { id: string; label: string; type: 'lookup'; config: Record<string, unknown> }
+  | { id: string; label: string; type: 'aggregate'; config: Record<string, unknown> }
+  | { id: string; label: string; type: 'join'; config: Record<string, unknown> };
 
 /** Saved data transformation pipeline */
 export interface Pipeline {

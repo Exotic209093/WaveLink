@@ -8,22 +8,17 @@ import { interpolate, evaluateCondition } from './formulas';
 
 export type StepType = 'filter' | 'transform' | 'lookup' | 'aggregate' | 'join';
 
-export interface PipelineStep {
-  id: string;
-  type: StepType;
-  label: string;
-  config: Record<string, unknown>;
-}
-
 export interface FilterStepConfig {
   field: string;
   operator: string;
   value: string;
+  [key: string]: unknown;
 }
 
 export interface TransformStepConfig {
   field: string;
   expression: string;
+  [key: string]: unknown;
 }
 
 export interface LookupStepConfig {
@@ -31,11 +26,13 @@ export interface LookupStepConfig {
   lookupTable: Record<string, unknown>[];
   lookupKey: string;
   outputField: string;
+  [key: string]: unknown;
 }
 
 export interface AggregateStepConfig {
   groupBy: string[];
   aggregations: Array<{ field: string; fn: 'count' | 'sum' | 'avg' | 'min' | 'max'; outputField: string }>;
+  [key: string]: unknown;
 }
 
 export interface JoinStepConfig {
@@ -43,7 +40,17 @@ export interface JoinStepConfig {
   rightRecords: Record<string, unknown>[];
   rightJoinField: string;
   joinType: 'inner' | 'left';
+  [key: string]: unknown;
 }
+
+/** Discriminated union of pipeline steps keyed by type. Provides compile-time
+ *  exhaustiveness checking and eliminates unsafe casts in executeStep. */
+export type PipelineStep =
+  | { id: string; label: string; type: 'filter'; config: FilterStepConfig }
+  | { id: string; label: string; type: 'transform'; config: TransformStepConfig }
+  | { id: string; label: string; type: 'lookup'; config: LookupStepConfig }
+  | { id: string; label: string; type: 'aggregate'; config: AggregateStepConfig }
+  | { id: string; label: string; type: 'join'; config: JoinStepConfig };
 
 /** Execute a single pipeline step. O(N) to O(N*M) depending on step type. */
 export function executeStep(
@@ -52,14 +59,14 @@ export function executeStep(
 ): Record<string, unknown>[] {
   switch (step.type) {
     case 'filter': {
-      const cfg = step.config as unknown as FilterStepConfig;
+      const cfg = step.config;
       return records.filter(r =>
         evaluateCondition(r, { field: cfg.field, operator: cfg.operator as 'eq' | 'neq' | 'contains' | 'startsWith' | 'isEmpty' | 'notEmpty', value: cfg.value })
       );
     }
 
     case 'transform': {
-      const cfg = step.config as unknown as TransformStepConfig;
+      const cfg = step.config;
       return records.map(r => ({
         ...r,
         [cfg.field]: interpolate(cfg.expression, r),
@@ -67,7 +74,7 @@ export function executeStep(
     }
 
     case 'lookup': {
-      const cfg = step.config as unknown as LookupStepConfig;
+      const cfg = step.config;
       const lookupMap = new Map<string, Record<string, unknown>>();
       for (const row of (cfg.lookupTable ?? [])) {
         const key = String(row[cfg.lookupKey] ?? '');
@@ -81,7 +88,7 @@ export function executeStep(
     }
 
     case 'aggregate': {
-      const cfg = step.config as unknown as AggregateStepConfig;
+      const cfg = step.config;
       const groups = new Map<string, Record<string, unknown>[]>();
       for (const r of records) {
         const key = cfg.groupBy.map(f => String(r[f] ?? '')).join('|');
@@ -96,7 +103,10 @@ export function executeStep(
           row[f] = groupRecords[0][f];
         }
         for (const agg of cfg.aggregations) {
-          const vals = groupRecords.map(r => r[agg.field]).filter(v => v !== null && v !== undefined);
+          // Filter out null/undefined AND non-numeric values to prevent NaN corruption (#102)
+          const vals = groupRecords
+            .map(r => r[agg.field])
+            .filter(v => v !== null && v !== undefined && !isNaN(Number(v)));
           switch (agg.fn) {
             case 'count': row[agg.outputField] = groupRecords.length; break;
             case 'sum': row[agg.outputField] = vals.reduce((a: number, b) => a + Number(b), 0); break;
@@ -111,22 +121,43 @@ export function executeStep(
     }
 
     case 'join': {
-      const cfg = step.config as unknown as JoinStepConfig;
-      const rightMap = new Map<string, Record<string, unknown>>();
+      const cfg = step.config;
+      // Use Map<string, Record[]> to support one-to-many joins (#92)
+      const rightMap = new Map<string, Record<string, unknown>[]>();
       for (const r of (cfg.rightRecords ?? [])) {
-        rightMap.set(String(r[cfg.rightJoinField] ?? ''), r);
+        const key = String(r[cfg.rightJoinField] ?? '');
+        if (!rightMap.has(key)) rightMap.set(key, []);
+        rightMap.get(key)!.push(r);
       }
 
       if (cfg.joinType === 'inner') {
-        return records
-          .filter(r => rightMap.has(String(r[cfg.joinField] ?? '')))
-          .map(r => ({ ...r, ...rightMap.get(String(r[cfg.joinField] ?? ''))! }));
+        const result: Record<string, unknown>[] = [];
+        for (const r of records) {
+          const key = String(r[cfg.joinField] ?? '');
+          const matches = rightMap.get(key);
+          if (matches) {
+            for (const right of matches) {
+              result.push({ ...r, ...right });
+            }
+          }
+        }
+        return result;
       }
 
-      return records.map(r => {
-        const right = rightMap.get(String(r[cfg.joinField] ?? ''));
-        return right ? { ...r, ...right } : r;
-      });
+      // Left join: emit one row per right match, or original row if no match
+      const result: Record<string, unknown>[] = [];
+      for (const r of records) {
+        const key = String(r[cfg.joinField] ?? '');
+        const matches = rightMap.get(key);
+        if (matches && matches.length > 0) {
+          for (const right of matches) {
+            result.push({ ...r, ...right });
+          }
+        } else {
+          result.push(r);
+        }
+      }
+      return result;
     }
 
     default:

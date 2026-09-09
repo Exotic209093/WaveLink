@@ -17,7 +17,7 @@
 import { h } from 'preact';
 import type { VNode } from 'preact';
 import { useState } from 'preact/hooks';
-import type { PipelineStep } from '../utils/pipelineExecutor';
+import type { PipelineStep, FilterStepConfig, TransformStepConfig, LookupStepConfig, AggregateStepConfig, JoinStepConfig } from '../utils/pipelineExecutor';
 
 export interface StepConfigPanelProps {
   step: PipelineStep;
@@ -25,14 +25,18 @@ export interface StepConfigPanelProps {
   onRemove: () => void;
 }
 
+/** Narrowed step type for a given config type. */
+type TypedStep<C> = PipelineStep & { config: C };
+
 /**
  * Update a config field on the step. O(1).
+ * Uses generic constraint to preserve discriminated union narrowing.
  */
-function updateConfig(
-  step: PipelineStep,
+function updateConfig<S extends PipelineStep>(
+  step: S,
   key: string,
   value: unknown,
-  onChange: (s: PipelineStep) => void,
+  onChange: (s: S) => void,
 ): void {
   onChange({
     ...step,
@@ -43,11 +47,11 @@ function updateConfig(
 /**
  * Render the filter step config form. O(1).
  */
-function FilterConfig(props: { step: PipelineStep; onChange: (s: PipelineStep) => void }): VNode {
+function FilterConfig(props: { step: TypedStep<FilterStepConfig>; onChange: (s: TypedStep<FilterStepConfig>) => void }): VNode {
   const { step, onChange } = props;
-  const field = (step.config.field as string) ?? '';
-  const operator = (step.config.operator as string) ?? 'eq';
-  const value = (step.config.value as string) ?? '';
+  const field = step.config.field ?? '';
+  const operator = step.config.operator ?? 'eq';
+  const value = step.config.value ?? '';
 
   return (
     <div style="display:flex;flex-direction:column;gap:8px">
@@ -91,10 +95,10 @@ function FilterConfig(props: { step: PipelineStep; onChange: (s: PipelineStep) =
 /**
  * Render the transform step config form. O(1).
  */
-function TransformConfig(props: { step: PipelineStep; onChange: (s: PipelineStep) => void }): VNode {
+function TransformConfig(props: { step: TypedStep<TransformStepConfig>; onChange: (s: TypedStep<TransformStepConfig>) => void }): VNode {
   const { step, onChange } = props;
-  const field = (step.config.field as string) ?? '';
-  const expression = (step.config.expression as string) ?? '';
+  const field = step.config.field ?? '';
+  const expression = step.config.expression ?? '';
 
   return (
     <div style="display:flex;flex-direction:column;gap:8px">
@@ -126,11 +130,11 @@ function TransformConfig(props: { step: PipelineStep; onChange: (s: PipelineStep
 /**
  * Render the lookup step config form. O(1).
  */
-function LookupConfig(props: { step: PipelineStep; onChange: (s: PipelineStep) => void }): VNode {
+function LookupConfig(props: { step: TypedStep<LookupStepConfig>; onChange: (s: TypedStep<LookupStepConfig>) => void }): VNode {
   const { step, onChange } = props;
-  const lookupField = (step.config.lookupField as string) ?? '';
-  const lookupKey = (step.config.lookupKey as string) ?? '';
-  const outputField = (step.config.outputField as string) ?? '';
+  const lookupField = step.config.lookupField ?? '';
+  const lookupKey = step.config.lookupKey ?? '';
+  const outputField = step.config.outputField ?? '';
   const lookupTableJson = (step.config._lookupTableJson as string) ?? '[]';
 
   return (
@@ -189,11 +193,11 @@ function LookupConfig(props: { step: PipelineStep; onChange: (s: PipelineStep) =
 /**
  * Render the aggregate step config form. O(A) where A = aggregation rows.
  */
-function AggregateConfig(props: { step: PipelineStep; onChange: (s: PipelineStep) => void }): VNode {
+function AggregateConfig(props: { step: TypedStep<AggregateStepConfig>; onChange: (s: TypedStep<AggregateStepConfig>) => void }): VNode {
   const { step, onChange } = props;
-  const groupByRaw = (step.config.groupBy as string[]) ?? [];
+  const groupByRaw = step.config.groupBy ?? [];
   const [groupByInput, setGroupByInput] = useState(groupByRaw.join(', '));
-  const aggregations = (step.config.aggregations as Array<{ field: string; fn: string; outputField: string }>) ?? [];
+  const aggregations = step.config.aggregations ?? [];
 
   /** Update groupBy from comma-separated input. O(G). */
   function handleGroupByChange(value: string): void {
@@ -274,11 +278,11 @@ function AggregateConfig(props: { step: PipelineStep; onChange: (s: PipelineStep
 /**
  * Render the join step config form. O(1).
  */
-function JoinConfig(props: { step: PipelineStep; onChange: (s: PipelineStep) => void }): VNode {
+function JoinConfig(props: { step: TypedStep<JoinStepConfig>; onChange: (s: TypedStep<JoinStepConfig>) => void }): VNode {
   const { step, onChange } = props;
-  const joinField = (step.config.joinField as string) ?? '';
-  const rightJoinField = (step.config.rightJoinField as string) ?? '';
-  const joinType = (step.config.joinType as string) ?? 'inner';
+  const joinField = step.config.joinField ?? '';
+  const rightJoinField = step.config.rightJoinField ?? '';
+  const joinType = step.config.joinType ?? 'inner';
   const rightRecordsJson = (step.config._rightRecordsJson as string) ?? '[]';
 
   return (
