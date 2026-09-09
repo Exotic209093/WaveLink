@@ -214,6 +214,8 @@ export interface DataPushResultGetResponse {
   operation: 'insert' | 'update' | 'upsert' | 'delete';
   ids: string[];
   capturedAt: number;
+  /** Per-record failure metadata; indices correspond to input record positions. */
+  failedRecords?: Array<{ index: number; record: Record<string, unknown>; error: string }>;
 }
 
 export interface PushHistoryGetResponse {

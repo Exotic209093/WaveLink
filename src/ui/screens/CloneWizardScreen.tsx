@@ -61,11 +61,17 @@ async function awaitPushResult(
   pushId: string,
   timeoutMs = 5 * 60_000,
   intervalMs = 1_000,
-): Promise<string[] | null> {
+): Promise<{ ids: string[]; failedIndices: Set<number> } | null> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const res = await sf.getDataPushResult(pushId);
-    if (res && Array.isArray(res.ids) && res.ids.length > 0) return res.ids;
+    if (res && Array.isArray(res.ids) && res.ids.length > 0) {
+      const failedIndices = new Set<number>();
+      if (res.failedRecords) {
+        for (const f of res.failedRecords) failedIndices.add(f.index);
+      }
+      return { ids: res.ids, failedIndices };
+    }
     await new Promise((r) => setTimeout(r, intervalMs));
   }
   return null;
@@ -292,23 +298,25 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
           log.push(`  Push started: ${pushResult.pushId} (${pushResult.strategy}) — awaiting completion...`);
           setExecutionLog([...log]);
 
-          const insertedIds = await awaitPushResult(sf, pushResult.pushId);
-          if (!insertedIds) {
+          const pushOutcome = await awaitPushResult(sf, pushResult.pushId);
+          if (!pushOutcome) {
             log.push(`  Push timed out before inserted IDs were available; skipping ID remap for ${objectName}.`);
             setExecutionLog([...log]);
             continue;
           }
 
           let mapped = 0;
-          for (let i = 0; i < sourceRecords.length && i < insertedIds.length; i++) {
+          let successIdx = 0;
+          for (let i = 0; i < sourceRecords.length; i++) {
+            if (pushOutcome.failedIndices.has(i)) continue;
             const oldId = sourceRecords[i].Id as string | undefined;
-            const newId = insertedIds[i];
+            const newId = pushOutcome.ids[successIdx++];
             if (oldId && newId) {
               idMap.set(oldId, newId);
               mapped++;
             }
           }
-          log.push(`  Inserted ${insertedIds.length} ${objectName} records; remapped ${mapped} IDs.`);
+          log.push(`  Inserted ${pushOutcome.ids.length} ${objectName} records; remapped ${mapped} IDs.`);
         } catch (e) {
           log.push(`  Insert failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
         }
