@@ -1993,12 +1993,28 @@ messageBus.on('DATA_PUSH_CANCEL', async (message): Promise<MessageResponse> => {
   try {
     const { pushId } = message.payload as { pushId: string };
     const active = activePushes.get(pushId);
-    if (!active) {
-      return { success: true, data: { cancelled: false }, requestId: message.requestId };
+    if (active) {
+      active.abortController.abort();
+      storage.updateActivePushStatus(pushId, 'cancelled').catch(() => undefined);
+      return { success: true, data: { cancelled: true }, requestId: message.requestId };
     }
-    active.abortController.abort();
-    storage.updateActivePushStatus(pushId, 'cancelled').catch(() => undefined);
-    return { success: true, data: { cancelled: true }, requestId: message.requestId };
+    // Issue #58: After worker eviction the in-memory registry is empty, but the
+    // durable checkpoint still holds the bulkJobId. Abort the Salesforce job directly.
+    const checkpoint = await storage.getActivePush(pushId);
+    if (checkpoint?.bulkJobId) {
+      try {
+        const org = await storage.getOrg(checkpoint.orgId);
+        if (org) {
+          const bulkApi = bulkServiceFor(org);
+          await bulkApi.abortJob(checkpoint.bulkJobId);
+        }
+      } catch {
+        // Best-effort: the job may already be complete or aborted server-side.
+      }
+      await storage.updateActivePushStatus(pushId, 'cancelled');
+      return { success: true, data: { cancelled: true }, requestId: message.requestId };
+    }
+    return { success: true, data: { cancelled: false }, requestId: message.requestId };
   } catch (error) {
     return {
       success: false,

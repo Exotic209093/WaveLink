@@ -95,10 +95,25 @@ export async function captureViaOffscreen(payload: OffscreenCapturePayload): Pro
   throw lastError instanceof Error ? lastError : new Error('offscreen capture failed');
 }
 
-/** Delegate Bulk ingest polling/finalization to the persistent offscreen context. */
+/** Delegate Bulk ingest polling/finalization to the persistent offscreen context.
+ *  Only throws for transport failures (missing/closed port). Job-level errors are
+ *  fully handled inside the offscreen document — rethrowing them here would cause
+ *  the worker to duplicate history rows and terminal broadcasts (issue #60). */
 export async function runBulkPushViaOffscreen(payload: OffscreenBulkPushPayload): Promise<void> {
   const ready = await ensureOffscreenDocument();
   if (!ready) throw new Error('offscreen document unavailable');
-  const res = (await chrome.runtime.sendMessage({ type: 'OFFSCREEN_BULK_PUSH', payload })) as OffscreenBulkPushResponse | undefined;
-  if (!res?.ok) throw new Error(res?.error ?? 'offscreen bulk push failed');
+  try {
+    const res = (await chrome.runtime.sendMessage({ type: 'OFFSCREEN_BULK_PUSH', payload })) as OffscreenBulkPushResponse | undefined;
+    // A successful round-trip means the offscreen document handled the job
+    // (success or failure). Do NOT rethrow job errors — only transport issues.
+    if (!res) throw new Error('empty offscreen response');
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // Only transport-level failures warrant a worker-side fallback.
+    if (/receiving end does not exist|message port closed|offscreen document unavailable/i.test(msg)) {
+      throw e;
+    }
+    // Any other error (including job failures reported via res.error) was already
+    // handled by the offscreen document. Swallow to prevent duplicate processing.
+  }
 }
