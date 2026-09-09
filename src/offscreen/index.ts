@@ -85,6 +85,21 @@ export async function runBulkPush(request: OffscreenBulkPushRequest): Promise<vo
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Bulk push failed';
     const cancelled = /Aborted|Cancelled/i.test(message);
+    // Issue #59: A poll timeout means the Salesforce job is still running server-side.
+    // Leave the checkpoint in a resumable 'interrupted' state instead of recording
+    // an all-failed error — the worker can resume polling via resumeBulkPush.
+    const timedOut = /did not complete within the timeout period/i.test(message);
+    if (timedOut && !cancelled) {
+      await storage.updateActivePush(p.pushId, {
+        status: 'interrupted',
+        lastError: 'Polling timed out; the Salesforce job is still running and can be resumed.',
+      });
+      broadcast('DATA_PUSH_COMPLETE', {
+        pushId: p.pushId, totalRecords: p.totalRecords, processedRecords: 0,
+        failedRecords: 0, status: 'interrupted',
+      });
+      return;
+    }
     await storage.updateActivePush(p.pushId, { status: cancelled ? 'cancelled' : 'error', lastError: message });
     const history = await storage.getPushHistory();
     if (!history.some(entry => entry.id === p.pushId)) {

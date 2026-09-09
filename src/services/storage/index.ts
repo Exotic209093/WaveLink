@@ -692,17 +692,25 @@ export class StorageService {
     return Object.values(all);
   }
 
-  /** Mark any "processing" pushes as interrupted (called on service worker startup) */
+  /** Mark any "processing" pushes as interrupted (called on service worker startup).
+   *  Skips pushes delegated to the offscreen document whose updatedAt is within
+   *  the heartbeat window — those are still being actively polled. */
   async markInterruptedPushes(): Promise<number> {
+    const OFFSCREEN_HEARTBEAT_MS = 30_000; // offscreen polls every 5s; 30s is generous
+    const now = Date.now();
     const all = await this.getActivePushMap();
     let count = 0;
     for (const push of Object.values(all)) {
       if (push.status === 'processing' || push.status === 'queued') {
+        // Skip offscreen-delegated pushes with a recent heartbeat.
+        if (push.resumeSupported && push.updatedAt && (now - push.updatedAt) < OFFSCREEN_HEARTBEAT_MS) {
+          continue;
+        }
         push.status = 'interrupted';
         push.lastError = push.resumeSupported
           ? 'The extension worker restarted. This Salesforce job can be resumed.'
           : 'The extension worker restarted. Re-run this local REST job from its source file.';
-        push.updatedAt = Date.now();
+        push.updatedAt = now;
         count++;
       }
     }
