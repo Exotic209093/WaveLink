@@ -1,7 +1,7 @@
-/**
+﻿/**
  * SOQL generation from structured query builder state.
  *
- * Pure functions — no side effects, no DOM.
+ * Pure functions â€” no side effects, no DOM.
  */
 
 import type { SalesforceFieldType } from '../../core/types/salesforce';
@@ -106,9 +106,9 @@ export function buildSoql(
 
       let expr: string;
       if (cond.operator === 'IS NULL') {
-        expr = `${cond.field} = NULL`;
+        expr = `${cond.field} = null`;
       } else if (cond.operator === 'IS NOT NULL') {
-        expr = `${cond.field} != NULL`;
+        expr = `${cond.field} != null`;
       } else {
         const ft = fieldTypeMap?.get(cond.field) ?? 'string';
         const formatted = formatSoqlValue(cond.value, ft, cond.operator);
@@ -221,3 +221,4 @@ function isNumericType(ft: SalesforceFieldType): boolean {
 function escapeSoqlString(s: string): string {
   return s.replace(/'/g, "\\'");
 }
+
