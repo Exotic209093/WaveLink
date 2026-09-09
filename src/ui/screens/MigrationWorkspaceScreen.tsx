@@ -204,12 +204,21 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
         // 4. Collect inserted IDs and build ID map
         const result = await sf.getDataPushResult(pushResult.pushId);
         if (result && result.ids) {
-          const entries = result.ids.map((newId, idx) => ({
-            sourceId: (queryResult.records[idx] as Record<string, unknown>).Id as string,
-            targetId: newId,
-            objectName: obj.objectName,
-            createdAt: Date.now(),
-          }));
+          const failedIndices = new Set<number>();
+          if (result.failedRecords) {
+            for (const f of result.failedRecords) failedIndices.add(f.index);
+          }
+
+          const entries: Array<{ sourceId: string; targetId: string; objectName: string; createdAt: number }> = [];
+          let successIdx = 0;
+          for (let i = 0; i < queryResult.records.length; i++) {
+            if (failedIndices.has(i)) continue;
+            const sourceId = (queryResult.records[i] as Record<string, unknown>).Id as string;
+            const targetId = result.ids[successIdx++];
+            if (sourceId && targetId) {
+              entries.push({ sourceId, targetId, objectName: obj.objectName, createdAt: Date.now() });
+            }
+          }
 
           // Add to local map for subsequent objects
           for (const entry of entries) {
