@@ -26,6 +26,18 @@ export interface DataDiffResult {
   changed: RecordDiff[];
   unchanged: RecordDiff[];
   summary: { total: number; added: number; removed: number; changed: number };
+  /** Number of duplicate match-key values silently collapsed during indexing. */
+  duplicateKeyCount: number;
+}
+
+/**
+ * Stringify a value for comparison. Objects and arrays are JSON-stringified
+ * so that nested structures compare by content rather than as "[object Object]".
+ */
+function stringifyForCompare(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
 }
 
 export function diffRecords(
@@ -38,15 +50,20 @@ export function diffRecords(
   objectName: string,
 ): DataDiffResult {
   const sourceMap = new Map<string, Record<string, unknown>>();
+  let duplicateKeyCount = 0;
   for (const rec of sourceRecords) {
     const key = String(rec[matchField] ?? '');
-    if (key) sourceMap.set(key, rec);
+    if (!key) continue;
+    if (sourceMap.has(key)) duplicateKeyCount++;
+    sourceMap.set(key, rec);
   }
 
   const targetMap = new Map<string, Record<string, unknown>>();
   for (const rec of targetRecords) {
     const key = String(rec[matchField] ?? '');
-    if (key) targetMap.set(key, rec);
+    if (!key) continue;
+    if (targetMap.has(key)) duplicateKeyCount++;
+    targetMap.set(key, rec);
   }
 
   const allKeys = new Set([...sourceMap.keys(), ...targetMap.keys()]);
@@ -70,7 +87,9 @@ export function diffRecords(
       for (const field of compareFields) {
         const sv = source[field];
         const tv = target[field];
-        if (String(sv ?? '') !== String(tv ?? '')) {
+        const sStr = stringifyForCompare(sv);
+        const tStr = stringifyForCompare(tv);
+        if (sStr !== tStr) {
           changedFields.push(field);
           fieldDiffs[field] = { source: sv, target: tv };
         }
@@ -95,6 +114,7 @@ export function diffRecords(
     changed,
     unchanged,
     summary: { total: allKeys.size, added: added.length, removed: removed.length, changed: changed.length },
+    duplicateKeyCount,
   };
 }
 
@@ -103,9 +123,9 @@ export function diffToCsv(diff: DataDiffResult): string {
   const all = [...diff.added, ...diff.removed, ...diff.changed];
   for (const d of all) {
     const fieldCols = diff.fields.map(f => {
-      const sv = d.sourceRecord?.[f] ?? '';
-      const tv = d.targetRecord?.[f] ?? '';
-      return `"${String(sv).replace(/"/g, '""')}","${String(tv).replace(/"/g, '""')}"`;
+      const sv = stringifyForCompare(d.sourceRecord?.[f]);
+      const tv = stringifyForCompare(d.targetRecord?.[f]);
+      return `"${sv.replace(/"/g, '""')}","${tv.replace(/"/g, '""')}"`;
     }).join(',');
     rows.push(`"${d.keyValue}","${d.status}","${d.changedFields.join('; ')}",${fieldCols}`);
   }

@@ -18,7 +18,10 @@ function neutralizeFormulaInjection(s: string): string {
 
 function escapeCsvValue(value: unknown): string {
   if (value === null || value === undefined) return '';
-  const s = neutralizeFormulaInjection(String(value));
+// Serialize objects/arrays to JSON to avoid "[object Object]" in output,
+  // then neutralize formula-injection payloads on the resulting string.
+  const raw = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  const s = neutralizeFormulaInjection(raw);
   if (/[",\n\r]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }

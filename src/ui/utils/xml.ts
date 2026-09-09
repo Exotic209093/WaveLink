@@ -14,7 +14,9 @@
  */
 function escapeXml(value: unknown): string {
   if (value === null || value === undefined) return '';
-  return String(value)
+  // Serialize objects/arrays to JSON to avoid "[object Object]" in output.
+  const s = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
