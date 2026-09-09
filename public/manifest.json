@@ -6,6 +6,7 @@
   "homepage_url": "https://github.com/Exotic209093/WaveLink",
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "cookies",
     "activeTab",
     "tabs",

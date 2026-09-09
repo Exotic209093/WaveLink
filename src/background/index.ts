@@ -1980,6 +1980,7 @@ chrome.runtime.onInstalled.addListener((_details) => {
 
 // On service worker startup: mark any in-progress pushes as interrupted
 storage.markInterruptedPushes().catch(() => undefined);
+storage.pruneTerminalPushes().catch(() => undefined);
 
 chrome.commands.onCommand.addListener((command) => {
   if (command === 'toggle-panel') {
@@ -2219,17 +2220,22 @@ async function loadSchedules(): Promise<ScheduledExport[]> {
 }
 
 async function saveSchedules(next: ScheduledExport[]): Promise<void> {
-  return new Promise(resolve => chrome.storage.local.set({ scheduledExports: next }, () => resolve()));
+  await chrome.storage.local.set({ scheduledExports: next });
+  if (chrome.runtime.lastError) {
+    throw new Error(`Failed to save schedules: ${chrome.runtime.lastError.message}`);
+  }
 }
 
 async function loadSnapshots(): Promise<Record<string, ExportSnapshot>> {
-  return new Promise(resolve => {
-    chrome.storage.local.get('exportSnapshots', r => resolve((r.exportSnapshots as Record<string, ExportSnapshot>) ?? {}));
-  });
+  const r = await chrome.storage.local.get('exportSnapshots');
+  return (r.exportSnapshots as Record<string, ExportSnapshot>) ?? {};
 }
 
 async function saveSnapshots(next: Record<string, ExportSnapshot>): Promise<void> {
-  return new Promise(resolve => chrome.storage.local.set({ exportSnapshots: next }, () => resolve()));
+  await chrome.storage.local.set({ exportSnapshots: next });
+  if (chrome.runtime.lastError) {
+    throw new Error(`Failed to save snapshots: ${chrome.runtime.lastError.message}`);
+  }
 }
 
 async function setScheduleAlarm(id: string): Promise<void> {
