@@ -25,11 +25,16 @@ export async function recordsToExcel(
   sheetName: string = 'Sheet1'
 ): Promise<void> {
   const XLSX = await loadXLSX();
-  // Filter records to only include specified columns
+  // Filter records to only include specified columns and neutralize formula injection (#66)
   const filtered = records.map(record => {
     const filtered: Record<string, unknown> = {};
     for (const col of columns) {
-      filtered[col] = record[col];
+      const val = record[col];
+      if (typeof val === 'string' && /^[=+\-@\t\r]/.test(val)) {
+        filtered[col] = `'${val}`;
+      } else {
+        filtered[col] = val;
+      }
     }
     return filtered;
   });
@@ -83,7 +88,13 @@ export async function recordsToExcelBuffer(
   const filtered = records.map(record => {
     const filtered: Record<string, unknown> = {};
     for (const col of columns) {
-      filtered[col] = record[col];
+      const val = record[col];
+      // Security (#66): neutralize formula-injection payloads in Excel export.
+      if (typeof val === 'string' && /^[=+\-@\t\r]/.test(val)) {
+        filtered[col] = `'${val}`;
+      } else {
+        filtered[col] = val;
+      }
     }
     return filtered;
   });

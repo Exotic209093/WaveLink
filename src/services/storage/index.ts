@@ -55,10 +55,15 @@ export class StorageService {
     return orgs[orgId] ?? null;
   }
 
-  /** Save or update an org */
+  /** Save or update an org (tokens stripped — stored only in session storage) */
   async saveOrg(org: SalesforceOrg): Promise<void> {
     const orgs = await this.getOrgs();
-    orgs[org.orgId] = org;
+    // Security (#64): never persist tokens to local storage.
+    // Tokens live only in chrome.storage.session via setSessionToken().
+    const { accessToken, tokenExpiresAt, ...safeOrg } = org;
+    void accessToken;
+    void tokenExpiresAt;
+    orgs[org.orgId] = safeOrg as SalesforceOrg;
     await this.setLocal(STORAGE_KEYS.ORGS, orgs);
   }
 

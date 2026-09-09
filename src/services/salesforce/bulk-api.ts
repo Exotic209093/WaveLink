@@ -281,7 +281,11 @@ export class BulkApiService {
       const values = headers.map(h => {
         const val = record[h];
         if (val === null || val === undefined) return '';
-        const str = String(val);
+        let str = String(val);
+        // Security (#66): neutralize formula-injection payloads in upload CSV.
+        if (/^[=+\-@\t\r]/.test(str)) {
+          str = `'${str}`;
+        }
         if (str.includes(',') || str.includes('"') || str.includes('\n')) {
           return `"${str.replace(/"/g, '""')}"`;
         }
