@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Child relationship subquery builder.
  *
  * Allows adding subqueries like (SELECT Id, Name FROM Contacts) to the
@@ -26,8 +26,8 @@ export function SubqueryBuilder(props: {
 
   const availableRels = useMemo(
     () => childRelationships
-      .filter(r => r.relationshipName && !r.deprecatedAndHidden)
-      .filter(r => !search || r.relationshipName!.toLowerCase().includes(search.toLowerCase()))
+      .filter((r): r is ChildRelationship & { relationshipName: string } => !!r.relationshipName && !r.deprecatedAndHidden)
+      .filter(r => !search || r.relationshipName.toLowerCase().includes(search.toLowerCase()))
       .slice(0, 40),
     [childRelationships, search],
   );
@@ -129,3 +129,4 @@ export function buildSubqueryString(sq: SubqueryDef): string {
   const fields = sq.fields.trim() || 'Id';
   return `(SELECT ${fields} FROM ${sq.relationshipName})`;
 }
+
