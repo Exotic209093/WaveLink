@@ -59,7 +59,23 @@ export function inferHeaders(records: Array<Record<string, unknown>>): string[] 
 export async function parseJsonFile(file: File): Promise<ParsedDataset> {
   const text = await file.text();
   const parsed = JSON.parse(text) as unknown;
-  const records = Array.isArray(parsed) ? parsed : [parsed];
+
+  // Unwrap metadata-wrapped exports (e.g. { exportedAt, records: [...] })
+  // so that re-importing our own JSON output yields the original records.
+  let records: unknown[];
+  if (Array.isArray(parsed)) {
+    records = parsed;
+  } else if (
+    parsed &&
+    typeof parsed === 'object' &&
+    !Array.isArray(parsed) &&
+    Array.isArray((parsed as Record<string, unknown>).records)
+  ) {
+    records = (parsed as Record<string, unknown>).records as unknown[];
+  } else {
+    records = [parsed];
+  }
+
   const objects = records
     .filter(r => r && typeof r === 'object')
     .map(r => r as Record<string, unknown>);
@@ -123,14 +139,24 @@ export async function parseExcelFile(file: File): Promise<ParsedDataset> {
   }
   const XLSX = await import(/* webpackChunkName: "xlsx" */ 'xlsx/dist/xlsx.mini.min.js');
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array', sheetRows: MAX_EXCEL_ROWS + 1 });
+  // cellDates converts Excel date serial numbers to JS Date objects at read time;
+  // raw: true on sheet_to_json preserves numeric precision (avoids scientific notation on long IDs).
+  const wb = XLSX.read(buf, { type: 'array', sheetRows: MAX_EXCEL_ROWS + 1, cellDates: true });
   const sheetName = wb.SheetNames[0];
   if (!sheetName) throw new Error('Excel file contains no sheets');
   const sheet = wb.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: false });
-  if (rows.length > MAX_EXCEL_ROWS) {
+  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
+  if (rawRows.length > MAX_EXCEL_ROWS) {
     throw new Error(`Excel worksheets must contain ${MAX_EXCEL_ROWS.toLocaleString()} rows or fewer`);
   }
+  // Convert Date objects to ISO strings for consistent round-trip fidelity.
+  const rows = rawRows.map(row => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(row)) {
+      out[k] = v instanceof Date ? v.toISOString() : v;
+    }
+    return out;
+  });
   return { records: rows, headers: inferHeaders(rows) };
 }
 
