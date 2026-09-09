@@ -14,7 +14,7 @@ export interface OnboardingStep {
   title: string;
   description: string;
   targetRoute?: AppRoute;
-  category: 'getting-started' | 'data-push' | 'query' | 'advanced';
+  category: 'getting-started' | 'import' | 'query' | 'advanced';
   /** Opens a bounded, non-sensitive example in the relevant workflow. */
   example?: 'export' | 'import';
 }
@@ -59,7 +59,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     title: 'Upload Data from a File',
     description: 'Upload a CSV or Excel file to prepare data for pushing to Salesforce. WaveLink will parse and preview your records.',
     targetRoute: APP_ROUTES.import,
-    category: 'data-push',
+    category: 'import',
     example: 'import',
   },
   {
@@ -67,14 +67,14 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     title: 'Push Data to Salesforce',
     description: 'Map your uploaded fields to Salesforce fields and push records using insert, update, upsert, or delete operations.',
     targetRoute: APP_ROUTES.import,
-    category: 'data-push',
+    category: 'import',
   },
   {
     id: 'use-templates',
     title: 'Save and Use Data Templates',
     description: 'Save your field mappings and sample data as reusable templates for repeated data push operations.',
     targetRoute: APP_ROUTES.templates,
-    category: 'data-push',
+    category: 'import',
   },
 
   // ── Advanced ──

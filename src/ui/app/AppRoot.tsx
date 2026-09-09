@@ -164,11 +164,8 @@ export function AppRoot(): VNode {
       applyTheme('light');
     });
 
-    sf.getOnboarding().then(progress => {
-      if (!progress.dismissedAt && progress.completedSteps.length === 0) {
-        setShowOnboarding(true);
-      }
-    }).catch(() => {});
+    // Onboarding modal is no longer auto-shown on first launch. Users can
+    // open it from the Home "Getting started" surface when they choose.
   }, []);
 
   useEffect(() => {
@@ -217,7 +214,7 @@ export function AppRoot(): VNode {
         () => setRoute('import'),
       ),
       shortcutRegistry.register(
-        { id: 'toggle-undo', defaultKeys: 'ctrl+z', description: 'Toggle undo panel', scope: 'global' },
+        { id: 'toggle-undo', defaultKeys: 'ctrl+shift+z', description: 'Toggle undo panel', scope: 'global' },
         () => setUndoPanelOpen(v => !v),
       ),
     ];

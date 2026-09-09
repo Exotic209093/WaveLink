@@ -28,7 +28,7 @@ type OnboardingCategory = OnboardingStep['category'];
 /** Category display labels in presentation order. */
 const ONBOARDING_CATEGORIES: OnboardingCategory[] = [
   'getting-started',
-  'data-push',
+  'import',
   'query',
   'advanced',
 ];
@@ -36,7 +36,7 @@ const ONBOARDING_CATEGORIES: OnboardingCategory[] = [
 /** Human-readable labels for each category. */
 const CATEGORY_LABELS: Record<OnboardingCategory, string> = {
   'getting-started': 'Getting Started',
-  'data-push': 'Data Push',
+  'import': 'Import',
   'query': 'Query',
   'advanced': 'Advanced',
 };

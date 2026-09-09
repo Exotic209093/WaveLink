@@ -98,6 +98,22 @@ class ShortcutRegistryImpl {
   }
 
   handleKeydown(e: KeyboardEvent): boolean {
+    // Never hijack native undo/redo/editing inside text inputs unless the
+    // binding uses a modifier combo that users don't expect to conflict
+    // (ctrl+shift, ctrl+alt, etc.). Plain ctrl+z / ctrl+y must pass through.
+    const target = e.target as HTMLElement | null;
+    if (target) {
+      const tag = target.tagName.toLowerCase();
+      const isEditable =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        target.isContentEditable;
+      if (isEditable && !e.shiftKey && !e.altKey) {
+        return false;
+      }
+    }
+
     const normalized = normalizeKeys(e);
     const id = this.keyIndex.get(normalized);
     if (!id) return false;
