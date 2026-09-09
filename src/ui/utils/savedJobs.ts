@@ -51,10 +51,12 @@ export function mergeLegacyJobs(
   exports: ExportTemplate[],
   imports: ImportTemplate[],
   schedules: ScheduledExport[],
+  deletedLegacyIds: string[] = [],
 ): SavedJob[] {
-  const byId = new Map(existing.map(job => [job.id, job]));
+  const tombstones = new Set(deletedLegacyIds);
+  const byId = new Map(existing.filter(job => !tombstones.has(job.id)).map(job => [job.id, job]));
   for (const job of [...exports.map(jobFromExportTemplate), ...imports.map(jobFromImportTemplate), ...schedules.map(jobFromSchedule)]) {
-    if (!byId.has(job.id)) byId.set(job.id, job);
+    if (!tombstones.has(job.id) && !byId.has(job.id)) byId.set(job.id, job);
   }
   return Array.from(byId.values());
 }

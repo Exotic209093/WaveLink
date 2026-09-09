@@ -5,6 +5,7 @@ import type { ExportSnapshot, SavedExportFormat, ScheduledExport } from '../../c
 import type { SfApi } from '../api/sf';
 import { Icon } from '../components/Icon';
 import { exportRecords, ensureCorrectExtension } from '../utils/export';
+import { flattenRecord, deriveColumns } from '../utils/records';
 import { forecastSnapshotStorage, formatStorageSize } from '../utils/scheduleForecast';
 import { diffBaselineRecords, selectComparisonKey } from '../utils/localDataDiff';
 
@@ -71,21 +72,26 @@ export function SnapshotCenterScreen(props: {
   }
 
   async function compareWithLive(): Promise<void> {
-    if (!left || !props.tabId) return;
+    if (!left) return;
     const schedule = scheduleById.get(left.scheduleId);
     if (!schedule) return;
+    const targetOrgId = left.orgId ?? schedule.orgId;
+    if (!targetOrgId) {
+      setMessage('Cannot compare: snapshot has no org ID.');
+      return;
+    }
     setMessage('Loading live org records…');
     try {
       const records: Record<string, unknown>[] = [];
-      let page = await props.sf.runQuery(schedule.soql, props.tabId);
+      let page = await props.sf.crossOrgQuery(targetOrgId, schedule.soql);
       records.push(...(page.records ?? []));
       while (page.nextRecordsUrl && records.length < 100_000) {
-        page = await props.sf.queryMore(page.nextRecordsUrl, props.tabId);
+        page = await props.sf.queryMore(page.nextRecordsUrl);
         records.push(...(page.records ?? []));
       }
       setLiveRecords(records);
       setRightId('');
-      setMessage(`Loaded ${records.length.toLocaleString()} live records.`);
+      setMessage(`Loaded ${records.length.toLocaleString()} live records from org ${targetOrgId}.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Live comparison failed.');
     }
@@ -133,7 +139,11 @@ export function SnapshotCenterScreen(props: {
             <button class="wl-buttonText" onClick={() => persistSnapshots({ ...snapshots, [snapshot.id]: { ...snapshot, pinned: !snapshot.pinned } })}>{snapshot.pinned ? 'Unpin' : 'Pin'}</button>
             <button class="wl-buttonNeutral" onClick={() => { setLeftId(snapshot.id); setRightId(''); setLiveRecords(null); }}>Compare</button>
             <select class="wl-select" aria-label={`Download format for ${schedule?.name ?? snapshot.id}`} value={format} onChange={event => setFormats(current => ({ ...current, [snapshot.id]: (event.currentTarget as HTMLSelectElement).value as SavedExportFormat }))}><option value="csv">CSV</option><option value="json">JSON</option><option value="excel">Excel</option><option value="xml">XML</option></select>
-            <button class="wl-buttonBrand" disabled={Boolean(snapshot.error)} onClick={() => exportRecords(snapshot.records, snapshot.columns, { format, filename: ensureCorrectExtension(`${schedule?.name ?? 'snapshot'}-${snapshot.capturedAt}`, format) })}>Download</button>
+            <button class="wl-buttonBrand" disabled={Boolean(snapshot.error)} onClick={() => {
+              const flat = snapshot.records.map(record => flattenRecord(record));
+              const columns = deriveColumns(flat);
+              return exportRecords(flat, columns, { format, filename: ensureCorrectExtension(`${schedule?.name ?? 'snapshot'}-${snapshot.capturedAt}`, format) });
+            }}>Download</button>
           </div></div><div class="wl-cardSection"><div class="wl-muted">{new Date(snapshot.capturedAt).toLocaleString()} · org {snapshot.orgId ?? schedule?.orgId ?? 'unknown'}{snapshot.error ? ` · ${snapshot.error}` : ''}</div></div></article>;
         })}</div>
       )}

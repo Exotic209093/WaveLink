@@ -1,4 +1,4 @@
-import { h } from 'preact';
+﻿import { h } from 'preact';
 import type { VNode } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ExportTemplate, ImportTemplate, SavedJob, ScheduledExport } from '../../core/types/storage';
@@ -30,12 +30,13 @@ export function SavedJobsScreen(props: {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    chrome.storage.local.get(['savedJobs', 'exportTemplates', 'importTemplates', 'scheduledExports'], result => {
+    chrome.storage.local.get(['savedJobs', 'exportTemplates', 'importTemplates', 'scheduledExports', 'deletedLegacyJobIds'], result => {
       const merged = mergeLegacyJobs(
         (result.savedJobs as SavedJob[]) ?? [],
         (result.exportTemplates as ExportTemplate[]) ?? [],
         (result.importTemplates as ImportTemplate[]) ?? [],
         (result.scheduledExports as ScheduledExport[]) ?? [],
+        (result.deletedLegacyJobIds as string[]) ?? [],
       );
       setJobs(merged);
       chrome.storage.local.set({ savedJobs: merged });
@@ -195,10 +196,19 @@ export function SavedJobsScreen(props: {
           setRenaming(null);
         }}
       />
-      <ConfirmModal open={pendingDelete !== null} title="Delete saved job" confirmText="Delete" confirmTone="danger" onCancel={() => setPendingDelete(null)} onConfirm={() => {
-        if (pendingDelete) void persist(jobs.filter(job => job.id !== pendingDelete.id));
+      <ConfirmModal open={pendingDelete !== null} title="Delete saved job" confirmText="Delete" confirmTone="danger" onCancel={() => setPendingDelete(null)} onConfirm={async () => {
+        if (!pendingDelete) return;
+        const isLegacy = /^(export|import|schedule):/.test(pendingDelete.id);
+        await persist(jobs.filter(job => job.id !== pendingDelete.id));
+        if (isLegacy) {
+          const result = await chrome.storage.local.get('deletedLegacyJobIds');
+          const existing = (result.deletedLegacyJobIds as string[]) ?? [];
+          if (!existing.includes(pendingDelete.id)) {
+            await chrome.storage.local.set({ deletedLegacyJobIds: [...existing, pendingDelete.id] });
+          }
+        }
         setPendingDelete(null);
-      }}><p>Delete “{pendingDelete?.name}” and its version history?</p></ConfirmModal>
+      }}><p>Delete &quot;{pendingDelete?.name}&quot; and its version history?</p></ConfirmModal>
     </div>
   );
 }
