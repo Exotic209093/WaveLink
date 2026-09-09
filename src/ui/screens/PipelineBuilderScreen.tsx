@@ -48,21 +48,21 @@ function makePipelineId(): string {
   return `pipe_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Create a default step config for a given type. O(1). */
-function defaultConfig(type: StepType): Record<string, unknown> {
+/** Create a default step for a given type. O(1). Returns a fully-typed PipelineStep. */
+function makeDefaultStep(type: StepType): PipelineStep {
+  const id = makeStepId();
+  const label = `${type.charAt(0).toUpperCase() + type.slice(1)} Step`;
   switch (type) {
     case 'filter':
-      return { field: '', operator: 'eq', value: '' };
+      return { id, label, type: 'filter', config: { field: '', operator: 'eq', value: '' } };
     case 'transform':
-      return { field: '', expression: '' };
+      return { id, label, type: 'transform', config: { field: '', expression: '' } };
     case 'lookup':
-      return { lookupField: '', lookupKey: '', outputField: '', lookupTable: [], _lookupTableJson: '[]' };
+      return { id, label, type: 'lookup', config: { lookupField: '', lookupKey: '', outputField: '', lookupTable: [] } };
     case 'aggregate':
-      return { groupBy: [], aggregations: [] };
+      return { id, label, type: 'aggregate', config: { groupBy: [], aggregations: [] } };
     case 'join':
-      return { joinField: '', rightJoinField: '', joinType: 'inner', rightRecords: [], _rightRecordsJson: '[]' };
-    default:
-      return {};
+      return { id, label, type: 'join', config: { joinField: '', rightJoinField: '', joinType: 'inner', rightRecords: [] } };
   }
 }
 
@@ -143,12 +143,7 @@ export function PipelineBuilderScreen(props: PipelineBuilderScreenProps): VNode 
 
   /** Add a step from the library. O(1). */
   function handleAddStep(type: StepType): void {
-    const newStep: PipelineStep = {
-      id: makeStepId(),
-      type,
-      label: `${type.charAt(0).toUpperCase() + type.slice(1)} Step`,
-      config: defaultConfig(type),
-    };
+    const newStep = makeDefaultStep(type);
     setSteps((prev) => [...prev, newStep]);
     setSelectedStepId(newStep.id);
     setPreviewResult(null);
@@ -221,7 +216,7 @@ export function PipelineBuilderScreen(props: PipelineBuilderScreenProps): VNode 
   function loadPipeline(id: string): void {
     const p = savedPipelines.find((pl) => pl.id === id);
     if (!p) return;
-    setSteps(p.steps as PipelineStep[]);
+    setSteps(p.steps as unknown as PipelineStep[]);
     setSelectedStepId(null);
     setLoadedPipelineId(p.id);
     setPipelineName(p.name);
