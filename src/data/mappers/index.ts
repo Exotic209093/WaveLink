@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Data mapping and transformation engine.
  * Maps source data fields to Salesforce target fields with transformations.
  *
@@ -34,7 +34,7 @@ export type MappingMatchKind =
 
 /** A scored suggestion linking one source header to one Salesforce field. */
 export interface MappingSuggestion extends FieldMapping {
-  /** 0–1 confidence. 1 = exact API-name match, lower = looser/fuzzy. */
+  /** 0â€“1 confidence. 1 = exact API-name match, lower = looser/fuzzy. */
   confidence: number;
   /** What the match was based on (for surfacing "auto" vs "guess" in the UI). */
   matchedOn: MappingMatchKind;
@@ -164,7 +164,7 @@ export class DataMapper {
    * createable Salesforce fields. Matches against both the API name and the
    * human-readable label (so a header like "Account Name" maps to the `Name`
    * field), and falls back to a fuzzy edit-distance match for near-misses
-   * (e.g. "Emial" → "Email"). Each target field is claimed by at most one
+   * (e.g. "Emial" â†’ "Email"). Each target field is claimed by at most one
    * source header, best score first.
    */
   suggestFieldMappings(
@@ -219,7 +219,7 @@ export class DataMapper {
   /**
    * Auto-generate field mappings by matching source field names to Salesforce
    * field names and labels. Conservative: only high-confidence matches (exact
-   * or normalized on name/label) are returned — fuzzy guesses are excluded.
+   * or normalized on name/label) are returned â€” fuzzy guesses are excluded.
    */
   autoMapFields(
     sourceFields: string[],
@@ -310,9 +310,44 @@ export class DataMapper {
 
   private parseDate(value: unknown): string | null {
     if (!value) return null;
-    const date = new Date(String(value));
+    const str = String(value).trim();
+
+    // Helper: build YYYY-MM-DD from numeric parts and validate via UTC
+    const tryBuildIso = (y: number, m: number, d: number): string | null => {
+      const check = new Date(Date.UTC(y, m - 1, d));
+      if (
+        !isNaN(check.getTime()) &&
+        check.getUTCFullYear() === y &&
+        check.getUTCMonth() === m - 1 &&
+        check.getUTCDate() === d
+      ) {
+        return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+      return null;
+    };
+
+    // ISO date-only: YYYY-M-D or YYYY-MM-DD
+    const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (isoMatch) {
+      const result = tryBuildIso(Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3]));
+      if (result) return result;
+    }
+
+    // US format: M/D/YYYY or MM/DD/YYYY
+    const usMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (usMatch) {
+      const result = tryBuildIso(Number(usMatch[3]), Number(usMatch[1]), Number(usMatch[2]));
+      if (result) return result;
+    }
+
+    // Fallback: parse with Date constructor but extract UTC components
+    // to avoid local-timezone day-shift for users east of UTC
+    const date = new Date(str);
     if (isNaN(date.getTime())) return null;
-    return date.toISOString().split('T')[0]; // YYYY-MM-DD for Salesforce
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 }
 
@@ -346,3 +381,4 @@ function scoreFieldMatch(
   }
   return null;
 }
+
