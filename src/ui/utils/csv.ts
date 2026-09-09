@@ -6,9 +6,19 @@
 
 import type { FlatRecord } from './records';
 
+/** Neutralize formula-injection payloads (CSV injection / DDE). */
+function neutralizeFormulaInjection(s: string): string {
+  // Prefix with a single quote if the cell starts with a dangerous character.
+  // Excel/Sheets treats leading = + - @ \t \r as formula/DDE triggers.
+  if (/^[=+\-@\t\r]/.test(s)) {
+    return `'${s}`;
+  }
+  return s;
+}
+
 function escapeCsvValue(value: unknown): string {
   if (value === null || value === undefined) return '';
-  const s = String(value);
+  const s = neutralizeFormulaInjection(String(value));
   if (/[",\n\r]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }

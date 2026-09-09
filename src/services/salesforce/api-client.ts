@@ -134,11 +134,35 @@ export class SalesforceApiClient {
 
   /** Fetch next page of query results */
   async queryMore<T = Record<string, unknown>>(nextRecordsUrl: string): Promise<QueryResult<T>> {
+    // Security (#65): validate nextRecordsUrl is a relative Salesforce path.
+    if (/^https?:\/\//i.test(nextRecordsUrl)) {
+      const allowedOrigin = new URL(this.config.instanceUrl).origin;
+      const requestedOrigin = new URL(nextRecordsUrl).origin;
+      if (requestedOrigin !== allowedOrigin) {
+        throw new SalesforceApiError(
+          `queryMore blocked: nextRecordsUrl origin (${requestedOrigin}) does not match org instanceUrl (${allowedOrigin})`,
+          403,
+          'URL_ORIGIN_MISMATCH',
+        );
+      }
+    }
     return this.request<QueryResult<T>>(nextRecordsUrl, { useFullPath: true });
   }
 
   /** Fetch next page of Tooling API query results */
   async toolingQueryMore<T = Record<string, unknown>>(nextRecordsUrl: string): Promise<QueryResult<T>> {
+    // Security (#65): validate nextRecordsUrl is a relative Salesforce path.
+    if (/^https?:\/\//i.test(nextRecordsUrl)) {
+      const allowedOrigin = new URL(this.config.instanceUrl).origin;
+      const requestedOrigin = new URL(nextRecordsUrl).origin;
+      if (requestedOrigin !== allowedOrigin) {
+        throw new SalesforceApiError(
+          `toolingQueryMore blocked: nextRecordsUrl origin (${requestedOrigin}) does not match org instanceUrl (${allowedOrigin})`,
+          403,
+          'URL_ORIGIN_MISMATCH',
+        );
+      }
+    }
     return this.request<QueryResult<T>>(nextRecordsUrl, { useFullPath: true });
   }
 
@@ -284,11 +308,25 @@ export class SalesforceApiClient {
     body?: unknown,
     opts: { rawText?: boolean } = {},
   ): Promise<RawCallResult> {
-    const url = /^https?:\/\//.test(path)
-      ? path
-      : path.startsWith('/services/')
-        ? `${this.config.instanceUrl}${path}`
-        : `${this.config.instanceUrl}${API_BASE_PATH}/${this.config.apiVersion}${path.startsWith('/') ? path : `/${path}`}`;
+    let url: string;
+    if (/^https?:\/\//.test(path)) {
+      // Security (#65): reject absolute URLs whose origin does not match the org's instanceUrl.
+      // Prevents Bearer-token exfiltration to attacker-controlled domains.
+      const allowedOrigin = new URL(this.config.instanceUrl).origin;
+      const requestedOrigin = new URL(path).origin;
+      if (requestedOrigin !== allowedOrigin) {
+        throw new SalesforceApiError(
+          `rawCall blocked: absolute URL origin (${requestedOrigin}) does not match org instanceUrl (${allowedOrigin})`,
+          403,
+          'URL_ORIGIN_MISMATCH',
+        );
+      }
+      url = path;
+    } else if (path.startsWith('/services/')) {
+      url = `${this.config.instanceUrl}${path}`;
+    } else {
+      url = `${this.config.instanceUrl}${API_BASE_PATH}/${this.config.apiVersion}${path.startsWith('/') ? path : `/${path}`}`;
+    }
 
     const response = await fetch(url, {
       method,

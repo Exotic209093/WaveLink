@@ -462,6 +462,14 @@ messageBus.on('SF_UPDATE_RECORD', async (message, sender): Promise<MessageRespon
 });
 
 messageBus.on('SF_API_REQUEST', async (message, sender): Promise<MessageResponse> => {
+  // Security (#68): restrict privileged handler to trusted extension contexts.
+  if (message.source !== 'app' && message.source !== 'popup') {
+    return {
+      success: false,
+      error: { code: 'UNAUTHORIZED_SOURCE', message: `SF_API_REQUEST not allowed from source: ${message.source}` },
+      requestId: message.requestId,
+    };
+  }
   try {
     const { method, path, body, rawText } = message.payload as {
       method: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
@@ -483,6 +491,14 @@ messageBus.on('SF_API_REQUEST', async (message, sender): Promise<MessageResponse
 });
 
 messageBus.on('SF_EXECUTE_ANONYMOUS', async (message, sender): Promise<MessageResponse> => {
+  // Security (#68): restrict privileged handler to trusted extension contexts.
+  if (message.source !== 'app' && message.source !== 'popup') {
+    return {
+      success: false,
+      error: { code: 'UNAUTHORIZED_SOURCE', message: `SF_EXECUTE_ANONYMOUS not allowed from source: ${message.source}` },
+      requestId: message.requestId,
+    };
+  }
   try {
     const { apexBody } = message.payload as { apexBody: string };
     const org = await resolveSfOrg(message.payload, sender);
@@ -902,6 +918,14 @@ messageBus.on('DATA_EXPORT', async (message): Promise<MessageResponse> => {
 });
 
 messageBus.on('DATA_IMPORT', async (message): Promise<MessageResponse> => {
+  // Security (#68): restrict privileged handler to trusted extension contexts.
+  if (message.source !== 'app' && message.source !== 'popup') {
+    return {
+      success: false,
+      error: { code: 'UNAUTHORIZED_SOURCE', message: `DATA_IMPORT not allowed from source: ${message.source}` },
+      requestId: message.requestId,
+    };
+  }
   try {
     const payload = message.payload as Record<string, unknown>;
     const result = await storage.importUserData(payload);
@@ -984,9 +1008,14 @@ messageBus.on('OPEN_FULL_APP', async (message): Promise<MessageResponse> => {
 messageBus.on('ORG_LIST', async (message): Promise<MessageResponse> => {
   const orgs = await storage.getOrgs();
   const activeOrgId = await storage.getActiveOrgId();
+  // Security (#67): strip tokens before sending to UI surfaces.
+  // Tokens never need to leave the background worker.
+  const safeOrgs = Object.values(orgs).map(({ orgId, username, instanceUrl, displayName, environment, nickname, id, connectedAt, lastUsedAt, apiVersion }) => ({
+    orgId, username, instanceUrl, displayName, environment, nickname, id, connectedAt, lastUsedAt, apiVersion,
+  }));
   return {
     success: true,
-    data: { orgs: Object.values(orgs), activeOrgId },
+    data: { orgs: safeOrgs, activeOrgId },
     requestId: message.requestId,
   };
 });
