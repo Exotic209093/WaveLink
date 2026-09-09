@@ -22,6 +22,7 @@ import { MessageBus } from '../services/messaging';
 import { StorageService } from '../services/storage';
 import { SalesforceAuth } from '../services/salesforce/auth';
 import { SalesforceApiClient } from '../services/salesforce/api-client';
+import { ApiClientFactory } from '../services/salesforce/api-client-factory';
 import { BulkApiService } from '../services/salesforce/bulk-api';
 import { queryAllRecords, deriveColumns } from '../services/salesforce/queryAll';
 import { captureViaOffscreen, runBulkPushViaOffscreen } from './offscreen';
@@ -39,6 +40,7 @@ import type { MigrationProject } from '../core/types/migration';
 const messageBus = new MessageBus('background');
 const storage = new StorageService();
 const auth = new SalesforceAuth();
+const apiClientFactory = new ApiClientFactory();
 
 // In-memory registry for cancellation; cleared when the MV3 service worker is restarted.
 const activePushes = new Map<string, { abortController: AbortController }>();
@@ -251,11 +253,7 @@ messageBus.on('SF_QUERY_RUN', async (message, sender): Promise<MessageResponse> 
   try {
     const { soql } = message.payload as { soql: string };
     const org = await resolveSfOrg(message.payload, sender);
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     const result = await client.query(soql);
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
@@ -271,11 +269,7 @@ messageBus.on('SF_QUERY_MORE', async (message, sender): Promise<MessageResponse>
   try {
     const { nextRecordsUrl } = message.payload as { nextRecordsUrl: string };
     const org = await resolveSfOrg(message.payload, sender);
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     const result = await client.queryMore(nextRecordsUrl);
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
@@ -288,11 +282,7 @@ messageBus.on('SF_QUERY_MORE', async (message, sender): Promise<MessageResponse>
 });
 
 function bulkServiceFor(org: SalesforceOrg): BulkApiService {
-  return new BulkApiService({
-    instanceUrl: org.instanceUrl,
-    accessToken: org.accessToken,
-    apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-  });
+  return apiClientFactory.getBulkService(org);
 }
 
 messageBus.on('SF_BULK_QUERY_START', async (message, sender): Promise<MessageResponse> => {
@@ -340,11 +330,7 @@ messageBus.on('SF_TOOLING_QUERY_RUN', async (message, sender): Promise<MessageRe
   try {
     const { soql } = message.payload as { soql: string };
     const org = await resolveSfOrg(message.payload, sender);
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     const result = await client.toolingQuery(soql);
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
@@ -360,11 +346,7 @@ messageBus.on('SF_TOOLING_QUERY_MORE', async (message, sender): Promise<MessageR
   try {
     const { nextRecordsUrl } = message.payload as { nextRecordsUrl: string };
     const org = await resolveSfOrg(message.payload, sender);
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     const result = await client.toolingQueryMore(nextRecordsUrl);
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
@@ -379,11 +361,7 @@ messageBus.on('SF_TOOLING_QUERY_MORE', async (message, sender): Promise<MessageR
 messageBus.on('SF_DESCRIBE_GLOBAL', async (message, sender): Promise<MessageResponse> => {
   try {
     const org = await resolveSfOrg(message.payload, sender);
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     const result = await client.describeGlobal();
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
@@ -405,11 +383,7 @@ messageBus.on('SF_DESCRIBE_SOBJECT', async (message, sender): Promise<MessageRes
       return { success: true, data: cached, requestId: message.requestId };
     }
 
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     const result = await client.describeSObject(objectName);
     const uiSettingsForTtl = await storage.getUiSettings();
     const ttl = uiSettingsForTtl.schemaCacheTtlMinutes ? uiSettingsForTtl.schemaCacheTtlMinutes * 60 * 1000 : SCHEMA_CACHE_TTL;
@@ -432,11 +406,7 @@ messageBus.on('SF_UPDATE_RECORD', async (message, sender): Promise<MessageRespon
       fields: Record<string, unknown>;
     };
     const org = await resolveSfOrg(message.payload, sender);
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     await client.updateRecord(objectName, recordId, fields);
     return { success: true, data: { recordId }, requestId: message.requestId };
   } catch (error) {
@@ -457,11 +427,7 @@ messageBus.on('SF_API_REQUEST', async (message, sender): Promise<MessageResponse
       rawText?: boolean;
     };
     const org = await resolveSfOrg(message.payload, sender);
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     const result = await client.rawCall(method, path, body, { rawText });
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
@@ -477,11 +443,7 @@ messageBus.on('SF_EXECUTE_ANONYMOUS', async (message, sender): Promise<MessageRe
   try {
     const { apexBody } = message.payload as { apexBody: string };
     const org = await resolveSfOrg(message.payload, sender);
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     const result = await client.executeAnonymous(apexBody);
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
@@ -497,11 +459,7 @@ messageBus.on('SF_CREATE_RECORD', async (message, sender): Promise<MessageRespon
   try {
     const { objectName, fields } = message.payload as { objectName: string; fields: Record<string, unknown> };
     const org = await resolveSfOrg(message.payload, sender);
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     const result = await client.createRecord(objectName, fields);
     return { success: true, data: { id: result.id }, requestId: message.requestId };
   } catch (error) {
@@ -517,11 +475,7 @@ messageBus.on('SF_DELETE_RECORD', async (message, sender): Promise<MessageRespon
   try {
     const { objectName, recordId } = message.payload as { objectName: string; recordId: string };
     const org = await resolveSfOrg(message.payload, sender);
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     await client.deleteRecord(objectName, recordId);
     return { success: true, data: { recordId }, requestId: message.requestId };
   } catch (error) {
@@ -536,11 +490,7 @@ messageBus.on('SF_DELETE_RECORD', async (message, sender): Promise<MessageRespon
 messageBus.on('SF_LIMITS_GET', async (message, sender): Promise<MessageResponse> => {
   try {
     const org = await resolveSfOrg(message.payload, sender);
-    const client = new SalesforceApiClient({
-      instanceUrl: org.instanceUrl,
-      accessToken: org.accessToken,
-      apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-    });
+    const client = apiClientFactory.getClient(org);
     const result = await client.getLimits();
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
@@ -1074,7 +1024,7 @@ messageBus.on('CROSS_ORG_QUERY', async (message): Promise<MessageResponse> => {
   try {
     const { orgId, soql } = message.payload as { orgId: string; soql: string };
     const org = await getValidOrg(orgId);
-    const client = createApiClient(org);
+    const client = apiClientFactory.getClient(org);
     const result = await client.query(soql);
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
@@ -1090,7 +1040,7 @@ messageBus.on('CROSS_ORG_DESCRIBE', async (message): Promise<MessageResponse> =>
   try {
     const { orgId, objectName } = message.payload as { orgId: string; objectName?: string };
     const org = await getValidOrg(orgId);
-    const client = createApiClient(org);
+    const client = apiClientFactory.getClient(org);
     if (objectName) {
       const cached = await storage.getCachedSchema(orgId, objectName);
       if (cached) return { success: true, data: cached, requestId: message.requestId };
@@ -1117,7 +1067,7 @@ messageBus.on('SCHEMA_DESCRIBE', async (message): Promise<MessageResponse> => {
   try {
     const { orgId } = message.payload as { orgId: string };
     const org = await getValidOrg(orgId);
-    const client = createApiClient(org);
+    const client = apiClientFactory.getClient(org);
     const result = await client.describeGlobal();
 
     return {
@@ -1148,7 +1098,7 @@ messageBus.on('SCHEMA_DESCRIBE_SOBJECT', async (message): Promise<MessageRespons
     }
 
     const org = await getValidOrg(orgId);
-    const client = createApiClient(org);
+    const client = apiClientFactory.getClient(org);
     const result = await client.describeSObject(objectName);
 
     // Cache the result with user-configured TTL
@@ -1318,7 +1268,7 @@ async function executeRestPush(
   // and broadcast completion. Otherwise the UI can miss the terminal event
   // before it has installed the new push state.
   await new Promise<void>(resolve => setTimeout(resolve, 0));
-  const client = createApiClient(org);
+  const client = apiClientFactory.getClient(org);
 
   const effectiveBatchSize =
     payload.operation === 'upsert'
@@ -1964,13 +1914,6 @@ async function getValidOrg(orgId: string): Promise<SalesforceOrg> {
   return refreshed;
 }
 
-function createApiClient(org: SalesforceOrg): SalesforceApiClient {
-  return new SalesforceApiClient({
-    instanceUrl: org.instanceUrl,
-    accessToken: org.accessToken,
-    apiVersion: org.apiVersion ?? DEFAULT_API_VERSION,
-  });
-}
 
 // ── Service Worker Lifecycle ─────────────────────────────────────────
 
@@ -2290,11 +2233,12 @@ async function runSchedule(id: string): Promise<void> {
     try {
       records = await captureViaOffscreen(capturePayload);
     } catch {
-      const client = new SalesforceApiClient({
+      const client = apiClientFactory.getClient({
+        orgId: s.orgId,
         instanceUrl: capturePayload.instanceUrl,
         accessToken: capturePayload.accessToken,
         apiVersion: capturePayload.apiVersion,
-      });
+      } as SalesforceOrg);
       records = await queryAllRecords(client, s.soql);
     }
     columns = deriveColumns(records);

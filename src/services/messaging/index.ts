@@ -19,6 +19,7 @@ import type {
   MessageResponse,
   MessageSource,
   MessageHandler,
+  PayloadMap,
 } from '../../core/types/messaging';
 import { generateRequestId } from '../../core/utils';
 
@@ -30,7 +31,7 @@ const MESSAGE_TIMEOUT = 30_000;
  */
 export class MessageBus {
   private source: MessageSource;
-  private handlers = new Map<MessageType, MessageHandler>();
+  private handlers = new Map<MessageType, MessageHandler<MessageType>>();
 
   constructor(source: MessageSource) {
     this.source = source;
@@ -39,9 +40,12 @@ export class MessageBus {
 
   /**
    * Register a handler for a specific message type.
+   * The handler receives ExtensionMessage<T> with payload typed as PayloadMap[T].
    */
   on<T extends MessageType>(type: T, handler: MessageHandler<T>): void {
-    this.handlers.set(type, handler as MessageHandler);
+    // Safe cast: the map is internal and dispatch erases the generic at runtime.
+    // The public API enforces type safety at registration and send sites.
+    this.handlers.set(type, handler as unknown as MessageHandler<MessageType>);
   }
 
   /**
@@ -53,12 +57,13 @@ export class MessageBus {
 
   /**
    * Send a message to the background service worker and wait for a response.
+   * Payload type is inferred from the message type via PayloadMap.
    */
-  async send<P = unknown, R = unknown>(
-    type: MessageType,
-    payload: P,
+  async send<T extends MessageType, R = unknown>(
+    type: T,
+    payload: PayloadMap[T],
   ): Promise<MessageResponse<R>> {
-    const message: ExtensionMessage = {
+    const message: ExtensionMessage<T> = {
       type,
       payload,
       requestId: generateRequestId(),
@@ -84,13 +89,14 @@ export class MessageBus {
 
   /**
    * Send a message to a specific tab's content script.
+   * Payload type is inferred from the message type via PayloadMap.
    */
-  async sendToTab<P = unknown, R = unknown>(
+  async sendToTab<T extends MessageType, R = unknown>(
     tabId: number,
-    type: MessageType,
-    payload: P,
+    type: T,
+    payload: PayloadMap[T],
   ): Promise<MessageResponse<R>> {
-    const message: ExtensionMessage = {
+    const message: ExtensionMessage<T> = {
       type,
       payload,
       requestId: generateRequestId(),
@@ -116,9 +122,10 @@ export class MessageBus {
 
   /**
    * Broadcast a message to all extension contexts (no response expected).
+   * Payload type is inferred from the message type via PayloadMap.
    */
-  broadcast<P = unknown>(type: MessageType, payload: P): void {
-    const message: ExtensionMessage = {
+  broadcast<T extends MessageType>(type: T, payload: PayloadMap[T]): void {
+    const message: ExtensionMessage<T> = {
       type,
       payload,
       requestId: generateRequestId(),
