@@ -12,7 +12,7 @@
  *
  * Complexity:
  * - Org detection is O(1) DOM querying.
- * - URL change detection uses a MutationObserver; callback work is O(1) per DOM mutation batch.
+ * - URL change detection uses history.pushState/replaceState monkey-patching and popstate; fires only on actual navigations.
  */
 
 import { MessageBus } from '../services/messaging';
@@ -159,15 +159,30 @@ messageBus.on('ORG_INFO', async (message) => {
 reportOrgDetection();
 
 // Re-detect on URL changes (SPA navigation in Lightning)
+// Uses history API monkey-patching + popstate instead of a document-wide
+// MutationObserver, which fired on every DOM mutation in Salesforce pages.
 let lastUrl = window.location.href;
-const urlObserver = new MutationObserver(() => {
+
+function onUrlChange(): void {
   if (window.location.href !== lastUrl) {
     lastUrl = window.location.href;
     reportOrgDetection();
   }
-});
+}
 
-urlObserver.observe(document.body, { childList: true, subtree: true });
+window.addEventListener('popstate', onUrlChange);
+
+const originalPushState = history.pushState.bind(history);
+history.pushState = function (...args: Parameters<typeof history.pushState>): void {
+  originalPushState(...args);
+  onUrlChange();
+};
+
+const originalReplaceState = history.replaceState.bind(history);
+history.replaceState = function (...args: Parameters<typeof history.replaceState>): void {
+  originalReplaceState(...args);
+  onUrlChange();
+};
 
 // Content script initialized
 
