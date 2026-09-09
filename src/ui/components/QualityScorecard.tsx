@@ -40,13 +40,13 @@ export function QualityScorecard(props: QualityScorecardProps): VNode {
   breakdowns.sort((a, b) => a.passRate - b.passRate);
 
   return (
-    <div class="wl-card" style="display:flex;flex-direction:column;gap:16px">
+    <div class="wl-card" style="display:flex;flex-direction:column;gap:16px" role="region" aria-label="Data quality scorecard">
       <div class="wl-cardHeader">
         <h2>Quality Scorecard</h2>
       </div>
 
       {/* Score badge */}
-      <div style="display:flex;align-items:center;justify-content:center;padding:16px 0">
+      <div style="display:flex;align-items:center;justify-content:center;padding:16px 0" role="img" aria-label={`Overall quality score: ${result.score} out of 100`}>
         <div
           style={`
             width:100px;height:100px;border-radius:50%;

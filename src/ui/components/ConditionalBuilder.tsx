@@ -52,13 +52,14 @@ export function ConditionalBuilder(props: ConditionalBuilderProps): VNode {
   };
 
   return (
-    <div>
+    <div role="group" aria-label="Conditional rule builder">
       {/* IF row */}
       <div class="wl-conditionalRow" style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <span style="font-weight:700;font-size:12px;min-width:36px">IF</span>
+        <span style="font-weight:700;font-size:12px;min-width:36px" id="wl-cond-if-label">IF</span>
 
         <select
           class="wl-select"
+          aria-labelledby="wl-cond-if-label"
           value={current.field}
           onChange={(e) => update({ field: (e.currentTarget as HTMLSelectElement).value })}
         >

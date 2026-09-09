@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Card component for displaying a saved data template.
  *
  * Renders the template name, object badge, category, usage count,
@@ -33,7 +33,7 @@ export function TemplateCard(props: TemplateCardProps): VNode {
   const { template, onEdit, onDelete, onUse } = props;
 
   return (
-    <div class="wl-templateCard">
+    <div class="wl-templateCard" role="article" aria-label={`Template: ${template.name}`}>
       <div class="wl-templateCardTitle">{template.name}</div>
 
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
@@ -56,10 +56,11 @@ export function TemplateCard(props: TemplateCardProps): VNode {
       </div>
 
       <div class="wl-actions" style="margin-top:auto;padding-top:4px">
-        <button class="wl-btn" onClick={onEdit} style="font-size:11px;padding:5px 8px">Edit</button>
-        <button class="wl-btn wl-btnDanger" onClick={onDelete} style="font-size:11px;padding:5px 8px">Delete</button>
-        <button class="wl-btn wl-btnPrimary" onClick={onUse} style="font-size:11px;padding:5px 8px">Use</button>
+        <button class="wl-btn" onClick={onEdit} style="font-size:11px;padding:5px 8px" aria-label={`Edit template ${template.name}`}>Edit</button>
+        <button class="wl-btn wl-btnDanger" onClick={onDelete} style="font-size:11px;padding:5px 8px" aria-label={`Delete template ${template.name}`}>Delete</button>
+        <button class="wl-btn wl-btnPrimary" onClick={onUse} style="font-size:11px;padding:5px 8px" aria-label={`Use template ${template.name}`}>Use</button>
       </div>
     </div>
   );
 }
+

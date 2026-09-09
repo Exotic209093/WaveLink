@@ -49,11 +49,11 @@ export function SubqueryBuilder(props: {
   }
 
   return (
-    <div class="wl-qb-section">
-      <div class="wl-qb-sectionLabel">
+    <div class="wl-qb-section" role="group" aria-label="Subquery builder">
+      <div class="wl-qb-sectionLabel" id="wl-qb-subquery-label">
         Subqueries (Child Relationships)
         {subqueries.length > 0 && (
-          <span class="wl-badge" style="margin-left:8px;font-weight:700;padding:2px 8px">
+          <span class="wl-badge" style="margin-left:8px;font-weight:700;padding:2px 8px" aria-label={`${subqueries.length} subqueries`}>
             {subqueries.length}
           </span>
         )}

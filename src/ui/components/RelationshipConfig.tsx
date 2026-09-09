@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Configuration component for lookup relationship fields.
  *
  * Provides a textarea for entering lookup record IDs (one per line)
@@ -41,8 +41,7 @@ export function RelationshipConfig(props: RelationshipConfigProps): VNode {
         </span>
       </div>
 
-      <textarea
-        class="wl-textarea"
+      <textarea class="wl-textarea" aria-label={`Lookup record IDs for ${fieldName}`}
         style="min-height:80px;font-size:12px"
         placeholder={"Enter lookup record IDs (one per line):\n001xx000003abc1\n001xx000003abc2\n001xx000003abc3"}
         value={lookupValues.join('\n')}
@@ -57,3 +56,4 @@ export function RelationshipConfig(props: RelationshipConfigProps): VNode {
     </div>
   );
 }
+

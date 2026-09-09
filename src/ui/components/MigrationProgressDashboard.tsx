@@ -42,13 +42,14 @@ export function MigrationProgressDashboard(props: {
   const barColor = status === 'error' ? 'var(--wl-danger)' : progress.done ? 'var(--wl-success)' : 'var(--wl-accent)';
 
   return (
-    <div class="wl-card">
+    <div class="wl-card" role="region" aria-label="Migration progress dashboard" aria-live="polite">
       <div class="wl-cardHeader">
         <h2>Migration Progress</h2>
         <div style="display:flex;align-items:center;gap:10px">
           <span
             class="wl-pill"
             style={`color:${badge.color};border-color:${badge.color}55`}
+            aria-label={`Status: ${badge.label}`}
           >
             {badge.label}
           </span>

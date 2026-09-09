@@ -39,13 +39,13 @@ export function DryRunPanel(props: {
   }
 
   return (
-    <div class="wl-card">
+    <div class="wl-card" role="region" aria-label="Dry run results" aria-live="polite">
       <div class="wl-cardHeader">
         <h2>Dry Run {allPass ? '✓' : ''}</h2>
-        <div class="wl-actions">
-          <button class="wl-btn" onClick={exportCsv} disabled={report.total === 0}>Export CSV</button>
-          <button class="wl-btn" onClick={exportJson} disabled={report.total === 0}>Export JSON</button>
-          <button class="wl-btn" onClick={onClose}>Dismiss</button>
+        <div class="wl-actions" role="toolbar" aria-label="Dry run actions">
+          <button class="wl-btn" onClick={exportCsv} disabled={report.total === 0} aria-label="Export dry run report as CSV">Export CSV</button>
+          <button class="wl-btn" onClick={exportJson} disabled={report.total === 0} aria-label="Export dry run report as JSON">Export JSON</button>
+          <button class="wl-btn" onClick={onClose} aria-label="Dismiss dry run panel">Dismiss</button>
         </div>
       </div>
 

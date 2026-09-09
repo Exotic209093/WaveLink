@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tree of objects with checkboxes and edge labels for the clone wizard.
  *
  * What this file does:
@@ -69,7 +69,7 @@ export function RelationshipTree(props: RelationshipTreeProps): VNode {
   }, [graph.edges]);
 
   return (
-    <div class="wl-relationshipTree">
+    <div class="wl-relationshipTree" role="tree" aria-label="Object relationship tree">
       {nodeNames.length === 0 && (
         <div class="wl-muted" style="padding:8px">
           No objects in the relationship graph.
@@ -85,11 +85,7 @@ export function RelationshipTree(props: RelationshipTreeProps): VNode {
             {/* Node */}
             <div class="wl-relNode" data-cycle={inCycle ? 'true' : undefined}>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1">
-                <input
-                  type="checkbox"
-                  checked={selectedObjects.has(name)}
-                  onChange={() => onToggleObject(name)}
-                  style="accent-color:var(--wl-accent)"
+                <input type="checkbox" checked={selectedObjects.has(name)} onChange={() => onToggleObject(name)} style="accent-color:var(--wl-accent)" aria-label={`Select ${name} for cloning`}
                 />
                 <span style="font-weight:700;font-size:13px">{name}</span>
               </label>
@@ -129,3 +125,4 @@ export function RelationshipTree(props: RelationshipTreeProps): VNode {
     </div>
   );
 }
+

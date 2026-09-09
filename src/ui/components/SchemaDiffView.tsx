@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Scrollable list view of schema diffs with filter toolbar and summary stats.
  *
  * Renders a toolbar with all/added/removed/changed toggle buttons,
@@ -48,7 +48,7 @@ export function SchemaDiffView(props: SchemaDiffViewProps): VNode {
   ];
 
   return (
-    <div class="wl-diffView">
+    <div class="wl-diffView" role="region" aria-label="Schema diff results">
       {/* Summary stats */}
       <div class="wl-chipRow" style="padding:8px 0">
         <span class="wl-chip">
@@ -66,7 +66,7 @@ export function SchemaDiffView(props: SchemaDiffViewProps): VNode {
           <button
             key={f.mode}
             class="wl-btn"
-            data-active={filter === f.mode ? 'true' : 'false'}
+            data-active={filter === f.mode ? 'true' : 'false'} aria-pressed={filter === f.mode}
             onClick={() => setFilter(f.mode)}
             style="font-size:11px;padding:5px 10px"
           >
@@ -76,7 +76,7 @@ export function SchemaDiffView(props: SchemaDiffViewProps): VNode {
       </div>
 
       {/* Diff list */}
-      <div style="max-height:520px;overflow-y:auto">
+      <div style="max-height:520px;overflow-y:auto" aria-live="polite">
         {visibleDiffs.length > 0 ? (
           visibleDiffs.map((d) => (
             <FieldDiffDetail key={d.name} diff={d} />
@@ -88,3 +88,4 @@ export function SchemaDiffView(props: SchemaDiffViewProps): VNode {
     </div>
   );
 }
+

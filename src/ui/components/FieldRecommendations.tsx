@@ -27,7 +27,7 @@ export function FieldRecommendations(props: FieldRecommendationsProps): VNode {
   }
 
   return (
-    <ul class="wl-recommendations">
+    <ul class="wl-recommendations" role="list" aria-label="Field quality recommendations">
       {recommendations.map((rec, i) => (
         <li key={i}>{rec}</li>
       ))}

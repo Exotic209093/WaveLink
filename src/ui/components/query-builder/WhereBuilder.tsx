@@ -1,4 +1,4 @@
-import type { VNode } from 'preact';
+﻿import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useMemo } from 'preact/hooks';
 import type { SObjectField } from '../../../core/types/salesforce';
@@ -44,8 +44,8 @@ export function WhereBuilder(props: {
   }
 
   return (
-    <div class="wl-qb-section">
-      <div class="wl-qb-sectionLabel">Where</div>
+    <div class="wl-qb-section" role="group" aria-label="Where clause builder">
+      <div class="wl-qb-sectionLabel" id="wl-qb-where-label">Where</div>
       <div class="wl-qb-condGroup">
         {conditions.map((cond, i) => {
           const field = fieldMap.get(cond.field);
@@ -72,8 +72,7 @@ export function WhereBuilder(props: {
               )}
 
               <div class="wl-qb-condCard">
-                <select
-                  class="wl-select wl-qb-condField"
+                <select class="wl-select wl-qb-condField" aria-label="Condition field"
                   value={cond.field}
                   onChange={(e) => update(i, { field: (e.currentTarget as HTMLSelectElement).value })}
                 >
@@ -81,8 +80,7 @@ export function WhereBuilder(props: {
                   {fields.map(f => <option key={f.name} value={f.name}>{fieldDisplay(f)}</option>)}
                 </select>
 
-                <select
-                  class="wl-select wl-qb-condOp"
+                <select class="wl-select wl-qb-condOp" aria-label="Condition operator"
                   value={cond.operator}
                   onChange={(e) => update(i, { operator: (e.currentTarget as HTMLSelectElement).value as SoqlOperator })}
                 >
@@ -91,17 +89,14 @@ export function WhereBuilder(props: {
 
                 {renderValueInput(cond, field, picklist, i)}
 
-                <button
-                  class="wl-qb-condRemove"
-                  onClick={() => remove(i)}
-                  title="Remove condition"
+                <button class="wl-qb-condRemove" onClick={() => remove(i)} title="Remove condition" aria-label="Remove this condition"
                 >&times;</button>
               </div>
             </div>
           );
         })}
       </div>
-      <button class="wl-qb-addBtn" onClick={add} disabled={fields.length === 0}>
+      <button class="wl-qb-addBtn" onClick={add} disabled={fields.length === 0} aria-label="Add new where condition">
         + Add Condition
       </button>
     </div>
@@ -232,3 +227,4 @@ export function WhereBuilder(props: {
     );
   }
 }
+

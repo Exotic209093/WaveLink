@@ -50,9 +50,9 @@ export function DuplicateGroupView(props: DuplicateGroupViewProps): VNode {
   const indexes = getGroupIndexes(group);
 
   return (
-    <div class="wl-dupGroup">
+    <div class="wl-dupGroup" role="region" aria-label={`Duplicate group ${group.masterIndex} resolution`}>
       <div class="wl-tableWrap">
-        <table class="wl-dupGroupTable">
+        <table class="wl-dupGroupTable" aria-label="Field-level merge selection table">
           <thead>
             <tr>
               <th style="padding:4px 8px;border-bottom:1px solid var(--wl-line-2);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--wl-ink-dim)">
