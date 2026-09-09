@@ -75,11 +75,11 @@ describe('deriveColumns', () => {
     expect(deriveColumns(records)).toEqual(['Id', 'Name', 'Industry']);
   });
 
-  it('only samples up to sampleSize records', () => {
+  it('derives columns from all records, not just a sample', () => {
     const records = [
       { Id: '1' },
-      { Id: '2', Late: 'x' }, // beyond sampleSize=1, so Late not picked up
+      { Id: '2', Late: 'x' },
     ];
-    expect(deriveColumns(records, 1)).toEqual(['Id']);
+    expect(deriveColumns(records)).toEqual(['Id', 'Late']);
   });
 });

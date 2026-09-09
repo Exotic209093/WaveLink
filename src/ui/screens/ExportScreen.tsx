@@ -59,9 +59,13 @@ export function ExportScreen(props: {
   const [tabNameDraft, setTabNameDraft] = useState('');
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
   const workspaceKey = `exportWorkspace:${context?.orgId ?? 'local'}`;
+  // Track which workspaceKey the current tabs belong to, so the save effect
+  // never writes stale tabs under a new org's key during the async load gap.
+  const loadedForKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setWorkspaceLoaded(false);
+    loadedForKeyRef.current = null;
     chrome.storage.local.get([workspaceKey], result => {
       const saved = result[workspaceKey] as { tabs?: QueryWorkspaceTab[]; activeTabId?: string } | undefined;
       if (saved?.tabs?.length) {
@@ -71,13 +75,22 @@ export function ExportScreen(props: {
         setActiveTabId(nextActive);
         onSoqlChange(restoredTabs.find(tab => tab.id === nextActive)?.soql ?? soql);
         nextTabNumber.current = restoredTabs.length + 1;
+      } else {
+        // New org with no saved workspace — reset to defaults so stale tabs
+        // from the previous org are not displayed or persisted.
+        setTabs([normalizeTab({ id: 'query-1', name: 'Query 1', soql })]);
+        setActiveTabId('query-1');
+        onSoqlChange(soql);
+        nextTabNumber.current = 2;
       }
+      loadedForKeyRef.current = workspaceKey;
       setWorkspaceLoaded(true);
     });
   }, [workspaceKey]);
 
   useEffect(() => {
     if (!workspaceLoaded) return;
+    if (loadedForKeyRef.current !== workspaceKey) return;
     chrome.storage.local.set({ [workspaceKey]: { tabs, activeTabId } });
   }, [workspaceLoaded, workspaceKey, tabs, activeTabId]);
 

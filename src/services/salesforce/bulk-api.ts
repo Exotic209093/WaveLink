@@ -244,6 +244,7 @@ export class BulkApiService {
       header: true,
       delimiter: ',',
       skipEmptyLines: true,
+      dynamicTyping: true,
       transformHeader: header => header.trim(),
     });
     if (parsed.errors.length > 0) {

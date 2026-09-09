@@ -24,7 +24,6 @@ export function flattenRecord(
   const out: FlatRecord = {};
 
   function visit(value: unknown, path: string, depth: number): void {
-    if (path === 'attributes') return;
     if (value === undefined) return;
 
     if (value === null) {
@@ -48,6 +47,7 @@ export function flattenRecord(
         return;
       }
       for (const [k, v] of Object.entries(value)) {
+        if (k === 'attributes') continue;
         const nextPath = path ? `${path}.${k}` : k;
         visit(v, nextPath, depth + 1);
       }
@@ -66,9 +66,9 @@ export function flattenRecord(
   return cleaned;
 }
 
-export function deriveColumns(records: Array<Record<string, unknown>>, limit: number = 50): string[] {
+export function deriveColumns(records: Array<Record<string, unknown>>): string[] {
   const cols = new Set<string>();
-  for (const rec of records.slice(0, limit)) {
+  for (const rec of records) {
     const flat = flattenRecord(rec);
     for (const key of Object.keys(flat)) {
       cols.add(key);

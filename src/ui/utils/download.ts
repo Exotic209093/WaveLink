@@ -13,7 +13,9 @@ export function downloadTextFile(filename: string, content: string, contentType:
 
 /** Build a download from bounded generated chunks instead of one giant string. */
 export function downloadBlobParts(filename: string, parts: BlobPart[], contentType: string): void {
-  const blob = new Blob(parts, { type: contentType });
+  // Prepend UTF-8 BOM for CSV so Windows Excel opens it correctly (issue #72)
+  const finalParts: BlobPart[] = contentType === 'text/csv' ? ['﻿', ...parts] : parts;
+  const blob = new Blob(finalParts, { type: contentType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
