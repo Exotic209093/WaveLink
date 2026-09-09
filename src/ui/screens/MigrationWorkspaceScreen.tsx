@@ -1,5 +1,5 @@
-/**
- * Migration Workspace screen — configures and executes a single migration project.
+﻿/**
+ * Migration Workspace screen â€” configures and executes a single migration project.
  *
  * Phase 1, Features 1.1 + 1.2: Project configuration and multi-object orchestration.
  *
@@ -17,6 +17,22 @@ import type { SfApi } from '../api/sf';
 import type { MigrationProject, MigrationObject, MigrationObjectProgress, DependencyGraph } from '../../core/types/migration';
 import type { SObjectDescribe } from '../../core/types/salesforce';
 import { buildMigrationGraph } from '../utils/dependencyGraph';
+
+/** Poll for a completed push result. Resolves with the inserted IDs in order, or null on timeout. */
+async function awaitPushResult(
+  sf: SfApi,
+  pushId: string,
+  timeoutMs = 5 * 60_000,
+  intervalMs = 1_000,
+): Promise<string[] | null> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const res = await sf.getDataPushResult(pushId);
+    if (res && Array.isArray(res.ids) && res.ids.length > 0) return res.ids;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return null;
+}
 
 interface Props {
   sf: SfApi;
@@ -174,7 +190,7 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
         progress[i] = { ...prog };
         setObjectProgress([...progress]);
 
-        // 2. Prepare records — remap reference fields using accumulated ID map
+        // 2. Prepare records â€” remap reference fields using accumulated ID map
         const records = queryResult.records.map((r: Record<string, unknown>) => {
           const mapped: Record<string, unknown> = {};
           for (const [key, val] of Object.entries(r)) {
@@ -194,16 +210,16 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
         setObjectProgress([...progress]);
 
         const pushResult = await sf.startDataPush({
-          tabId,
+          orgId: project.targetOrgId,
           objectName: obj.objectName,
           operation: obj.operation,
           records,
           externalIdField: obj.externalIdField,
         });
 
-        // 4. Collect inserted IDs and build ID map
-        const result = await sf.getDataPushResult(pushResult.pushId);
-        if (result && result.ids) {
+        // 4. Poll for push completion before reading inserted IDs
+        const result = await awaitPushResult(sf, pushResult.pushId);
+        if (result) {
           const failedIndices = new Set<number>();
           if (result.failedRecords) {
             for (const f of result.failedRecords) failedIndices.add(f.index);
@@ -228,8 +244,8 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
           // Persist to ID map storage
           await sf.addIdMapEntries(idMapId, entries);
 
-          prog.processedRecords = result.ids.length;
-          prog.failedRecords = prog.totalRecords - result.ids.length;
+          prog.processedRecords = entries.length;
+          prog.failedRecords = prog.totalRecords - entries.length;
         }
 
         prog.status = 'done';

@@ -141,10 +141,16 @@ export class CircuitBreakerError extends WaveLinkError {
   }
 }
 
-/** Check if an error is retryable */
-export function isRetryableError(error: unknown): boolean {
+/** Check if an error is retryable. Non-idempotent methods (POST) should not
+ *  retry on NetworkError because the request may have reached the server but
+ *  the response was lost — retrying would duplicate records. */
+export function isRetryableError(error: unknown, method?: string): boolean {
   if (error instanceof RateLimitError) return true;
-  if (error instanceof NetworkError) return true;
+  if (error instanceof NetworkError) {
+    // Only retry network errors for idempotent methods (GET, PUT, DELETE, PATCH).
+    // POST creates are not safe to retry without idempotency guarantees.
+    return method !== 'POST';
+  }
   if (error instanceof SalesforceApiError) {
     return error.statusCode >= 500 || error.statusCode === 429;
   }

@@ -66,6 +66,7 @@ export function UndoHistoryPanel(props: UndoHistoryPanelProps): VNode {
     setBusy(t.id);
     try {
       await sf.startDataPush({
+        orgId: t.orgId,
         objectName: t.objectName,
         operation: 'delete',
         records: t.rollbackIds.map((id) => ({ Id: id })),
@@ -73,8 +74,9 @@ export function UndoHistoryPanel(props: UndoHistoryPanelProps): VNode {
       // Remove the transaction after successful undo
       await sf.removePushTransaction(t.id);
       await loadTransactions();
-    } catch {
-      // Silently handle undo failures
+    } catch (e) {
+      console.error('Undo failed:', e);
+      alert(e instanceof Error ? e.message : 'Undo failed');
     } finally {
       setBusy(null);
     }
