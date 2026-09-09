@@ -340,52 +340,16 @@ export class BulkApiService {
   }
 
   private parseCsv(csvText: string): BulkJobResult[] {
-    const lines = csvText.trim().split('\n');
-    if (lines.length < 2) return [];
+    const parsed = Papa.parse<Record<string, string>>(csvText, {
+      header: true,
+      skipEmptyLines: true,
+    });
 
-    const headers = this.parseCsvLine(lines[0]);
-    const results: BulkJobResult[] = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = this.parseCsvLine(lines[i]);
-      const record: BulkJobResult = { sf__Id: '', sf__Created: '', sf__Error: '' };
-      headers.forEach((header, idx) => {
-        record[header] = values[idx] ?? '';
-      });
-      results.push(record);
-    }
-
-    return results;
-  }
-
-  private parseCsvLine(line: string): string[] {
-    const values: string[] = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (inQuotes) {
-        if (char === '"' && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else if (char === '"') {
-          inQuotes = false;
-        } else {
-          current += char;
-        }
-      } else {
-        if (char === '"') {
-          inQuotes = true;
-        } else if (char === ',') {
-          values.push(current);
-          current = '';
-        } else {
-          current += char;
-        }
-      }
-    }
-    values.push(current);
-    return values;
+    return parsed.data.map((row) => ({
+      sf__Id: row['sf__Id'] ?? '',
+      sf__Created: row['sf__Created'] ?? '',
+      sf__Error: row['sf__Error'] ?? '',
+      ...row,
+    }));
   }
 }
