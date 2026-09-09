@@ -231,6 +231,11 @@ describe('formatSoqlValue', () => {
     expect(formatSoqlValue("O'Brien", 'string', '=')).toBe("'O\\'Brien'");
   });
 
+  it('escapes backslashes before quotes to prevent injection', () => {
+    expect(formatSoqlValue('C:\\data\\', 'string', '=')).toBe("'C:\\\\data\\\\'");
+    expect(formatSoqlValue("test\\' OR Name != NULL --", 'string', '=')).toBe("'test\\\\\\' OR Name != NULL --'");
+  });
+
   it('returns bare number for numeric types', () => {
     expect(formatSoqlValue('42', 'int', '=')).toBe('42');
     expect(formatSoqlValue('3.14', 'double', '>')).toBe('3.14');

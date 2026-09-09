@@ -219,6 +219,6 @@ function isNumericType(ft: SalesforceFieldType): boolean {
 }
 
 function escapeSoqlString(s: string): string {
-  return s.replace(/'/g, "\\'");
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
