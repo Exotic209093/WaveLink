@@ -2212,6 +2212,54 @@ function intervalToMinutes(i: ScheduleInterval): number {
   }
 }
 
+/**
+ * Compute the next run timestamp for a schedule. For daily intervals with a
+ * timeZone, anchors to the same local time-of-day in that zone so DST shifts
+ * are handled correctly. Falls back to simple interval arithmetic otherwise.
+ */
+function computeNextRunAt(interval: ScheduleInterval, timeZone?: string, afterMs: number = Date.now()): number {
+  if (interval.kind === 'days' && timeZone) {
+    // Determine the local time-of-day from `afterMs` in the target zone, then
+    // advance by `days` calendar days in that zone and convert back to UTC ms.
+    const localFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+    const parts = localFmt.formatToParts(new Date(afterMs));
+    const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? 0);
+    let y = get('year'), mo = get('month') - 1, d = get('day');
+    const h = get('hour'), mi = get('minute'), sec = get('second');
+
+    // Advance by N days in the target zone's calendar
+    d += interval.days;
+    // Construct a date string that Temporal/ZonedDateTime would parse; we use
+    // a binary-search approach via Date to find the UTC ms whose local
+    // representation matches. A simpler approximation: build an ISO string
+    // with the target offset. For correctness across DST we iterate.
+    const candidateBase = new Date(Date.UTC(y, mo, d, h, mi, sec));
+    // Adjust: the above treats inputs as UTC but they are local-zone values.
+    // We search for the UTC instant whose zone-local rendering equals our target.
+    let lo = candidateBase.getTime() - 26 * 3600_000;
+    let hi = candidateBase.getTime() + 26 * 3600_000;
+    // Binary search for the UTC ms whose local time matches (y,mo,d,h,mi,sec)
+    for (let iter = 0; iter < 40; iter++) {
+      const mid = Math.round((lo + hi) / 2);
+      const mp = localFmt.formatToParts(new Date(mid));
+      const mg = (t: string) => Number(mp.find(p => p.type === t)?.value ?? 0);
+      const my = mg('year'), mmo = mg('month') - 1, md = mg('day');
+      const mh = mg('hour'), mmi = mg('minute'), msc = mg('second');
+      const cmpY = my - y || mmo - mo || md - d || mh - h || mmi - mi || msc - sec;
+      if (cmpY === 0) return mid;
+      if (cmpY < 0) lo = mid + 1; else hi = mid - 1;
+    }
+    // Fallback if binary search doesn't converge exactly
+    return candidateBase.getTime();
+  }
+  return afterMs + intervalToMinutes(interval) * 60 * 1000;
+}
+
 async function loadSchedules(): Promise<ScheduledExport[]> {
   return new Promise(resolve => {
     chrome.storage.local.get('scheduledExports', r => resolve((r.scheduledExports as ScheduledExport[]) ?? []));
@@ -2239,17 +2287,34 @@ async function setScheduleAlarm(id: string): Promise<void> {
     await chrome.alarms.clear(SCHEDULE_ALARM_PREFIX + id);
     return;
   }
-  const minutes = Math.max(1, intervalToMinutes(s.interval));
-  const nextRunAt = Date.now() + minutes * 60 * 1000;
-  await chrome.alarms.create(SCHEDULE_ALARM_PREFIX + id, {
-    delayInMinutes: minutes,
-    periodInMinutes: minutes,
-  });
-  await saveSchedules(schedules.map(schedule => schedule.id === id ? {
-    ...schedule,
-    nextRunAt,
-    timeZone: schedule.timeZone ?? 'UTC',
-  } : schedule));
+
+  const alarmName = SCHEDULE_ALARM_PREFIX + id;
+  const existing = await chrome.alarms.get(alarmName);
+
+  // If the stored nextRunAt is already past, fire immediately rather than
+  // resetting the countdown (which would silently skip missed runs).
+  const now = Date.now();
+  if (s.nextRunAt && s.nextRunAt <= now) {
+    // Run now; runSchedule will re-arm via computeNextRunAt afterwards.
+    runSchedule(id).catch(e => console.error('Catch-up schedule run failed:', e));
+    return;
+  }
+
+  // Only create/replace the alarm when it doesn't already exist. This prevents
+  // every service-worker wake from resetting the countdown (#54).
+  if (!existing) {
+    const minutes = Math.max(1, intervalToMinutes(s.interval));
+    const nextRunAt = computeNextRunAt(s.interval, s.timeZone, now);
+    await chrome.alarms.create(alarmName, {
+      delayInMinutes: minutes,
+      periodInMinutes: minutes,
+    });
+    await saveSchedules(schedules.map(schedule => schedule.id === id ? {
+      ...schedule,
+      nextRunAt,
+      timeZone: schedule.timeZone ?? 'UTC',
+    } : schedule));
+  }
 }
 
 async function clearScheduleAlarm(id: string): Promise<void> {
@@ -2328,15 +2393,25 @@ async function runSchedule(id: string): Promise<void> {
   }
   await saveSnapshots(snapshots);
 
-  const nextRun = now + intervalToMinutes(s.interval) * 60 * 1000;
-  schedules[idx] = {
-    ...s,
-    lastRunAt: now,
-    lastRunStatus: status,
-    lastRunError: errorMsg,
-    nextRunAt: nextRun,
-  };
-  await saveSchedules(schedules);
+  // Re-load schedules to avoid overwriting concurrent UI edits (#55).
+  // Patch only the matching entry; skip if it was deleted during capture.
+  const freshSchedules = await loadSchedules();
+  const freshIdx = freshSchedules.findIndex(x => x.id === id);
+  const nextRun = computeNextRunAt(s.interval, s.timeZone, now);
+  if (freshIdx >= 0) {
+    freshSchedules[freshIdx] = {
+      ...freshSchedules[freshIdx],
+      lastRunAt: now,
+      lastRunStatus: status,
+      lastRunError: errorMsg,
+      nextRunAt: nextRun,
+    };
+    await saveSchedules(freshSchedules);
+  }
+
+  // Re-arm the alarm with timezone-aware timing so daily schedules anchor
+  // to local time-of-day rather than drifting by interval arithmetic (#62).
+  await setScheduleAlarm(id);
 
   const runEntry: ScheduleRunHistoryEntry = {
     id: `run-${id}-${now}`,
