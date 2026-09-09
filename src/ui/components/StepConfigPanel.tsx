@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Configuration form panel for a single pipeline step.
  *
  * What this file does:
@@ -353,12 +353,12 @@ export function StepConfigPanel(props: StepConfigPanelProps): VNode {
   }
 
   return (
-    <div class="wl-configPanel">
+    <div class="wl-configPanel" role="form" aria-label={`Configure ${step.type} step`}>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div style="font-weight:900;font-size:13px">
           Configure: {step.type}
         </div>
-        <button class="wl-btn wl-btnDanger" style="font-size:11px" onClick={onRemove}>
+        <button class="wl-btn wl-btnDanger" style="font-size:11px" onClick={onRemove} aria-label={`Remove ${step.type} step`}>
           Remove Step
         </button>
       </div>

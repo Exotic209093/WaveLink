@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Fixed bottom-right overlay panel for viewing and undoing push transactions.
  *
  * What this file does:
@@ -98,14 +98,14 @@ export function UndoHistoryPanel(props: UndoHistoryPanelProps): VNode {
   if (!open) return h('div', null) as VNode;
 
   return (
-    <div class="wl-undoPanel" style="position:fixed;bottom:16px;right:16px;width:380px;z-index:1000">
+    <div class="wl-undoPanel" role="dialog" aria-label="Undo history panel" style="position:fixed;bottom:16px;right:16px;width:380px;z-index:1000">
       <div class="wl-undoPanelHeader">
         <span>Undo History</span>
         <div class="wl-actions">
-          <button class="wl-btn" onClick={loadTransactions} style="padding:4px 8px;font-size:11px">
+          <button class="wl-btn" onClick={loadTransactions} style="padding:4px 8px;font-size:11px" aria-label="Refresh undo history">
             Refresh
           </button>
-          <button class="wl-btn" onClick={onClose} style="padding:4px 8px;font-size:11px">
+          <button class="wl-btn" onClick={onClose} style="padding:4px 8px;font-size:11px" aria-label="Close undo history panel">
             Close
           </button>
         </div>
@@ -139,16 +139,14 @@ export function UndoHistoryPanel(props: UndoHistoryPanelProps): VNode {
                   <button
                     class="wl-btn wl-btnPrimary"
                     style="padding:4px 8px;font-size:11px"
-                    onClick={() => handleUndo(t)}
-                    disabled={expired || isBusy}
+                    onClick={() => handleUndo(t)} disabled={expired || isBusy} aria-label={`Undo ${t.objectName} ${t.operation}`}
                   >
                     {isBusy ? '...' : 'Undo'}
                   </button>
                   <button
                     class="wl-btn wl-btnDanger"
                     style="padding:4px 8px;font-size:11px"
-                    onClick={() => handleRemove(t)}
-                    disabled={isBusy}
+                    onClick={() => handleRemove(t)} disabled={isBusy} aria-label={`Remove ${t.objectName} transaction from history`}
                   >
                     Remove
                   </button>
@@ -161,3 +159,4 @@ export function UndoHistoryPanel(props: UndoHistoryPanelProps): VNode {
     </div>
   );
 }
+

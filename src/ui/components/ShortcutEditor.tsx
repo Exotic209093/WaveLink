@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Keyboard shortcut editor component.
  *
  * Displays a table of all registered shortcuts with their default and current
@@ -92,10 +92,10 @@ export function ShortcutEditor(props: { sf: SfApi }): VNode {
   };
 
   return (
-    <div class="wl-shortcutEditor">
+    <div class="wl-shortcutEditor" role="region" aria-label="Keyboard shortcut editor">
       <h3>Keyboard Shortcuts</h3>
       {error && <div class="wl-shortcutError">{error}</div>}
-      <table class="wl-shortcutTable">
+      <table class="wl-shortcutTable" aria-label="Keyboard shortcuts">
         <thead>
           <tr>
             <th>Description</th>
@@ -119,7 +119,7 @@ export function ShortcutEditor(props: { sf: SfApi }): VNode {
                   {isCapturing ? (
                     <input
                       class="wl-input wl-shortcutCapture"
-                      placeholder="Press keys..."
+                      placeholder="Press keys..." aria-label="Press new keyboard shortcut"
                       readOnly
                       autoFocus
                       onKeyDown={handleCaptureKeydown}
@@ -131,11 +131,11 @@ export function ShortcutEditor(props: { sf: SfApi }): VNode {
                 </td>
                 <td>
                   {isCapturing ? (
-                    <button class="wl-btn" onClick={cancelCapture}>
+                    <button class="wl-btn" onClick={cancelCapture} aria-label="Cancel shortcut capture">
                       Cancel
                     </button>
                   ) : (
-                    <button class="wl-btn" onClick={() => startCapture(def.id)}>
+                    <button class="wl-btn" onClick={() => startCapture(def.id)} aria-label={`Edit shortcut for ${def.description}`}>
                       Edit
                     </button>
                   )}
@@ -148,3 +148,4 @@ export function ShortcutEditor(props: { sf: SfApi }): VNode {
     </div>
   );
 }
+

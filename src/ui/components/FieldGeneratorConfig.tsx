@@ -26,7 +26,7 @@ export function FieldGeneratorConfig(props: FieldGeneratorConfigProps): VNode {
   }
 
   return (
-    <div class="wl-fieldConfigRow">
+    <div class="wl-fieldConfigRow" role="group" aria-label={`Generator config for ${config.fieldName}`}>
       <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
         <span class="wl-mono" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={config.fieldName}>
           {config.fieldName}

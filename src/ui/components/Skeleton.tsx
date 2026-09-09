@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Reusable skeleton placeholder component for loading states.
  *
  * Replaces plain "Loading..." text with animated shimmer placeholders
@@ -30,7 +30,7 @@ export function Skeleton(props: SkeletonProps): VNode {
 
   if (variant === 'card') {
     return (
-      <div class="wl-skeleton--card">
+      <div class="wl-skeleton--card" role="status" aria-label="Loading content">
         <SkeletonLine width="60%" />
         <SkeletonLine width="100%" />
         <SkeletonLine width="80%" />
@@ -40,7 +40,7 @@ export function Skeleton(props: SkeletonProps): VNode {
 
   if (variant === 'chip') {
     return (
-      <div class="wl-skeleton--chipRow">
+      <div class="wl-skeleton--chipRow" role="status" aria-label="Loading content">
         <div class="wl-skeleton wl-skeleton--chip" />
         <div class="wl-skeleton wl-skeleton--chip" />
         <div class="wl-skeleton wl-skeleton--chip" />
@@ -50,7 +50,7 @@ export function Skeleton(props: SkeletonProps): VNode {
 
   if (variant === 'table') {
     return (
-      <div class="wl-skeleton--table">
+      <div class="wl-skeleton--table" role="status" aria-label="Loading content">
         <div class="wl-skeleton--tableRow">
           {Array.from({ length: columns }, (_, i) => (
             <div key={i} class="wl-skeleton wl-skeleton--tableHead" />
@@ -70,10 +70,11 @@ export function Skeleton(props: SkeletonProps): VNode {
   // Default: text lines with varying widths
   const widths = ['100%', '85%', '70%', '90%', '60%'];
   return (
-    <div class="wl-skeleton--textGroup">
+    <div class="wl-skeleton--textGroup" role="status" aria-label="Loading content">
       {Array.from({ length: rows }, (_, i) => (
         <SkeletonLine key={i} width={widths[i % widths.length]} />
       ))}
     </div>
   );
 }
+

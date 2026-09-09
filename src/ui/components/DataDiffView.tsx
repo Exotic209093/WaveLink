@@ -46,13 +46,15 @@ export function DataDiffView(props: {
   };
 
   return (
-    <div style="min-width:0;overflow:hidden">
+    <div style="min-width:0;overflow:hidden" role="region" aria-label="Data comparison results">
       <div class="wl-row" style="gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
-        <div class="wl-chipRow">
+        <div class="wl-chipRow" role="tablist" aria-label="Filter diff results">
           {(['all', 'added', 'removed', 'changed'] as FilterTab[]).map(tab => (
             <button
               key={tab}
               class="wl-chip"
+              role="tab"
+              aria-selected={filter === tab}
               data-active={filter === tab}
               onClick={() => { setFilter(tab); setPage(0); }}
               style={filter === tab ? 'background:var(--wl-accent);color:white' : ''}

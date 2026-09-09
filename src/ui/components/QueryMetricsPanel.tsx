@@ -36,16 +36,16 @@ export function QueryMetricsPanel(props: QueryMetricsPanelProps): VNode {
   const displayed = viewAll ? sorted : sorted.slice(0, 5);
 
   return (
-    <div class="wl-card" style="display:flex;flex-direction:column;gap:10px">
+    <div class="wl-card" style="display:flex;flex-direction:column;gap:10px" role="region" aria-label="Query metrics panel">
       <div class="wl-cardHeader">
         <h2>Query Metrics</h2>
-        <div class="wl-actions">
+        <div class="wl-actions" role="toolbar" aria-label="Query metrics actions">
           {metrics.length > 5 ? (
-            <button class="wl-btn" onClick={() => setViewAll(!viewAll)}>
+            <button class="wl-btn" onClick={() => setViewAll(!viewAll)} aria-expanded={viewAll} aria-label={viewAll ? 'Show recent queries only' : `View all ${metrics.length} queries`}>
               {viewAll ? 'Show Recent' : `View All (${metrics.length})`}
             </button>
           ) : null}
-          <button class="wl-btn" onClick={onClear} disabled={metrics.length === 0}>
+          <button class="wl-btn" onClick={onClear} disabled={metrics.length === 0} aria-label="Clear query metrics">
             Clear
           </button>
         </div>

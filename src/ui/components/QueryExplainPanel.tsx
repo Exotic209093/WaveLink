@@ -49,11 +49,11 @@ export function QueryExplainPanel(props: {
   }
 
   return (
-    <div class="wl-card">
+    <div class="wl-card" role="region" aria-label="Query explain plan">
       <div class="wl-cardHeader">
         <h2>Explain Plan</h2>
-        <div class="wl-actions">
-          <button class="wl-btn wl-btnPrimary" style="font-size:11px;padding:5px 14px" onClick={runExplain} disabled={loading || !soql.trim()}>
+        <div class="wl-actions" role="toolbar" aria-label="Explain plan actions">
+          <button class="wl-btn wl-btnPrimary" style="font-size:11px;padding:5px 14px" onClick={runExplain} disabled={loading || !soql.trim()} aria-label="Analyze SOQL query execution plan">
             {loading ? 'Analyzing...' : 'Analyze'}
           </button>
         </div>

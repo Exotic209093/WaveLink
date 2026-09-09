@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Form component for creating or editing a DataTemplate.
  *
  * Provides text inputs for name, description, objectName, and category,
@@ -74,10 +74,10 @@ export function TemplateEditor(props: TemplateEditorProps): VNode {
   const canSave = name.trim().length > 0 && objectName.trim().length > 0;
 
   return (
-    <div class="wl-card">
+    <div class="wl-card" role="form" aria-label="Template editor">
       <div class="wl-cardHeader">
         <h2>{template ? 'Edit Template' : 'New Template'}</h2>
-        <button class="wl-btn" onClick={onCancel}>Cancel</button>
+        <button class="wl-btn" onClick={onCancel} aria-label="Cancel template editing">Cancel</button>
       </div>
 
       <div class="wl-row">
@@ -151,8 +151,8 @@ export function TemplateEditor(props: TemplateEditorProps): VNode {
         </div>
 
         <div class="wl-actions" style="justify-content:flex-end;padding-top:8px;border-top:1px solid var(--wl-line-2)">
-          <button class="wl-btn" onClick={onCancel}>Cancel</button>
-          <button class="wl-btn wl-btnPrimary" onClick={handleSave} disabled={!canSave}>
+          <button class="wl-btn" onClick={onCancel} aria-label="Cancel template editing">Cancel</button>
+          <button class="wl-btn wl-btnPrimary" onClick={handleSave} disabled={!canSave} aria-label={template ? 'Save template changes' : 'Create new template'}>
             {template ? 'Save Changes' : 'Create Template'}
           </button>
         </div>
@@ -160,3 +160,4 @@ export function TemplateEditor(props: TemplateEditorProps): VNode {
     </div>
   );
 }
+

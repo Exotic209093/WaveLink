@@ -75,15 +75,15 @@ export function ValidationPanel(props: {
   }, [errors]);
 
   return (
-    <div class="wl-card">
+    <div class="wl-card" role="region" aria-label="Data validation panel">
       <div class="wl-cardHeader">
         <h2>Validation</h2>
-        <div class="wl-actions">
+        <div class="wl-actions" role="toolbar" aria-label="Validation controls">
           <label class="wl-chip" style="cursor:pointer">
-            <input type="checkbox" checked={enabled} onChange={(e) => onEnabledChange((e.currentTarget as HTMLInputElement).checked)} />
+            <input type="checkbox" checked={enabled} onChange={(e) => onEnabledChange((e.currentTarget as HTMLInputElement).checked)} aria-label="Enable validation" />
             <span>Enable</span>
           </label>
-          <button class="wl-btn" onClick={() => setOpen(v => !v)}>{open ? 'Collapse' : 'Expand'}</button>
+          <button class="wl-btn" onClick={() => setOpen(v => !v)} aria-expanded={open} aria-label={open ? 'Collapse validation panel' : 'Expand validation panel'}>{open ? 'Collapse' : 'Expand'}</button>
         </div>
       </div>
 

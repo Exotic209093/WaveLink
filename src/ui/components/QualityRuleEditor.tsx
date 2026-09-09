@@ -177,7 +177,7 @@ export function QualityRuleEditor(props: QualityRuleEditorProps): VNode {
   }
 
   return (
-    <div class="wl-card" style="display:flex;flex-direction:column;gap:12px">
+    <div class="wl-card" style="display:flex;flex-direction:column;gap:12px" role="region" aria-label="Quality rules editor">
       <div class="wl-cardHeader">
         <h2>Quality Rules</h2>
         <span class="wl-muted">{rules.length} rule{rules.length !== 1 ? 's' : ''}</span>
@@ -193,6 +193,8 @@ export function QualityRuleEditor(props: QualityRuleEditorProps): VNode {
         <div
           key={rule.id}
           class="wl-card"
+          role="listitem"
+          aria-label={`Quality rule ${index + 1}: ${rule.field || 'unconfigured'}`}
           style="padding:12px;display:flex;flex-direction:column;gap:10px;border:1px solid var(--wl-line-2);border-radius:8px"
         >
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">

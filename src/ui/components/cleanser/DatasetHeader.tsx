@@ -43,27 +43,28 @@ export function DatasetHeader(props: {
   const sizeText = dataset?.bytes ? `${Math.round(dataset.bytes / 1024)} KB` : '';
 
   return (
-    <div class="wl-card">
+    <div class="wl-card" role="region" aria-label="Data Cleanser header">
       <div class="wl-cardHeader">
         <h2>Data Cleanser</h2>
-        <div class="wl-actions">
+        <div class="wl-actions" role="toolbar" aria-label="Dataset actions">
           <label class="wl-btn">
             {dataset ? 'Replace File' : 'Upload CSV/JSON'}
             <input
               type="file"
               accept=".csv,.json"
               style="display:none"
+              aria-label={dataset ? 'Replace dataset file' : 'Upload CSV or JSON file'}
               onChange={(e) => {
                 const f = (e.currentTarget as HTMLInputElement).files?.[0];
                 if (f) onUpload(f);
               }}
             />
           </label>
-          <button class="wl-btn wl-btnDanger" onClick={onClear} disabled={!dataset}>Clear</button>
-          <button class="wl-btn wl-btnPrimary" onClick={onApply} disabled={!canApply}>Apply</button>
-          <button class="wl-btn" onClick={onExportCsv} disabled={!hasSnapshot && !canApply}>Export CSV</button>
-          <button class="wl-btn" onClick={onExportJson} disabled={!hasSnapshot && !canApply}>Export JSON</button>
-          <button class="wl-btn wl-btnPrimary" onClick={onGoToPush} disabled={!hasSnapshot}>Send to Data Push</button>
+          <button class="wl-btn wl-btnDanger" onClick={onClear} disabled={!dataset} aria-label="Clear current dataset">Clear</button>
+          <button class="wl-btn wl-btnPrimary" onClick={onApply} disabled={!canApply} aria-label="Apply cleanser changes">Apply</button>
+          <button class="wl-btn" onClick={onExportCsv} disabled={!hasSnapshot && !canApply} aria-label="Export dataset as CSV">Export CSV</button>
+          <button class="wl-btn" onClick={onExportJson} disabled={!hasSnapshot && !canApply} aria-label="Export dataset as JSON">Export JSON</button>
+          <button class="wl-btn wl-btnPrimary" onClick={onGoToPush} disabled={!hasSnapshot} aria-label="Send dataset to Data Push">Send to Data Push</button>
         </div>
       </div>
 

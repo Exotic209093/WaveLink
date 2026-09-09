@@ -133,14 +133,17 @@ export function MergeWizard(props: MergeWizardProps): VNode {
   }
 
   return (
-    <div class="wl-card">
+    <div class="wl-card" role="region" aria-label="Merge wizard">
       <div class="wl-cardHeader">
         <h2>Merge Wizard</h2>
-        <div class="wl-actions">
+        <div class="wl-actions" role="tablist" aria-label="Wizard steps">
           {STEPS.map((label, i) => (
             <span
               key={label}
               class="wl-chip"
+              role="tab"
+              aria-selected={i === step}
+              aria-current={i === step ? 'step' : undefined}
               style={i === step ? 'border-color:var(--wl-accent);font-weight:900' : ''}
             >
               {i + 1}. {label}

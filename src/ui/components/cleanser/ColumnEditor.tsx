@@ -35,7 +35,7 @@ export function ColumnEditor(props: {
   });
 
   return (
-    <div class="wl-card">
+    <div class="wl-card" role="region" aria-label={`Column editor for ${op.source}`}>
       <div class="wl-cardHeader">
         <div style="display:flex;align-items:baseline;gap:10px;min-width:0">
           <h2 style="margin:0">Column</h2>

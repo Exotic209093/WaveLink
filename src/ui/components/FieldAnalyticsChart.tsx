@@ -27,9 +27,9 @@ export function FieldAnalyticsChart(props: FieldAnalyticsChartProps): VNode {
   }
 
   return (
-    <div class="wl-analyticsChart">
+    <div class="wl-analyticsChart" role="img" aria-label={`Field analytics chart showing ${metrics.length} fields`}>
       {/* Header row */}
-      <div class="wl-analyticsRow" style="font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--wl-ink-dim)">
+      <div class="wl-analyticsRow" style="font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--wl-ink-dim)" aria-hidden="true">
         <span>Field</span>
         <span>Population Rate</span>
         <span style="text-align:right">%</span>

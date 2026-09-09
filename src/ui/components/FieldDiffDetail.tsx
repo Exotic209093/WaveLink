@@ -20,12 +20,12 @@ export function FieldDiffDetail(props: FieldDiffDetailProps): VNode {
   const { diff } = props;
 
   return (
-    <div class="wl-diffRow" data-status={diff.status}>
+    <div class="wl-diffRow" data-status={diff.status} role="listitem" aria-label={`Field ${diff.name}: ${diff.status}`}>
       <span class="wl-mono" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={diff.name}>
         {diff.name}
       </span>
 
-      <span class="wl-diffBadge" data-status={diff.status}>
+      <span class="wl-diffBadge" data-status={diff.status} aria-label={`Status: ${diff.status}`}>
         {diff.status}
       </span>
 

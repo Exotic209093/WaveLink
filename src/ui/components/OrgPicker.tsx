@@ -22,7 +22,7 @@ export function OrgPicker(props: {
   }
 
   return (
-    <div class="wl-orgPicker">
+    <div class="wl-orgPicker" role="group" aria-label="Organization picker for data comparison">
       <div style="flex:1">
         <label htmlFor="compare-source-org" class="wl-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px">Source Org</label>
         <select
