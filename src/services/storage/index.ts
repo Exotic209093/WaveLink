@@ -531,10 +531,17 @@ export class StorageService {
     return cleared;
   }
 
-  /** Get storage usage in bytes */
+  /** Get storage usage in bytes. Quota is derived from manifest permissions:
+   *  5 MB default for chrome.storage.local; unlimitedStorage removes the hard cap
+   *  but Chrome's effective limit is implementation-defined. We report 1 GB as a
+   *  practical ceiling when unlimitedStorage is declared so UI percentages stay
+   *  meaningful without pretending to know the true bound. */
   async getStorageUsage(): Promise<{ bytesInUse: number; quota: number }> {
     const bytesInUse = await chrome.storage.local.getBytesInUse(null);
-    return { bytesInUse, quota: 10 * 1024 * 1024 };
+    const manifest = chrome.runtime.getManifest();
+    const hasUnlimited = Array.isArray(manifest.permissions) && manifest.permissions.includes('unlimitedStorage');
+    const quota = hasUnlimited ? 1024 * 1024 * 1024 : 5 * 1024 * 1024;
+    return { bytesInUse, quota };
   }
 
   /** Purge push history older than given age in ms and expired undo transactions */

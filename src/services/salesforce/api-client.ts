@@ -407,7 +407,7 @@ export class SalesforceApiClient {
       },
       MAX_API_RETRIES,
       RETRY_BASE_DELAY_MS,
-      isRetryableError,
+      (error) => isRetryableError(error, method),
     );
   }
 }
