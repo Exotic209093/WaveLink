@@ -560,6 +560,7 @@ export interface PayloadMap {
   MIGRATION_REPORTS_GET: MigrationReportGetPayload;
   MIGRATION_REPORTS_SAVE: MigrationReportSavePayload;
   MIGRATION_REPORTS_DELETE: MigrationReportDeletePayload;
+  OFFSCREEN_TOKEN_REFRESH: { orgId?: string; instanceUrl?: string };
 }
 
 /** Base message shape — payload type is derived from the message type via PayloadMap. */
