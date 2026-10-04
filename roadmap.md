@@ -1,10 +1,19 @@
 # WaveLink Product Roadmap
 
-> Last updated: 2026-08-31<br>
-> Prepared release: **v0.6.0**; current Chrome Web Store release: **v0.2.0**<br>
+> Last updated: 2026-10-04<br>
+> Prepared release: **v0.7.0**; current Chrome Web Store release: **v0.6.0**<br>
 > Product direction: **a fast, local-first Salesforce data workspace for safely exporting, importing, comparing, scheduling, and repeating data jobs**
 
 ## Road to 1.0 (2026-08-31 audit)
+
+> **Status (2026-10-04):** all 46 audit issues and the follow-ups #88–#106 are
+> fixed and ship together in **v0.7.0** — a deliberate decision to release the
+> v0.8.0–v1.0.0 milestone work in one store update rather than four. The fixes
+> for #43, #49, #56/#63/#94/#99, #66, and #80 were reworked after review found
+> them incomplete; CI, red on `main` from #107 to #125, is green again.
+> Write paths were re-validated with `npm run validate:salesforce` against the
+> `nebula-dev` org (see `docs/release-validation.md`). Remaining before 1.0: the
+> packaged-extension browser matrix on 0.7.0 and post-release field feedback.
 
 A full-project test pass on 2026-08-31 at commit `74cf21b` found the automated
 gates all green — TypeScript, ESLint, `npm test` (499 tests / 49 suites), the

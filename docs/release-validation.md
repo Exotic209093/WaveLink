@@ -99,6 +99,18 @@ packaged-extension browser scenarios above.
   caveat is that the already-open normal Chrome profile was not remotely
   attachable; it was not modified or restarted.
 
+#### 2026-10-04 — v0.7.0 service-layer validation, `nebula-dev`
+
+- Org suffix `…28TUAS`, `IsSandbox=false`, API v63.0, branch `release/v0.7.0`.
+- Read-only and write-mode `npm run validate:salesforce`: all 13 checks passed,
+  cleanup `passed`.
+- New v0.7.0 checks: Bulk per-row identity (failure mapped to input row 1, IDs
+  to rows 0 and 2; job `750dL000012hMq1QAE`), a column absent from row 0 still
+  uploaded, `+44…` values stored verbatim, explicit null cleared Phone through
+  Bulk update (`750dL000012hIb8QAE`), and Bulk-typed query values matched REST
+  for populated number, currency, and boolean fields (`750dL000012h54TQAQ`).
+- Not yet run on 0.7.0: the packaged-extension browser matrix above.
+
 ## Maintainer-authorized usability gate
 
 Run the packaged build without using implementation notes:
