@@ -3,6 +3,7 @@ import {
   topologicalSort,
   detectCircularReferences,
   remapIds,
+  pairClonedIds,
 } from '../../src/ui/utils/crossObjectClone';
 import type { CloneGraph } from '../../src/ui/utils/crossObjectClone';
 
@@ -280,5 +281,58 @@ describe('remapIds', () => {
     expect(result[0].AccountId).toBe('new_A1');
     expect(result[0].OwnerId).toBe('new_U1');
     expect(result[0].Name).toBe('Test');
+  });
+});
+
+describe('pairClonedIds (#49)', () => {
+  const sources = [{ Id: 'S0' }, { Id: 'S1' }, { Id: 'S2' }, { Id: 'S3' }];
+
+  it('pairs IDs by result index when a row in the middle failed', () => {
+    const result = pairClonedIds(sources, {
+      ids: ['T0', 'T2', 'T3'],
+      idRecordIndexes: [0, 2, 3],
+      failedRecords: [{ index: 1 }],
+    });
+    expect(result.pairs).toEqual([
+      { sourceId: 'S0', targetId: 'T0' },
+      { sourceId: 'S2', targetId: 'T2' },
+      { sourceId: 'S3', targetId: 'T3' },
+    ]);
+    expect(result).toEqual(expect.objectContaining({ unmapped: 0, failed: 1 }));
+  });
+
+  it('pairs by result index when a middle failure has no identifiable index (Bulk reports -1)', () => {
+    // Background drops errors with recordIndex -1 from failedRecords, so only idRecordIndexes says which row failed.
+    const result = pairClonedIds(sources, { ids: ['T0', 'T2', 'T3'], idRecordIndexes: [0, 2, 3] });
+    expect(result.pairs).toEqual([
+      { sourceId: 'S0', targetId: 'T0' },
+      { sourceId: 'S2', targetId: 'T2' },
+      { sourceId: 'S3', targetId: 'T3' },
+    ]);
+  });
+
+  it('pairs IDs that arrive out of input order (Bulk / parallel REST batches)', () => {
+    const result = pairClonedIds(sources, {
+      ids: ['T3', 'T1', 'T0', 'T2'],
+      idRecordIndexes: [3, 1, 0, 2],
+    });
+    expect(new Map(result.pairs.map(p => [p.sourceId, p.targetId]))).toEqual(
+      new Map([['S0', 'T0'], ['S1', 'T1'], ['S2', 'T2'], ['S3', 'T3']]),
+    );
+  });
+
+  it('leaves IDs with unknown or conflicting indexes unmapped instead of guessing', () => {
+    const result = pairClonedIds(sources, {
+      ids: ['T0', 'TX', 'T2a', 'T2b', 'T9'],
+      idRecordIndexes: [0, -1, 2, 2, 9],
+    });
+    expect(result.pairs).toEqual([{ sourceId: 'S0', targetId: 'T0' }]);
+    expect(result.unmapped).toBe(4);
+  });
+
+  it('maps nothing when the result has no idRecordIndexes', () => {
+    const result = pairClonedIds(sources, { ids: ['T0', 'T1'] });
+    expect(result.pairs).toEqual([]);
+    expect(result.unmapped).toBe(2);
   });
 });
