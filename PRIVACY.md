@@ -43,9 +43,9 @@ When you request an operation, the necessary authentication information, Salesfo
 
 ## 5. Chrome permission explanations
 
-- **storage:** saves organisation connections, tokens, queries, mappings, jobs, schedules, snapshots, results, activity, and preferences locally.
+- **storage:** saves organisation connections, queries, mappings, jobs, schedules, snapshots, results, activity, and preferences locally.
 - **cookies:** reads the `sid` cookie from supported Salesforce domains to authenticate to an existing Salesforce session.
-- **activeTab:** identifies the Salesforce context in the tab where you invoke WaveLink.
+- **unlimitedStorage:** lets locally retained snapshots, checkpoints, and results exceed Chrome's default 10 MB extension-storage quota. The data stays on your device.
 - **tabs:** finds open Salesforce tabs, lets you choose a connected organisation, and opens the full Extension workspace.
 - **alarms:** wakes the Extension to run locally configured export schedules.
 - **offscreen:** provides a local extension document for eligible long-running job and file-processing work when a visible page is not available.

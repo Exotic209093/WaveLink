@@ -18,7 +18,7 @@
 
 import type { VNode } from 'preact';
 import { h } from 'preact';
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import { Toast } from '../components/Toast';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -32,7 +32,7 @@ import { computePushProgress } from '../utils/pushMetrics';
 import { DryRunPanel } from '../components/DryRunPanel';
 import { simulatePush } from '../utils/pushDryRun';
 import type { DryRunReport } from '../utils/pushDryRun';
-import { buildPushOutcomeDatasets, buildRetryDataset } from '../utils/pushRetry';
+import { buildPushOutcomeDatasets, buildRetryDataset, countMappingDroppedRows } from '../utils/pushRetry';
 import { parseAnyFile } from '../utils/fileParse';
 import { DataMapper } from '../../data/mappers';
 import type { MappingMatchKind } from '../../data/mappers';
@@ -157,6 +157,11 @@ export function DataPushScreen(props: {
 
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean; updateable: boolean; deletable: boolean }>>([]);
   const [describeFields, setDescribeFields] = useState<SObjectField[] | null>(null);
+  // Describe fields of objects referenced by relationship lookups, so validation
+  // can confirm each lookup's match field is an External ID / idLookup field.
+  // Cached per tab so switching orgs never validates against another org's schema.
+  const [relatedDescribe, setRelatedDescribe] = useState<{ tabId: number | undefined; fields: Record<string, SObjectField[]> }>({ tabId: undefined, fields: {} });
+  const relatedFields = relatedDescribe.tabId === tabId ? relatedDescribe.fields : {};
 
   const dataset = props.dataset;
   const datasetBytes = (dataset as unknown as { bytes?: number } | null)?.bytes ?? 0;
@@ -171,6 +176,8 @@ export function DataPushScreen(props: {
   const [suggestions, setSuggestions] = useState<Record<string, { target: string; label: string }>>({});
   const [mappingErrors, setMappingErrors] = useState<Array<{ recordIndex: number; field: string; message: string; value?: unknown }> | null>(null);
   const [mappedRecords, setMappedRecords] = useState<Record<string, unknown>[] | null>(null);
+  // mapped position -> source position; null when mappedRecords are the source rows 1:1 (#46).
+  const [mappedSourceIndexes, setMappedSourceIndexes] = useState<number[] | null>(null);
   const [validationErrors, setValidationErrors] = useState<Array<{ field: string; message: string; value?: unknown }> | null>(null);
   const [dryRun, setDryRun] = useState<DryRunReport | null>(null);
 
@@ -180,9 +187,18 @@ export function DataPushScreen(props: {
   const [pushErrors, setPushErrors] = useState<Array<{ recordIndex: number; message: string }> | null>(null);
   const [lastPushConfig, setLastPushConfig] = useState<{
     sourceRecords: Record<string, unknown>[];
+    /** Pushed position -> source position; push results must be translated through it (#46). */
+    sourceIndexes?: number[];
+    /** Mapping errors (source-indexed) for rows excluded before the push; reported in the error file. */
+    mappingErrors?: Array<{ recordIndex: number; message: string }>;
     mappings: FieldMapping[];
   } | null>(null);
   const busRef = useRef<MessageBus | null>(null);
+  // Set just before this screen loads a dataset it built itself (retry rows,
+  // rollback IDs) alongside state restored in the same update. The
+  // dataset-change effects honour it instead of auto-mapping and resetting,
+  // so restored manual mappings and prepared records survive.
+  const restoredStateRef = useRef<{ filename: string; mappedRecords: Record<string, unknown>[] | null } | null>(null);
 
   useEffect(() => {
     if (!savedJobPreset || savedJobPreset.definition.kind !== 'import') return;
@@ -277,12 +293,45 @@ export function DataPushScreen(props: {
       .catch(e => setToast({ title: 'Describe Failed', body: e instanceof Error ? e.message : 'Unknown error' }));
   }, [sf, tabId, objectName]);
 
+  const lookupTargets = useMemo(() => {
+    if (!describeFields) return [];
+    const targets = new Set<string>();
+    for (const mapping of mappings) {
+      if (!mapping.lookup || mapping.lookup.mode === 'id') continue;
+      const referenceTo = describeFields.find(f => f.name === mapping.targetField)?.referenceTo ?? [];
+      if (referenceTo.length === 1) targets.add(referenceTo[0]);
+    }
+    return [...targets].sort();
+  }, [describeFields, mappings]);
+
+  useEffect(() => {
+    const missing = lookupTargets.filter(name => !relatedFields[name]);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    Promise.all(missing.map(name => sf.describeSObject(name, tabId).then(d => [name, d.fields] as const)))
+      .then(entries => {
+        if (cancelled) return;
+        setRelatedDescribe(prev => ({
+          tabId,
+          fields: { ...(prev.tabId === tabId ? prev.fields : {}), ...Object.fromEntries(entries) },
+        }));
+      })
+      .catch(() => {
+        // Validation still checks lookup shape; Salesforce rejects unusable match fields.
+      });
+    return () => { cancelled = true; };
+  }, [sf, tabId, lookupTargets.join('|'), relatedDescribe]);
+
   useEffect(() => {
     if (!dataset) {
       setMappings([]);
       setMappingErrors(null);
       setMappedRecords(null);
       setValidationErrors(null);
+      return;
+    }
+    if (restoredStateRef.current) {
+      restoredStateRef.current = null;
       return;
     }
     if (savedJobPreset?.definition.mappings?.length) {
@@ -336,6 +385,30 @@ export function DataPushScreen(props: {
       return { ...m, targetField: 'Id', required: true };
     }));
   }, [dataset?.filename, operation, sourceHeaders.join('|')]);
+
+  // Anything derived from the previous rows is stale once the dataset (or its
+  // cleaned rows) changes. Without this, Review stays reachable and Confirm
+  // would push the previous dataset's mapped records. A layout effect so the
+  // stale state is never interactive, even for a frame.
+  useLayoutEffect(() => {
+    let restored = restoredStateRef.current;
+    if (restored && restored.filename !== dataset?.filename) {
+      restoredStateRef.current = null;
+      restored = null;
+    }
+    setMappingErrors(null);
+    setDryRun(null);
+    if (restored?.mappedRecords) {
+      setMappedRecords(restored.mappedRecords);
+      setValidationErrors([]);
+      return;
+    }
+    setMappedRecords(null);
+    setValidationErrors(null);
+    if (!dataset) return;
+    setFurthestStage(current => Math.min(current, 1));
+    setStage(current => (IMPORT_STAGES.findIndex(item => item.key === current) > 1 ? 'configure' : current));
+  }, [dataset, props.cleanedRecords]);
 
   const targetableFields = useMemo(() => {
     if (!describeFields) return [];
@@ -391,6 +464,7 @@ export function DataPushScreen(props: {
     const usable = mappings.filter(m => m.targetField && m.targetField.trim().length > 0);
     const res = mapper.mapRecords(sourceRecords, usable);
     setMappedRecords(res.mappedRecords);
+    setMappedSourceIndexes(res.sourceIndexes);
     setMappingErrors(res.errors);
     setValidationErrors(null);
     setDryRun(null);
@@ -401,6 +475,7 @@ export function DataPushScreen(props: {
     if (!mappedRecords || !describeFields) return;
     const report = simulatePush(mappedRecords, describeFields, operation, {
       externalIdField: operation === 'upsert' ? externalIdField : null,
+      relatedFields,
     });
     setDryRun(report);
     moveToStage('review');
@@ -413,7 +488,7 @@ export function DataPushScreen(props: {
   function validate(): void {
     if (!mappedRecords || !describeFields) return;
     const validator = new DataValidator();
-    const res = validator.validateRecords(mappedRecords, describeFields, operation);
+    const res = validator.validateRecords(mappedRecords, describeFields, operation, { relatedFields });
     if (res.valid) {
       setValidationErrors([]);
       setToast({ title: 'Validation Passed', body: 'No errors found.' });
@@ -522,9 +597,11 @@ export function DataPushScreen(props: {
       }
 
       const records = res.ids.map(id => ({ Id: id }));
+      const filename = `rollback-${push.pushId}.json`;
+      restoredStateRef.current = { filename, mappedRecords: records };
       props.onDataset({
         sourceRecords: records,
-        filename: `rollback-${push.pushId}.json`,
+        filename,
         format: 'json',
         headers: ['Id'],
       });
@@ -533,6 +610,7 @@ export function DataPushScreen(props: {
       setExternalIdField('');
       setMappings(makeEmptyMappings(['Id']));
       setMappedRecords(records);
+      setMappedSourceIndexes(null);
       setMappingErrors(null);
       setValidationErrors([]);
       setToast({ title: 'Prepared Delete Push', body: `${records.length} IDs` });
@@ -550,12 +628,15 @@ export function DataPushScreen(props: {
     }
 
     try {
-      const retryData = buildRetryDataset(lastPushConfig.sourceRecords, pushErrors);
+      const retryData = buildRetryDataset(lastPushConfig.sourceRecords, pushErrors, lastPushConfig.sourceIndexes);
 
-      // Load retry dataset
+      // Load retry dataset; the flag keeps the automap effect from replacing
+      // the restored mappings below.
+      const filename = `retry-${push?.pushId || 'failed'}.json`;
+      restoredStateRef.current = { filename, mappedRecords: null };
       props.onDataset({
         sourceRecords: retryData.records,
-        filename: `retry-${push?.pushId || 'failed'}.json`,
+        filename,
         format: 'json',
         headers: retryData.headers,
       });
@@ -564,7 +645,10 @@ export function DataPushScreen(props: {
       setMappings(lastPushConfig.mappings);
 
       setRetryModalOpen(false);
-      setToast({ title: 'Retry Dataset Loaded', body: `${retryData.records.length} failed records loaded. Review mappings and push again.` });
+      const skipped = droppedAtMapping > 0
+        ? ` ${droppedAtMapping} ${droppedAtMapping === 1 ? 'row' : 'rows'} excluded at mapping ${droppedAtMapping === 1 ? 'is' : 'are'} not included; fix them from the error file.`
+        : '';
+      setToast({ title: 'Retry Dataset Loaded', body: `${retryData.records.length} failed records loaded. Review mappings and push again.${skipped}` });
     } catch (e) {
       setToast({ title: 'Retry Failed', body: e instanceof Error ? e.message : 'Unknown error' });
     }
@@ -575,7 +659,13 @@ export function DataPushScreen(props: {
     setBusy(true);
     try {
       const stored = kind === 'success' ? await sf.getDataPushResult(push.pushId) : null;
-      const datasets = buildPushOutcomeDatasets(lastPushConfig.sourceRecords, pushErrors ?? [], stored?.ids ?? []);
+      const datasets = buildPushOutcomeDatasets(
+        lastPushConfig.sourceRecords,
+        pushErrors ?? [],
+        stored ?? undefined,
+        lastPushConfig.sourceIndexes,
+        lastPushConfig.mappingErrors,
+      );
       const selected = datasets[kind];
       await exportRecords(selected.records, selected.headers, {
         format: 'csv',
@@ -589,6 +679,9 @@ export function DataPushScreen(props: {
     }
   }
 
+  const droppedAtMapping = lastPushConfig
+    ? countMappingDroppedRows(lastPushConfig.sourceRecords.length, lastPushConfig.sourceIndexes)
+    : 0;
   const hasDataset = !!dataset;
   const datasetTooLarge = hasDataset ? estimateTooLarge(datasetBytes, sourceRecords.length) : null;
   const datasetSizeWarning = hasDataset ? estimateSizeWarning(datasetBytes, sourceRecords.length) : null;
@@ -1137,7 +1230,7 @@ export function DataPushScreen(props: {
                 <>
                   <button class="wl-btn" disabled={busy} onClick={loadPushIds}>View IDs</button>
                   <button class="wl-buttonNeutral" disabled={busy} onClick={() => downloadOutcome('success')}>Download success file</button>
-                  {push.failed > 0 ? <button class="wl-buttonNeutral" disabled={busy} onClick={() => downloadOutcome('error')}>Download error file</button> : null}
+                  {push.failed > 0 || droppedAtMapping > 0 ? <button class="wl-buttonNeutral" disabled={busy} onClick={() => downloadOutcome('error')}>Download error file</button> : null}
                   <button class="wl-buttonBrand" disabled={busy} onClick={prepareDeletePushFromIds}>Prepare Delete Push</button>
                   {push.failed > 0 && pushErrors && pushErrors.length > 0 ? (
                     <button class="wl-buttonBrand" disabled={busy} onClick={() => setRetryModalOpen(true)}>Retry Failed Rows</button>
@@ -1209,6 +1302,8 @@ export function DataPushScreen(props: {
               // Save push config for retry
               setLastPushConfig({
                 sourceRecords,
+                sourceIndexes: mappedSourceIndexes ?? undefined,
+                mappingErrors: mappedSourceIndexes ? (mappingErrors ?? undefined) : undefined,
                 mappings: [...mappings],
               });
               setToast({ title: 'Push Started', body: `${res.strategy.toUpperCase()} - ${res.pushId}` });
@@ -1295,6 +1390,8 @@ export function DataPushScreen(props: {
               // Save push config for retry
               setLastPushConfig({
                 sourceRecords,
+                sourceIndexes: mappedSourceIndexes ?? undefined,
+                mappingErrors: mappedSourceIndexes ? (mappingErrors ?? undefined) : undefined,
                 mappings: [...mappings],
               });
               setToast({ title: 'Push Started', body: `${res.strategy.toUpperCase()} - ${res.pushId}` });

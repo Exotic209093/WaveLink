@@ -117,7 +117,7 @@ describe('buildSoql', () => {
       ],
     });
     const result = buildSoql(state);
-    expect(result).toContain('WHERE Email = NULL');
+    expect(result).toContain('WHERE Email = null');
   });
 
   it('builds IS NOT NULL condition', () => {
@@ -127,7 +127,7 @@ describe('buildSoql', () => {
       ],
     });
     const result = buildSoql(state);
-    expect(result).toContain('WHERE Email != NULL');
+    expect(result).toContain('WHERE Email != null');
   });
 
   it('skips conditions with empty field or operator', () => {

@@ -131,3 +131,73 @@ export function diffToCsv(diff: DataDiffResult): string {
   }
   return rows.join('\n');
 }
+
+export interface CompareSyncJob {
+  operation: 'insert' | 'update' | 'upsert';
+  records: Record<string, unknown>[];
+  externalIdField?: string;
+}
+
+export interface CompareSyncPlan {
+  jobs: CompareSyncJob[];
+  inserts: number;
+  updates: number;
+  upserts: number;
+  /** Selected Changed keys whose target record has no Id, so cannot be updated. */
+  skippedKeys: string[];
+}
+
+/**
+ * Turn selected diff rows into push jobs for the target org.
+ * - External ID match field: one upsert of Added + Changed records keyed on it.
+ * - Otherwise: Added records are inserted, and Changed records are updated by
+ *   the target record's Id with only the differing fields, so existing target
+ *   rows are corrected rather than duplicated.
+ */
+export function buildCompareSyncPlan(
+  diff: DataDiffResult,
+  selectedKeys: Set<string>,
+  options: { externalIdField?: string; omitFields?: Iterable<string> },
+): CompareSyncPlan {
+  const omit = new Set(options.omitFields ?? []);
+  omit.add('Id');
+  omit.add('attributes');
+  const clean = (rec: Record<string, unknown>, only?: string[]): Record<string, unknown> => {
+    const out: Record<string, unknown> = {};
+    for (const key of only ?? Object.keys(rec)) {
+      if (!omit.has(key) && key in rec) out[key] = rec[key];
+    }
+    return out;
+  };
+
+  const added = diff.added.filter(d => selectedKeys.has(d.keyValue) && d.sourceRecord);
+  const changed = diff.changed.filter(d => selectedKeys.has(d.keyValue) && d.sourceRecord);
+
+  if (options.externalIdField) {
+    const records = [...added, ...changed].map(d => clean(d.sourceRecord!));
+    return {
+      jobs: records.length ? [{ operation: 'upsert', records, externalIdField: options.externalIdField }] : [],
+      inserts: 0,
+      updates: 0,
+      upserts: records.length,
+      skippedKeys: [],
+    };
+  }
+
+  const inserts = added.map(d => clean(d.sourceRecord!));
+  const updates: Record<string, unknown>[] = [];
+  const skippedKeys: string[] = [];
+  for (const d of changed) {
+    const targetId = d.targetRecord?.Id;
+    if (typeof targetId !== 'string' || !targetId) {
+      skippedKeys.push(d.keyValue);
+      continue;
+    }
+    updates.push({ Id: targetId, ...clean(d.sourceRecord!, d.changedFields) });
+  }
+
+  const jobs: CompareSyncJob[] = [];
+  if (inserts.length) jobs.push({ operation: 'insert', records: inserts });
+  if (updates.length) jobs.push({ operation: 'update', records: updates });
+  return { jobs, inserts: inserts.length, updates: updates.length, upserts: 0, skippedKeys };
+}

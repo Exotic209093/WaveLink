@@ -19,7 +19,9 @@ import {
   topologicalSort,
   detectCircularReferences,
   remapIds,
+  pairClonedIds,
 } from '../utils/crossObjectClone';
+import { awaitPushResult } from '../utils/migrationPush';
 import { RelationshipTree } from '../components/RelationshipTree';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { Toast } from '../components/Toast';
@@ -53,28 +55,6 @@ function stripForInsert(record: Record<string, unknown>, describe: SObjectDescri
     out[k] = v;
   }
   return out;
-}
-
-/** Poll for a completed push result. Resolves with the inserted IDs in order, or null on timeout. */
-async function awaitPushResult(
-  sf: SfApi,
-  pushId: string,
-  timeoutMs = 5 * 60_000,
-  intervalMs = 1_000,
-): Promise<{ ids: string[]; failedIndices: Set<number> } | null> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const res = await sf.getDataPushResult(pushId);
-    if (res && Array.isArray(res.ids) && res.ids.length > 0) {
-      const failedIndices = new Set<number>();
-      if (res.failedRecords) {
-        for (const f of res.failedRecords) failedIndices.add(f.index);
-      }
-      return { ids: res.ids, failedIndices };
-    }
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-  return null;
 }
 
 /** Wizard step labels. O(1). */
@@ -305,18 +285,16 @@ export function CloneWizardScreen(props: CloneWizardScreenProps): VNode {
             continue;
           }
 
-          let mapped = 0;
-          let successIdx = 0;
-          for (let i = 0; i < sourceRecords.length; i++) {
-            if (pushOutcome.failedIndices.has(i)) continue;
-            const oldId = sourceRecords[i].Id as string | undefined;
-            const newId = pushOutcome.ids[successIdx++];
-            if (oldId && newId) {
-              idMap.set(oldId, newId);
-              mapped++;
-            }
+          // Pair by per-row result index, never positionally (#49).
+          const pairing = pairClonedIds(sourceRecords, pushOutcome);
+          for (const { sourceId, targetId } of pairing.pairs) idMap.set(sourceId, targetId);
+          const failedNote = pairing.failed > 0 ? `; ${pairing.failed} failed` : '';
+          log.push(`  Inserted ${pushOutcome.ids.length} ${objectName} records${failedNote}; remapped ${pairing.pairs.length} IDs.`);
+          if (pairing.unmapped > 0) {
+            log.push(
+              `  Warning: ${pairing.unmapped} inserted ${objectName} ${pairing.unmapped === 1 ? 'ID' : 'IDs'} could not be matched to a source row and ${pairing.unmapped === 1 ? 'was' : 'were'} not remapped; related child records will not be re-parented to ${pairing.unmapped === 1 ? 'it' : 'them'}.`,
+            );
           }
-          log.push(`  Inserted ${pushOutcome.ids.length} ${objectName} records; remapped ${mapped} IDs.`);
         } catch (e) {
           log.push(`  Insert failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
         }

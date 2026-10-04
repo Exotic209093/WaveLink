@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Scrollable list view of schema diffs with filter toolbar and summary stats.
  *
  * Renders a toolbar with all/added/removed/changed toggle buttons,

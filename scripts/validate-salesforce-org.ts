@@ -12,6 +12,8 @@
 
 import { SalesforceApiClient } from '../src/services/salesforce/api-client';
 import { BulkApiService } from '../src/services/salesforce/bulk-api';
+import { buildBulkRowIdentity, fetchBulkRowResults } from '../src/services/salesforce/bulk-results';
+import { typeBulkQueryPage } from '../src/services/salesforce/bulk-query-typing';
 import type { ApiVersion, BulkJob } from '../src/core/types/salesforce';
 import path from 'node:path';
 
@@ -104,6 +106,36 @@ async function completeIngest(service: BulkApiService, job: BulkJob): Promise<Bu
   return completed;
 }
 
+async function compareBulkTypesWithRest(typingSoql: string, label = 'Bulk query types match REST'): Promise<void> {
+  const restRows = await api.query<Record<string, unknown>>(typingSoql);
+  const typingJob = await bulk.createQueryJob(typingSoql);
+  await pollQuery(bulk, typingJob.id);
+  const typingStatus = await bulk.getQueryJobStatus(typingJob.id);
+  assert(typingStatus.object === 'Account', `Bulk query job info reported object "${typingStatus.object}", expected Account.`);
+  const typingPage = await bulk.getQueryResults(typingJob.id, undefined, 100);
+  const typedRows = await typeBulkQueryPage(typingPage.records, typingStatus.object, name => api.describeSObject(name));
+  const typedById = new Map(typedRows.map(row => [String(row.Id), row]));
+  let compared = 0;
+  for (const restRow of restRows.records) {
+    const bulkRow = typedById.get(String(restRow.Id));
+    assert(bulkRow, `Bulk results are missing REST record ${String(restRow.Id).slice(-6)}.`);
+    for (const fieldName of ['Name', 'NumberOfEmployees', 'AnnualRevenue', 'IsDeleted', 'CreatedDate']) {
+      const restValue = restRow[fieldName] ?? null;
+      const bulkValue = bulkRow[fieldName] ?? null;
+      assert(
+        (restValue === null) === (bulkValue === null) && typeof restValue === typeof bulkValue,
+        `${fieldName}: REST ${typeof restValue} vs Bulk ${typeof bulkValue}.`,
+      );
+      // Datetime formatting differs between the APIs (+0000 vs Z); compare type only.
+      if (fieldName !== 'CreatedDate') {
+        assert(restValue === bulkValue, `${fieldName}: REST and Bulk values differ.`);
+      }
+      compared++;
+    }
+  }
+  pass(label, `${restRows.records.length} records, ${compared} values`, typingJob.id);
+}
+
 async function main(): Promise<void> {
   const org = await api.query<{ Id: string; IsSandbox: boolean }>(
     'SELECT Id, IsSandbox FROM Organization LIMIT 1',
@@ -128,6 +160,9 @@ async function main(): Promise<void> {
   const queryPage = await resumedQuery.getQueryResults(queryJob.id, undefined, 100);
   assert(queryPage.records.length <= 5, 'Bulk query exceeded its requested record limit.');
   pass('Bulk Query 2.0 create, resume, and results', `${queryPage.records.length} records`, queryJob.id);
+
+  // #80: Bulk results typed from describe must match REST's JSON types and values.
+  await compareBulkTypesWithRest('SELECT Id, Name, NumberOfEmployees, AnnualRevenue, IsDeleted, CreatedDate FROM Account ORDER BY Id LIMIT 20');
 
   if (readOnly && !allowWrite) {
     pass('write safety guard', 'write scenarios intentionally skipped');
@@ -191,6 +226,44 @@ async function main(): Promise<void> {
   assert(retrySuccess.length === 1 && Boolean(retrySuccess[0].sf__Id), 'Corrected retry did not succeed.');
   retrySuccess.forEach(result => createdIds.add(result.sf__Id));
   pass('Bulk failed-row retry', '1 corrected success', retryJob.id);
+
+  // #45 / #47: ragged columns survive, results map to input rows, and values go up verbatim.
+  const mixedRows: Array<Record<string, unknown>> = [
+    { Name: `${tag} Row 0` },
+    { Name: 'x'.repeat(300), Phone: '+44 20 7946 0000' },
+    { Name: `${tag} Row 2`, Phone: '+44 20 7946 0001' },
+  ];
+  const mixedJob = await bulk.createJob({ object: 'Account', operation: 'insert' });
+  await bulk.uploadJobData(mixedJob.id, bulk.recordsToCsv(mixedRows));
+  await bulk.closeJob(mixedJob.id);
+  await completeIngest(bulk, mixedJob);
+  const mixed = await fetchBulkRowResults(bulk, mixedJob.id, buildBulkRowIdentity(mixedRows));
+  mixed.ids.forEach(id => createdIds.add(id));
+  assert(mixed.ids.length === 2 && mixed.errors.length === 1, 'Mixed Bulk job result counts were incorrect.');
+  assert(mixed.errors[0].recordIndex === 1, `Bulk failure mapped to row ${mixed.errors[0].recordIndex}, expected 1.`);
+  assert(
+    [...mixed.idRecordIndexes].sort().join(',') === '0,2',
+    `Bulk IDs mapped to rows ${mixed.idRecordIndexes.join(',')}, expected 0 and 2.`,
+  );
+  const row2Id = mixed.ids[mixed.idRecordIndexes.indexOf(2)];
+  const row2 = await api.query<{ Name: string; Phone: string | null }>(`SELECT Name, Phone FROM Account WHERE Id = '${row2Id}'`);
+  assert(row2.records[0]?.Name === `${tag} Row 2`, 'The ID mapped to row 2 belongs to a different record.');
+  assert(row2.records[0]?.Phone === '+44 20 7946 0001', 'Phone from a column absent in row 0 was not stored verbatim.');
+  pass('Bulk per-row results, ragged columns, verbatim values', 'failure on row 1, IDs on rows 0 and 2', mixedJob.id);
+
+  const clearJob = await bulk.createJob({ object: 'Account', operation: 'update' });
+  await bulk.uploadJobData(clearJob.id, bulk.recordsToCsv([{ Id: row2Id, Phone: null }]));
+  await bulk.closeJob(clearJob.id);
+  await completeIngest(bulk, clearJob);
+  const cleared = await api.query<{ Phone: string | null }>(`SELECT Phone FROM Account WHERE Id = '${row2Id}'`);
+  assert(cleared.records[0]?.Phone === null, 'Bulk update with an explicit null did not clear Phone.');
+  pass('Bulk blank-means-clear', 'explicit null cleared Phone', clearJob.id);
+
+  await api.updateRecord('Account', row2Id, { NumberOfEmployees: 42, AnnualRevenue: 1234.5 });
+  await compareBulkTypesWithRest(
+    `SELECT Id, Name, NumberOfEmployees, AnnualRevenue, IsDeleted, CreatedDate FROM Account WHERE Id = '${row2Id}'`,
+    'Bulk query types match REST (populated number, currency, boolean)',
+  );
 
   const undo = await api.createRecord('Account', { Name: `${tag} Undo` });
   assert(undo.success && undo.id, 'Undo setup insert failed.');

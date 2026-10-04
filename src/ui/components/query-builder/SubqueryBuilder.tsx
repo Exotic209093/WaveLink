@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Child relationship subquery builder.
  *
  * Allows adding subqueries like (SELECT Id, Name FROM Contacts) to the

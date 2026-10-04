@@ -1,4 +1,4 @@
-﻿import { h } from 'preact';
+import { h } from 'preact';
 import type { VNode } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ExportTemplate, ImportTemplate, SavedJob, ScheduledExport } from '../../core/types/storage';

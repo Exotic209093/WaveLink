@@ -5,6 +5,15 @@
  *
  * Complexity:
  * - `validateRecords` is O(N * K) where N is records and K is keys per record.
+ *
+ * Reference lookups: a mapped key may be a relationship name (for example
+ * `Account` or `Parent__r`) holding a nested `{ MatchField: value }` object,
+ * as produced by DataMapper for `externalId` / `relatedField` lookups. Those
+ * keys are resolved to their reference field (`AccountId`, `Parent__c`) via
+ * `relationshipName`, and the nested match field is checked for shape. When
+ * describe metadata for the referenced object is supplied via
+ * `options.relatedFields`, the match field must also exist there and be an
+ * External ID or idLookup field.
  */
 
 import type { SObjectField, SalesforceFieldType } from '../../core/types/salesforce';
@@ -13,6 +22,23 @@ import { ValidationError, type FieldValidationError } from '../../core/errors';
 export interface ValidationResult {
   valid: boolean;
   errors: FieldValidationError[];
+}
+
+export interface ValidationOptions {
+  /** Describe fields of referenced objects, keyed by SObject API name. */
+  relatedFields?: Record<string, SObjectField[]>;
+}
+
+/**
+ * Relationship name for a reference field. Mirrors the import UI's default:
+ * describe `relationshipName`, else `Foo__c` -> `Foo__r`, else `FooId` -> `Foo`.
+ */
+function relationshipNameOf(field: SObjectField): string | null {
+  if (field.type !== 'reference') return null;
+  if (field.relationshipName) return field.relationshipName;
+  if (field.name.endsWith('__c')) return field.name.replace(/__c$/, '__r');
+  if (field.name.endsWith('Id') && field.name.length > 2) return field.name.replace(/Id$/, '');
+  return null;
 }
 
 /**
@@ -26,14 +52,20 @@ export class DataValidator {
     records: Record<string, unknown>[],
     fields: SObjectField[],
     operation: 'insert' | 'update' | 'upsert' | 'delete',
+    options: ValidationOptions = {},
   ): ValidationResult {
     // Time: O(N*K). Data: returns a flat list of `FieldValidationError` entries.
     const fieldMap = new Map(fields.map(f => [f.name, f]));
+    const relationshipMap = new Map<string, SObjectField>();
+    for (const f of fields) {
+      const rel = relationshipNameOf(f);
+      if (rel && !fieldMap.has(rel)) relationshipMap.set(rel, f);
+    }
     const allErrors: FieldValidationError[] = [];
 
     for (let i = 0; i < records.length; i++) {
       const record = records[i];
-      const recordErrors = this.validateRecord(record, fieldMap, operation, i);
+      const recordErrors = this.validateRecord(record, fieldMap, relationshipMap, operation, i, options);
       allErrors.push(...recordErrors);
     }
 
@@ -49,8 +81,10 @@ export class DataValidator {
   private validateRecord(
     record: Record<string, unknown>,
     fieldMap: Map<string, SObjectField>,
+    relationshipMap: Map<string, SObjectField>,
     operation: string,
     recordIndex: number,
+    options: ValidationOptions,
   ): FieldValidationError[] {
     const errors: FieldValidationError[] = [];
 
@@ -59,6 +93,11 @@ export class DataValidator {
       if (key === 'Id' || key === 'id') continue;
       const field = fieldMap.get(key);
       if (!field) {
+        const refField = relationshipMap.get(key);
+        if (refField) {
+          errors.push(...this.validateRelationshipValue(key, record[key], refField, operation, recordIndex, options));
+          continue;
+        }
         errors.push({
           field: key,
           message: `Record ${recordIndex}: Unknown field "${key}"`,
@@ -92,7 +131,9 @@ export class DataValidator {
     // Check required fields for insert
     if (operation === 'insert') {
       for (const [fieldName, field] of fieldMap) {
-        if (field.required && field.createable && !field.defaultValue && !(fieldName in record)) {
+        const rel = relationshipNameOf(field);
+        const suppliedViaRelationship = rel !== null && relationshipMap.get(rel) === field && rel in record;
+        if (field.required && field.createable && !field.defaultValue && !(fieldName in record) && !suppliedViaRelationship) {
           errors.push({
             field: fieldName,
             message: `Record ${recordIndex}: Required field "${fieldName}" is missing`,
@@ -102,6 +143,62 @@ export class DataValidator {
     }
 
     return errors;
+  }
+
+  /**
+   * Validate a relationship key (e.g. `Account: { External_Key__c: 'A-1' }`)
+   * against its reference field (`AccountId`).
+   */
+  private validateRelationshipValue(
+    key: string,
+    value: unknown,
+    refField: SObjectField,
+    operation: string,
+    recordIndex: number,
+    options: ValidationOptions,
+  ): FieldValidationError[] {
+    const prefix = `Record ${recordIndex}:`;
+
+    if (operation === 'insert' && !refField.createable) {
+      return [{ field: key, message: `${prefix} Field "${refField.name}" (via "${key}") is not createable` }];
+    }
+    if ((operation === 'update' || operation === 'upsert') && !refField.updateable) {
+      return [{ field: key, message: `${prefix} Field "${refField.name}" (via "${key}") is not updateable` }];
+    }
+
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      return [{ field: key, message: `${prefix} Relationship "${key}" must be an object like { MatchField: value }`, value }];
+    }
+    const entries = Object.entries(value as Record<string, unknown>).filter(([k]) => k !== 'attributes');
+    if (entries.length !== 1) {
+      return [{ field: key, message: `${prefix} Relationship "${key}" must specify exactly one match field`, value }];
+    }
+
+    const [matchField, matchValue] = entries[0];
+    const isScalar = typeof matchValue === 'string' || typeof matchValue === 'number' || typeof matchValue === 'boolean';
+    if (!isScalar || String(matchValue).trim() === '') {
+      return [{ field: key, message: `${prefix} Relationship "${key}.${matchField}" needs a non-empty value`, value }];
+    }
+
+    // Only checkable when the caller supplies describe metadata for the
+    // referenced object; polymorphic references are left to Salesforce.
+    const targets = refField.referenceTo ?? [];
+    const relatedFields = targets.length === 1 ? options.relatedFields?.[targets[0]] : undefined;
+    if (relatedFields) {
+      const match = relatedFields.find(f => f.name === matchField);
+      if (!match) {
+        return [{ field: key, message: `${prefix} Unknown field "${matchField}" on ${targets[0]} (via "${key}")`, value }];
+      }
+      if (!match.externalId && !match.idLookup) {
+        return [{
+          field: key,
+          message: `${prefix} Field "${targets[0]}.${matchField}" is not an External ID or idLookup field and cannot be used to match "${key}"`,
+          value,
+        }];
+      }
+    }
+
+    return [];
   }
 
   /**
@@ -217,9 +314,10 @@ export function assertValid(
   records: Record<string, unknown>[],
   fields: SObjectField[],
   operation: 'insert' | 'update' | 'upsert' | 'delete',
+  options: ValidationOptions = {},
 ): void {
   const validator = new DataValidator();
-  const result = validator.validateRecords(records, fields, operation);
+  const result = validator.validateRecords(records, fields, operation, options);
   if (!result.valid) {
     throw new ValidationError(
       `Validation failed with ${result.errors.length} error(s)`,

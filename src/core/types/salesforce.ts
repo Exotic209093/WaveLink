@@ -65,6 +65,8 @@ export interface SObjectField {
   referenceTo?: string[];
   relationshipName?: string | null;
   externalId: boolean;
+  /** True when the field can identify a record in a relationship lookup (describe `idLookup`). */
+  idLookup?: boolean;
   unique: boolean;
 }
 
@@ -159,6 +161,8 @@ export type BulkJobState =
 export interface BulkQueryJob {
   id: string;
   operation: 'query' | 'queryAll';
+  /** API name of the queried (FROM) object. */
+  object?: string;
   state: 'UploadComplete' | 'InProgress' | 'Aborted' | 'JobComplete' | 'Failed';
   numberRecordsProcessed: number;
   retries?: number;

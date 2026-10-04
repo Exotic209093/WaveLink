@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tree of objects with checkboxes and edge labels for the clone wizard.
  *
  * What this file does:

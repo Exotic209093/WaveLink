@@ -1,4 +1,4 @@
-﻿import type { VNode } from 'preact';
+import type { VNode } from 'preact';
 import { h } from 'preact';
 import { useMemo } from 'preact/hooks';
 import type { SObjectField } from '../../../core/types/salesforce';

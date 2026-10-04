@@ -11,8 +11,8 @@ import { OrgPicker } from '../components/OrgPicker';
 import { DataDiffView } from '../components/DataDiffView';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { Toast } from '../components/Toast';
-import { diffRecords, diffToCsv } from '../utils/dataDiff';
-import type { DataDiffResult } from '../utils/dataDiff';
+import { buildCompareSyncPlan, diffRecords, diffToCsv } from '../utils/dataDiff';
+import type { CompareSyncPlan, DataDiffResult } from '../utils/dataDiff';
 import { downloadTextFile } from '../utils/download';
 import { TypedConfirmModal } from '../components/TypedConfirmModal';
 
@@ -26,6 +26,15 @@ interface FieldOption {
   label: string;
   type: string;
   externalId: boolean;
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+function describeSyncCounts(plan: CompareSyncPlan): string {
+  if (plan.upserts > 0) return `${plural(plan.upserts, 'upsert')} by External ID`;
+  return `${plural(plan.inserts, 'insert')}, ${plural(plan.updates, 'update')}`;
 }
 
 const SYSTEM_FIELDS = new Set(['Id', 'CreatedDate', 'CreatedById', 'LastModifiedDate', 'LastModifiedById', 'SystemModstamp', 'IsDeleted']);
@@ -114,7 +123,10 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
     setDiff(null);
     setSelectedKeys(new Set());
     try {
-      const fields = [matchField, ...Array.from(selectedFields).filter(f => f !== matchField)];
+      // Always select Id so Changed records can be updated by target Id; it is
+      // never compared because Ids differ between orgs.
+      const fields = [matchField, ...Array.from(selectedFields).filter(f => f !== matchField && f !== 'Id')];
+      if (matchField !== 'Id') fields.push('Id');
       const selectClause = fields.join(', ');
       let soql = `SELECT ${selectClause} FROM ${objectName}`;
       if (whereClause.trim()) soql += ` WHERE ${whereClause.trim()}`;
@@ -132,7 +144,7 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
           return clean;
         });
 
-      const compareFields = Array.from(selectedFields).filter(f => f !== matchField);
+      const compareFields = Array.from(selectedFields).filter(f => f !== matchField && f !== 'Id');
       const result = diffRecords(
         stripAttributes(srcResult.records),
         stripAttributes(tgtResult.records),
@@ -154,34 +166,32 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
     if (!diff || !targetOrgId || selectedKeys.size === 0) return;
     setSyncing(true);
     try {
-      const recordsToSync: Record<string, unknown>[] = [];
-      for (const d of [...diff.added, ...diff.changed]) {
-        if (selectedKeys.has(d.keyValue) && d.sourceRecord) {
-          const rec = { ...d.sourceRecord };
-          delete rec.attributes;
-          delete rec.Id;
-          for (const sf of SYSTEM_FIELDS) delete rec[sf];
-          recordsToSync.push(rec);
-        }
+      const plan = buildSyncPlan();
+      for (const job of plan.jobs) {
+        await sf.startDataPush({
+          orgId: targetOrgId,
+          objectName,
+          operation: job.operation,
+          records: job.records,
+          externalIdField: job.externalIdField,
+        });
       }
-
-      const matchFieldMeta = commonFields.find(f => f.name === matchField);
-      const isExternalId = matchFieldMeta?.externalId ?? false;
-      const operation = isExternalId ? 'upsert' : 'insert';
-
-      await sf.startDataPush({
-        orgId: targetOrgId,
-        objectName,
-        operation: operation as 'insert' | 'upsert',
-        records: recordsToSync,
-        externalIdField: isExternalId ? matchField : undefined,
-      });
-      setToast({ title: 'Sync Started', body: `${recordsToSync.length} records being pushed to target org` });
+      const skipped = plan.skippedKeys.length ? `; ${plan.skippedKeys.length} skipped (no target Id)` : '';
+      setToast({ title: 'Sync Started', body: `${describeSyncCounts(plan)} being pushed to target org${skipped}` });
       setReviewOpen(false);
     } catch (e) {
       setToast({ title: 'Sync Failed', body: e instanceof Error ? e.message : 'Unknown error' });
     }
     setSyncing(false);
+  }
+
+  function buildSyncPlan(): CompareSyncPlan {
+    const matchFieldMeta = commonFields.find(f => f.name === matchField);
+    const isExternalId = matchFieldMeta?.externalId ?? false;
+    return buildCompareSyncPlan(diff!, selectedKeys, {
+      externalIdField: isExternalId ? matchField : undefined,
+      omitFields: SYSTEM_FIELDS,
+    });
   }
 
   function exportDiff(): void {
@@ -190,6 +200,7 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
     downloadTextFile(`compare-${objectName}-${Date.now()}.csv`, csv, 'text/csv');
   }
 
+  const reviewPlan = reviewOpen && diff ? buildSyncPlan() : null;
   const canCompare = sourceOrgId && targetOrgId && objectName && matchField && selectedFields.size > 0;
 
   return (
@@ -352,8 +363,11 @@ export function DataComparisonScreen(props: { sf: SfApi; hideHeader?: boolean })
         onConfirm={syncToTarget}
       >
         <div>
-          <p><strong>Dry-run comparison complete.</strong> {selectedKeys.size} selected {objectName} records will be written to target org <span class="wl-mono">{targetOrgId}</span>.</p>
-          <p class="wl-muted">This controlled workflow copies one object at a time, removes Salesforce system fields, and uses upsert only when the match field is an External ID. It does not promise dependency migration or automatic rollback across objects.</p>
+          <p><strong>Dry-run comparison complete.</strong> {selectedKeys.size} selected {objectName} records will be written to target org <span class="wl-mono">{targetOrgId}</span>: {reviewPlan ? describeSyncCounts(reviewPlan) : ''}.</p>
+          {reviewPlan && reviewPlan.skippedKeys.length ? (
+            <p class="wl-muted">{reviewPlan.skippedKeys.length} changed records will be skipped because the target record Id was not returned.</p>
+          ) : null}
+          <p class="wl-muted">This controlled workflow copies one object at a time and removes Salesforce system fields. It upserts when the match field is an External ID; otherwise it inserts Added records and updates Changed records by their target Id. It does not promise dependency migration or automatic rollback across objects.</p>
         </div>
       </TypedConfirmModal>
     </div>

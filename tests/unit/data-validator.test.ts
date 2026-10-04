@@ -1,4 +1,6 @@
 import { DataValidator } from '../../src/data/validators';
+import { DataMapper } from '../../src/data/mappers';
+import { simulatePush } from '../../src/ui/utils/pushDryRun';
 import type { SObjectField } from '../../src/core/types/salesforce';
 
 describe('DataValidator', () => {
@@ -90,6 +92,84 @@ describe('DataValidator', () => {
 
       const result = validator.validateRecords([{ Required: null }], fields, 'insert');
       expect(result.valid).toBe(false);
+    });
+  });
+
+  // Regression for #50: reference-lookup mappings produce relationship keys
+  // (`Account: { External_Key__c: ... }`) that used to be reported as
+  // `Unknown field "Account"`, deadlocking the guided import.
+  describe('reference lookups (#50)', () => {
+    const contactFields = (): SObjectField[] => [
+      createField('LastName', 'string', { required: true, nillable: false }),
+      createField('AccountId', 'reference', { relationshipName: 'Account', referenceTo: ['Account'] }),
+      createField('Parent__c', 'reference', { relationshipName: 'Parent__r', referenceTo: ['Parent__c'], required: true, nillable: false }),
+    ];
+
+    it('accepts relationship keys produced by the mapper for externalId and relatedField lookups', () => {
+      const mapped = new DataMapper().mapRecords([{ last: 'Doe', accountKey: 'ACME-1', parentName: 'Head Office' }], [
+        { sourceField: 'last', targetField: 'LastName', required: true },
+        { sourceField: 'accountKey', targetField: 'AccountId', required: false, lookup: { mode: 'externalId', relationshipName: 'Account', matchField: 'External_Key__c' } },
+        { sourceField: 'parentName', targetField: 'Parent__c', required: false, lookup: { mode: 'relatedField', relationshipName: 'Parent__r', matchField: 'Name' } },
+      ]).mappedRecords;
+      expect(mapped[0]).toEqual({ LastName: 'Doe', Account: { External_Key__c: 'ACME-1' }, Parent__r: { Name: 'Head Office' } });
+
+      for (const op of ['insert', 'update', 'upsert'] as const) {
+        const result = validator.validateRecords(mapped, contactFields(), op);
+        expect(result.errors).toEqual([]);
+      }
+    });
+
+    it('lets the dry run pass lookup rows instead of flagging every row', () => {
+      const report = simulatePush([{ LastName: 'Doe', Account: { External_Key__c: 'ACME-1' }, Parent__r: { Name: 'HQ' } }], contactFields(), 'insert');
+      expect(report.rows[0]).toEqual(expect.objectContaining({ status: 'ok', reasons: [] }));
+    });
+
+    it('derives custom __r names when describe omits relationshipName', () => {
+      const fields = [createField('Region__c', 'reference', { relationshipName: null, referenceTo: ['Region__c'] })];
+      expect(validator.validateRecords([{ Region__r: { Code__c: 'EMEA' } }], fields, 'insert').errors).toEqual([]);
+    });
+
+    it('still rejects keys that are neither fields nor relationship names', () => {
+      const result = validator.validateRecords([{ LastName: 'Doe', Parent__c: 'a01000000000001', Acount: { Key__c: 'x' } }], contactFields(), 'insert');
+      expect(result.errors.map(e => e.message)).toEqual(['Record 0: Unknown field "Acount"']);
+    });
+
+    it('rejects malformed nested match values', () => {
+      const base = { LastName: 'Doe', Parent__c: 'a01000000000001' };
+      const bad = [
+        { ...base, Account: 'ACME-1' },
+        { ...base, Account: {} },
+        { ...base, Account: { External_Key__c: 'A', Name: 'B' } },
+        { ...base, Account: { External_Key__c: '   ' } },
+        { ...base, Account: { External_Key__c: { nested: true } } },
+      ];
+      const result = validator.validateRecords(bad, contactFields(), 'insert');
+      expect(result.errors.map(e => e.field)).toEqual(['Account', 'Account', 'Account', 'Account', 'Account']);
+    });
+
+    it('applies createable/updateable rules of the underlying reference field', () => {
+      const fields = [createField('MasterId', 'reference', { relationshipName: 'Master', referenceTo: ['Account'], updateable: false })];
+      expect(validator.validateRecords([{ Master: { Key__c: 'x' } }], fields, 'insert').valid).toBe(true);
+      const result = validator.validateRecords([{ Master: { Key__c: 'x' } }], fields, 'update');
+      expect(result.errors[0].message).toContain('"MasterId" (via "Master") is not updateable');
+    });
+
+    it('requires the match field to be an External ID or idLookup field when related metadata is supplied', () => {
+      const relatedFields = {
+        Account: [
+          createField('External_Key__c', 'string', { externalId: true }),
+          createField('Name', 'string', { idLookup: true }),
+          createField('Description', 'textarea'),
+        ],
+      };
+      const fields = [createField('AccountId', 'reference', { relationshipName: 'Account', referenceTo: ['Account'] })];
+      const check = (matchField: string) =>
+        validator.validateRecords([{ Account: { [matchField]: 'v' } }], fields, 'insert', { relatedFields }).errors.map(e => e.message);
+
+      expect(check('External_Key__c')).toEqual([]);
+      expect(check('Name')).toEqual([]);
+      expect(check('Description')).toEqual(['Record 0: Field "Account.Description" is not an External ID or idLookup field and cannot be used to match "Account"']);
+      expect(check('Missing__c')).toEqual(['Record 0: Unknown field "Missing__c" on Account (via "Account")']);
     });
   });
 });

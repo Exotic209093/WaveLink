@@ -1,5 +1,5 @@
-﻿/**
- * Migration Workspace screen â€” configures and executes a single migration project.
+/**
+ * Migration Workspace screen — configures and executes a single migration project.
  *
  * Phase 1, Features 1.1 + 1.2: Project configuration and multi-object orchestration.
  *
@@ -17,22 +17,7 @@ import type { SfApi } from '../api/sf';
 import type { MigrationProject, MigrationObject, MigrationObjectProgress, DependencyGraph } from '../../core/types/migration';
 import type { SObjectDescribe } from '../../core/types/salesforce';
 import { buildMigrationGraph } from '../utils/dependencyGraph';
-
-/** Poll for a completed push result. Resolves with the inserted IDs in order, or null on timeout. */
-async function awaitPushResult(
-  sf: SfApi,
-  pushId: string,
-  timeoutMs = 5 * 60_000,
-  intervalMs = 1_000,
-): Promise<string[] | null> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const res = await sf.getDataPushResult(pushId);
-    if (res && Array.isArray(res.ids) && res.ids.length > 0) return res.ids;
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-  return null;
-}
+import { awaitPushResult, buildIdMapEntries } from '../utils/migrationPush';
 
 interface Props {
   sf: SfApi;
@@ -190,7 +175,7 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
         progress[i] = { ...prog };
         setObjectProgress([...progress]);
 
-        // 2. Prepare records â€” remap reference fields using accumulated ID map
+        // 2. Prepare records — remap reference fields using accumulated ID map
         const records = queryResult.records.map((r: Record<string, unknown>) => {
           const mapped: Record<string, unknown> = {};
           for (const [key, val] of Object.entries(r)) {
@@ -219,33 +204,32 @@ export function MigrationWorkspaceScreen({ sf, tabId, projectId, onBack }: Props
 
         // 4. Poll for push completion before reading inserted IDs
         const result = await awaitPushResult(sf, pushResult.pushId);
-        if (result) {
-          const failedIndices = new Set<number>();
-          if (result.failedRecords) {
-            for (const f of result.failedRecords) failedIndices.add(f.index);
-          }
+        if (!result) {
+          throw new Error(`Timed out waiting for the ${obj.objectName} push to finish`);
+        }
 
-          const entries: Array<{ sourceId: string; targetId: string; objectName: string; createdAt: number }> = [];
-          let successIdx = 0;
-          for (let i = 0; i < queryResult.records.length; i++) {
-            if (failedIndices.has(i)) continue;
-            const sourceId = (queryResult.records[i] as Record<string, unknown>).Id as string;
-            const targetId = result.ids[successIdx++];
-            if (sourceId && targetId) {
-              entries.push({ sourceId, targetId, objectName: obj.objectName, createdAt: Date.now() });
-            }
-          }
+        // Pair each new ID with the source row that produced it via idRecordIndexes; IDs can
+        // arrive out of input order, so they are never zipped positionally (#47).
+        const entries = buildIdMapEntries(
+          queryResult.records as Array<Record<string, unknown>>,
+          result,
+          obj.objectName,
+        );
 
-          // Add to local map for subsequent objects
-          for (const entry of entries) {
-            idMap.set(entry.sourceId, entry.targetId);
-          }
+        // Add to local map for subsequent objects
+        for (const entry of entries) {
+          idMap.set(entry.sourceId, entry.targetId);
+        }
 
-          // Persist to ID map storage
+        // Persist to ID map storage
+        if (entries.length > 0) {
           await sf.addIdMapEntries(idMapId, entries);
+        }
 
-          prog.processedRecords = entries.length;
-          prog.failedRecords = prog.totalRecords - entries.length;
+        prog.processedRecords = entries.length;
+        prog.failedRecords = prog.totalRecords - entries.length;
+        if (result.failedRecords?.length) {
+          prog.errors = result.failedRecords.map(f => ({ recordIndex: f.index, message: f.error }));
         }
 
         prog.status = 'done';

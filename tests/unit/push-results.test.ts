@@ -1,6 +1,6 @@
 import { StorageService } from '../../src/services/storage';
 import { STORAGE_KEYS } from '../../src/core/constants';
-import { buildPushOutcomeDatasets } from '../../src/ui/utils/pushRetry';
+import { buildPushOutcomeDatasets, buildRetryDataset, countMappingDroppedRows } from '../../src/ui/utils/pushRetry';
 
 describe('Push Results (Session)', () => {
   test('caps stored push results to 20 (keeps most recent by capturedAt)', async () => {
@@ -35,7 +35,7 @@ describe('push outcome downloads', () => {
     const result = buildPushOutcomeDatasets(
       [{ Name: 'Good' }, { Name: 'Bad' }, { Name: 'Also good' }],
       [{ recordIndex: 1, message: 'Missing field' }, { recordIndex: 1, message: 'Invalid value' }],
-      ['001-good', '001-also'],
+      { ids: ['001-good', '001-also'], idRecordIndexes: [0, 2] },
     );
     expect(result.success.records).toEqual([
       { Name: 'Good', WaveLinkRecordId: '001-good' },
@@ -45,5 +45,126 @@ describe('push outcome downloads', () => {
       Name: 'Bad', WaveLinkError: 'Missing field; Invalid value', WaveLinkSourceRow: 3,
     }]);
   });
+
+  test('attaches IDs by record index, not position, when results arrive out of order (#47)', () => {
+    // Bulk results / parallel REST batches: IDs come back in a different order than the input,
+    // and an updating upsert (HTTP 204) returns no ID for row 1.
+    const result = buildPushOutcomeDatasets(
+      [{ Name: 'A' }, { Name: 'B' }, { Name: 'C' }, { Name: 'D' }],
+      [{ recordIndex: 2, message: 'DUPLICATE_VALUE' }],
+      { ids: ['001-D', '001-A'], idRecordIndexes: [3, 0] },
+    );
+    expect(result.success.records).toEqual([
+      { Name: 'A', WaveLinkRecordId: '001-A' },
+      { Name: 'B' },
+      { Name: 'D', WaveLinkRecordId: '001-D' },
+    ]);
+    expect(result.error.records).toEqual([{ Name: 'C', WaveLinkError: 'DUPLICATE_VALUE', WaveLinkSourceRow: 4 }]);
+  });
+
+  test('never zips IDs positionally when no record indexes are available (#47)', () => {
+    const result = buildPushOutcomeDatasets(
+      [{ Name: 'A' }, { Name: 'B' }],
+      [{ recordIndex: 0, message: 'Failed' }],
+      { ids: ['001-unknown'] },
+    );
+    expect(result.success.records).toEqual([{ Name: 'B' }]);
+    expect(result.success.headers).toEqual(['Name']);
+  });
 });
 
+describe('source-row translation after mapping drops rows (#46)', () => {
+  // Source row 1 failed mapping, so the pushed array is [row0, row2, row3, row4].
+  const sourceRecords = [{ Name: 'R0' }, { Name: 'R1-unmapped' }, { Name: 'R2' }, { Name: 'R3' }, { Name: 'R4' }];
+  const sourceIndexes = [0, 2, 3, 4];
+  // Pushed positions 1 and 3 failed, i.e. source rows 2 and 4.
+  const pushErrors = [{ recordIndex: 1, message: 'Bad R2' }, { recordIndex: 3, message: 'Bad R4' }];
+
+  test('retry dataset targets the source rows that actually failed', () => {
+    const retry = buildRetryDataset(sourceRecords, pushErrors, sourceIndexes);
+    expect(retry.records).toEqual([{ Name: 'R2' }, { Name: 'R4' }]);
+    expect(retry.originalIndices).toEqual([2, 4]);
+    expect(retry.errorMap).toEqual(new Map([[0, 'Bad R2'], [1, 'Bad R4']]));
+  });
+
+  test('outcome files blame the right rows and attach IDs to the right rows', () => {
+    const result = buildPushOutcomeDatasets(
+      sourceRecords,
+      pushErrors,
+      { ids: ['001-R0', '001-R3'], idRecordIndexes: [0, 2] },
+      sourceIndexes,
+      [{ recordIndex: 1, message: 'Required field "Name" is missing' }],
+    );
+    expect(result.error.records).toEqual([
+      { Name: 'R1-unmapped', WaveLinkError: 'Not pushed (mapping error): Required field "Name" is missing', WaveLinkSourceRow: 3 },
+      { Name: 'R2', WaveLinkError: 'Bad R2', WaveLinkSourceRow: 4 },
+      { Name: 'R4', WaveLinkError: 'Bad R4', WaveLinkSourceRow: 6 },
+    ]);
+    // The row dropped at mapping was never pushed, so it is not reported as a success.
+    expect(result.success.records).toEqual([
+      { Name: 'R0', WaveLinkRecordId: '001-R0' },
+      { Name: 'R3', WaveLinkRecordId: '001-R3' },
+    ]);
+  });
+});
+
+describe('rows dropped at mapping in Import Results', () => {
+  const sourceRecords = [{ Name: 'A' }, { Name: '' }, { Name: 'C' }, { Name: '' }];
+  const sourceIndexes = [0, 2];
+  const mappingErrors = [
+    { recordIndex: 1, message: 'Required field "Name" is missing' },
+    { recordIndex: 3, message: 'Required field "Name" is missing' },
+    { recordIndex: 3, message: 'Invalid date "x"' },
+  ];
+
+  test('appear in the error file with their mapping errors and source row numbers', () => {
+    const result = buildPushOutcomeDatasets(
+      sourceRecords,
+      [],
+      { ids: ['001A', '001C'], idRecordIndexes: [0, 1] },
+      sourceIndexes,
+      mappingErrors,
+    );
+    expect(result.success.records).toEqual([
+      { Name: 'A', WaveLinkRecordId: '001A' },
+      { Name: 'C', WaveLinkRecordId: '001C' },
+    ]);
+    expect(result.error.records).toEqual([
+      { Name: '', WaveLinkError: 'Not pushed (mapping error): Required field "Name" is missing', WaveLinkSourceRow: 3 },
+      { Name: '', WaveLinkError: 'Not pushed (mapping error): Required field "Name" is missing; Invalid date "x"', WaveLinkSourceRow: 5 },
+    ]);
+    expect(result.error.headers).toEqual(['Name', 'WaveLinkError', 'WaveLinkSourceRow']);
+  });
+
+  test('are reported even without mapping error detail', () => {
+    const result = buildPushOutcomeDatasets(sourceRecords, [], { ids: [] }, sourceIndexes);
+    expect(result.error.records.map(r => r.WaveLinkSourceRow)).toEqual([3, 5]);
+    expect(result.success.records).toHaveLength(2);
+  });
+
+  test('are interleaved with push failures in source order', () => {
+    const result = buildPushOutcomeDatasets(
+      sourceRecords,
+      [{ recordIndex: 1, message: 'DUPLICATE_VALUE' }],
+      { ids: ['001A'], idRecordIndexes: [0] },
+      sourceIndexes,
+      mappingErrors,
+    );
+    expect(result.error.records.map(r => [r.WaveLinkSourceRow, r.WaveLinkError])).toEqual([
+      [3, 'Not pushed (mapping error): Required field "Name" is missing'],
+      [4, 'DUPLICATE_VALUE'],
+      [5, 'Not pushed (mapping error): Required field "Name" is missing; Invalid date "x"'],
+    ]);
+  });
+
+  test('are not re-sent by Retry Failed Rows', () => {
+    const retry = buildRetryDataset(sourceRecords, [{ recordIndex: 1, message: 'DUPLICATE_VALUE' }], sourceIndexes);
+    expect(retry.originalIndices).toEqual([2]);
+    expect(retry.records).toEqual([{ Name: 'C' }]);
+  });
+
+  test('are counted for the error-file button and retry notice', () => {
+    expect(countMappingDroppedRows(4, sourceIndexes)).toBe(2);
+    expect(countMappingDroppedRows(4, undefined)).toBe(0);
+  });
+});

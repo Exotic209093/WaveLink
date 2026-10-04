@@ -47,6 +47,8 @@ export interface DryRunReport {
 export interface DryRunOptions {
   /** External Id field selected for upsert (if any). */
   externalIdField?: string | null;
+  /** Describe fields of objects referenced by relationship lookups. */
+  relatedFields?: Record<string, SObjectField[]>;
 }
 
 /** Salesforce record Ids are 15 (case-sensitive) or 18 (safe) alphanumeric chars. */
@@ -80,7 +82,7 @@ export function simulatePush(
     const reasons = new Set<string>();
 
     // 1. Schema validation via the shared, tested engine (run per-record).
-    const res = validator.validateRecords([record], fields, operation);
+    const res = validator.validateRecords([record], fields, operation, { relatedFields: options.relatedFields });
     for (const e of res.errors) reasons.add(stripIndexPrefix(e.message));
 
     // 2. Structural checks the schema validator doesn't cover.

@@ -1,7 +1,7 @@
-﻿/**
+/**
  * SOQL generation from structured query builder state.
  *
- * Pure functions â€” no side effects, no DOM.
+ * Pure functions — no side effects, no DOM.
  */
 
 import type { SalesforceFieldType } from '../../core/types/salesforce';

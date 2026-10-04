@@ -21,9 +21,10 @@
 import { MessageBus } from '../services/messaging';
 import { StorageService } from '../services/storage';
 import { SalesforceAuth } from '../services/salesforce/auth';
-import { SalesforceApiClient } from '../services/salesforce/api-client';
 import { ApiClientFactory } from '../services/salesforce/api-client-factory';
 import { BulkApiService } from '../services/salesforce/bulk-api';
+import { buildBulkRowIdentity, fetchBulkRowResults } from '../services/salesforce/bulk-results';
+import { typeBulkQueryPage } from '../services/salesforce/bulk-query-typing';
 import { queryAllRecords, deriveColumns } from '../services/salesforce/queryAll';
 import { captureViaOffscreen, runBulkPushViaOffscreen } from './offscreen';
 import { buildUpsertSubrequests, parseUpsertCompositeResponse } from '../services/salesforce/composite-upsert';
@@ -31,7 +32,7 @@ import { DEFAULT_API_VERSION, DEFAULT_BATCH_SIZE, BULK_API_THRESHOLD, MAX_COMPOS
 import { generateId } from '../core/utils';
 import { isSalesforceUrl } from '../core/utils';
 import type { MessageResponse } from '../core/types/messaging';
-import type { SalesforceOrg } from '../core/types/salesforce';
+import type { SalesforceOrg, SObjectDescribe } from '../core/types/salesforce';
 import type { PushHistoryEntry, PushResult, PushTransaction, ScheduledExport, ExportSnapshot, ScheduleInterval, ActivePush, ScheduleRunHistoryEntry } from '../core/types/storage';
 import type { MigrationProject } from '../core/types/migration';
 
@@ -328,6 +329,20 @@ function bulkServiceFor(org: SalesforceOrg): BulkApiService {
   return apiClientFactory.getBulkService(org);
 }
 
+/** Describe an SObject through the schema cache, populating it on a miss. */
+async function describeSObjectCached(org: SalesforceOrg, objectName: string): Promise<SObjectDescribe> {
+  const cached = await storage.getCachedSchema(org.orgId, objectName);
+  if (cached) return cached as SObjectDescribe;
+  const result = await apiClientFactory.getClient(org).describeSObject(objectName);
+  const uiSettingsForTtl = await storage.getUiSettings();
+  const ttl = uiSettingsForTtl.schemaCacheTtlMinutes ? uiSettingsForTtl.schemaCacheTtlMinutes * 60 * 1000 : SCHEMA_CACHE_TTL;
+  await storage.setCachedSchema(org.orgId, objectName, result, ttl);
+  return result;
+}
+
+// Queried object per Bulk query job, so each result page costs no extra status call after the first.
+const bulkQueryObjects = new Map<string, string>();
+
 messageBus.on('SF_BULK_QUERY_START', async (message, sender): Promise<MessageResponse> => {
   try {
     const { soql } = message.payload as { soql: string };
@@ -352,7 +367,16 @@ messageBus.on('SF_BULK_QUERY_STATUS', async (message, sender): Promise<MessageRe
 messageBus.on('SF_BULK_QUERY_RESULTS', async (message, sender): Promise<MessageResponse> => {
   try {
     const { jobId, locator, maxRecords } = message.payload as { jobId: string; locator?: string; maxRecords?: number };
-    const page = await bulkServiceFor(await resolveSfOrg(message.payload, sender)).getQueryResults(jobId, locator, maxRecords);
+    const org = await resolveSfOrg(message.payload, sender);
+    const service = bulkServiceFor(org);
+    const page = await service.getQueryResults(jobId, locator, maxRecords);
+    // CSV values are all strings; type them from describe so Bulk exports match REST JSON types (#80).
+    let queriedObject = bulkQueryObjects.get(jobId);
+    if (!queriedObject) {
+      queriedObject = await service.getQueryJobStatus(jobId).then(job => job.object).catch(() => undefined);
+      if (queriedObject) bulkQueryObjects.set(jobId, queriedObject);
+    }
+    page.records = await typeBulkQueryPage(page.records, queriedObject, objectName => describeSObjectCached(org, objectName));
     return { success: true, data: page, requestId: message.requestId };
   } catch (error) {
     return { success: false, error: { code: 'SF_BULK_QUERY_RESULTS_ERROR', message: error instanceof Error ? error.message : 'Bulk query results failed' }, requestId: message.requestId };
@@ -420,17 +444,7 @@ messageBus.on('SF_DESCRIBE_SOBJECT', async (message, sender): Promise<MessageRes
   try {
     const { objectName } = message.payload as { objectName: string };
     const org = await resolveSfOrg(message.payload, sender);
-
-    const cached = await storage.getCachedSchema(org.orgId, objectName);
-    if (cached) {
-      return { success: true, data: cached, requestId: message.requestId };
-    }
-
-    const client = apiClientFactory.getClient(org);
-    const result = await client.describeSObject(objectName);
-    const uiSettingsForTtl = await storage.getUiSettings();
-    const ttl = uiSettingsForTtl.schemaCacheTtlMinutes ? uiSettingsForTtl.schemaCacheTtlMinutes * 60 * 1000 : SCHEMA_CACHE_TTL;
-    await storage.setCachedSchema(org.orgId, objectName, result, ttl);
+    const result = await describeSObjectCached(org, objectName);
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
     return {
@@ -1357,6 +1371,9 @@ async function executeRestPush(
   let failedRecords = 0;
   const errors: Array<{ recordIndex: number; message: string }> = [];
   const successfulIds: string[] = [];
+  // Parallel to successfulIds: the input index of each ID. Batches finish out of order and
+  // upserts that update return no ID, so IDs must never be zipped positionally (#47).
+  const successfulIdIndexes: number[] = [];
   let broadcastedError = false;
   let cancelled = false;
   let checkpointWrite: Promise<void> = Promise.resolve();
@@ -1365,12 +1382,16 @@ async function executeRestPush(
     processed: number;
     failed: number;
     ids: string[];
+    idIndexes: number[];
     errors: Array<{ recordIndex: number; message: string }>;
     batchLevelError?: string;
   }): void => {
     processedRecords += res.processed;
     failedRecords += res.failed;
-    if (res.ids.length) successfulIds.push(...res.ids);
+    if (res.ids.length) {
+      successfulIds.push(...res.ids);
+      successfulIdIndexes.push(...res.idIndexes);
+    }
     if (res.errors.length) errors.push(...res.errors);
 
     const processedCheckpoint = processedRecords;
@@ -1413,6 +1434,7 @@ async function executeRestPush(
               processed: batch.length,
               failed: batch.length,
               ids: [],
+              idIndexes: [],
               errors: batch.map((_, i) => ({ recordIndex: start + i, message: 'Upsert requires externalIdField.' })),
               batchLevelError: 'Upsert requires externalIdField.',
             },
@@ -1437,6 +1459,7 @@ async function executeRestPush(
               processed: batch.length,
               failed: batch.length,
               ids: [],
+              idIndexes: [],
               errors: outErrors,
             },
           };
@@ -1446,8 +1469,12 @@ async function executeRestPush(
         const parsed = parseUpsertCompositeResponse(composite, built.refToRecordIndex);
 
         const ids: string[] = [];
+        const idIndexes: number[] = [];
         for (const s of parsed.successes) {
-          if (s.id) ids.push(s.id);
+          if (s.id) {
+            ids.push(s.id);
+            idIndexes.push(s.recordIndex);
+          }
         }
         for (const f of parsed.failures) outErrors.push({ recordIndex: f.recordIndex, message: f.message });
 
@@ -1457,6 +1484,7 @@ async function executeRestPush(
             processed: batch.length,
             failed: built.skipped.length + parsed.failures.length,
             ids,
+            idIndexes,
             errors: outErrors,
           },
         };
@@ -1478,6 +1506,7 @@ async function executeRestPush(
       }
 
       const ids: string[] = [];
+      const idIndexes: number[] = [];
       const outErrors: Array<{ recordIndex: number; message: string }> = [];
       let failed = 0;
 
@@ -1497,6 +1526,7 @@ async function executeRestPush(
           outErrors.push({ recordIndex, message: result.errors.map(e => e.message).join('; ') });
         } else if (typeof result.id === 'string' && result.id.length > 0) {
           ids.push(result.id);
+          idIndexes.push(recordIndex);
         }
       }
 
@@ -1509,6 +1539,7 @@ async function executeRestPush(
           processed: expected,
           failed,
           ids,
+          idIndexes,
           errors: outErrors,
         },
       };
@@ -1523,6 +1554,7 @@ async function executeRestPush(
           processed: desc.batch.length,
           failed: desc.batch.length,
           ids: [],
+          idIndexes: [],
           errors: desc.batch.map((_, i) => ({ recordIndex: desc.start + i, message: `Batch failed: ${message}` })),
           batchLevelError: message,
         },
@@ -1590,6 +1622,7 @@ async function executeRestPush(
     objectName: payload.objectName,
     operation: payload.operation,
     ids: successfulIds,
+    idRecordIndexes: successfulIdIndexes,
     capturedAt: completedAt,
     failedRecords: failedRecordData.length > 0 ? failedRecordData : undefined,
   };
@@ -1618,6 +1651,8 @@ async function executeRestPush(
     failedRecords,
     status: cancelled ? 'cancelled' : 'complete',
     errors: errors.length > 0 ? errors : undefined,
+    ids: successfulIds,
+    idRecordIndexes: successfulIdIndexes,
   });
   await storage.updateActivePush(pushId, {
     status: cancelled ? 'cancelled' : 'complete',
@@ -1681,6 +1716,8 @@ async function executeBulkPush(
     }, { once: true });
 
     const csvData = bulkApi.recordsToCsv(payload.records);
+    // Fingerprints of the uploaded rows let result rows be mapped back to input indices (#47).
+    const rowIdentity = buildBulkRowIdentity(payload.records);
     await bulkApi.uploadJobData(job.id, csvData);
     await bulkApi.closeJob(job.id);
 
@@ -1699,6 +1736,7 @@ async function executeBulkPush(
         totalRecords: payload.records.length,
         startedAt: ctx.startedAt,
         externalIdField: payload.externalIdField,
+        rowIdentity,
       });
       return;
     } catch {
@@ -1721,18 +1759,10 @@ async function executeBulkPush(
       });
     }, ctx.abortSignal);
 
+    const rowResults = completedJob.state === 'JobComplete'
+      ? await fetchBulkRowResults(bulkApi, job.id, rowIdentity)
+      : { ids: [], idRecordIndexes: [], errors: [] };
     const completedAt = Date.now();
-    const successfulIds: string[] = [];
-    if (completedJob.state === 'JobComplete') {
-      try {
-        const successful = await bulkApi.getSuccessfulResults(job.id);
-        for (const row of successful) {
-          if (typeof row.sf__Id === 'string' && row.sf__Id.length > 0) successfulIds.push(row.sf__Id);
-        }
-      } catch {
-        // Ignore: results endpoint may fail in some orgs/permissions; push itself can still be complete.
-      }
-    }
 
     const historyEntry: PushHistoryEntry = {
       id: pushId,
@@ -1746,6 +1776,7 @@ async function executeBulkPush(
       failureCount: completedJob.numberRecordsFailed,
       startedAt: ctx.startedAt,
       completedAt,
+      errors: rowResults.errors.length > 0 ? rowResults.errors : undefined,
     };
 
     await storage.addPushHistory(historyEntry);
@@ -1755,7 +1786,8 @@ async function executeBulkPush(
       orgId: org.orgId,
       objectName: payload.objectName,
       operation: payload.operation,
-      ids: successfulIds,
+      ids: rowResults.ids,
+      idRecordIndexes: rowResults.idRecordIndexes,
       capturedAt: completedAt,
     };
     await storage.setPushResult(pushResult);
@@ -1766,6 +1798,9 @@ async function executeBulkPush(
       processedRecords: completedJob.numberRecordsProcessed,
       failedRecords: completedJob.numberRecordsFailed,
       status: completedJob.state === 'JobComplete' ? 'complete' : 'error',
+      errors: rowResults.errors.length > 0 ? rowResults.errors : undefined,
+      ids: rowResults.ids,
+      idRecordIndexes: rowResults.idRecordIndexes,
     });
     await storage.updateActivePush(pushId, {
       status: completedJob.state === 'JobComplete' ? 'complete' : 'error',
@@ -1879,14 +1914,10 @@ async function resumeBulkPush(active: ActivePush, org: SalesforceOrg, abortSigna
   }, abortSignal);
   if (completed.state !== 'JobComplete') throw new Error(`Salesforce Bulk job ended in ${completed.state}.`);
 
-  const successfulIds: string[] = [];
-  try {
-    for (const row of await bulkApi.getSuccessfulResults(active.bulkJobId)) {
-      if (row.sf__Id) successfulIds.push(row.sf__Id);
-    }
-  } catch {
-    // Completion remains valid if detailed result rows are unavailable.
-  }
+  // The original records are gone after eviction, so result rows cannot be mapped to input
+  // indices (they report -1), but IDs and failure messages are still surfaced.
+  const rowResults = await fetchBulkRowResults(bulkApi, active.bulkJobId, undefined);
+  const successfulIds = rowResults.ids;
   const completedAt = Date.now();
   const existingHistory = await storage.getPushHistory();
   if (!existingHistory.some(entry => entry.id === active.id)) {
@@ -1901,6 +1932,7 @@ async function resumeBulkPush(active: ActivePush, org: SalesforceOrg, abortSigna
       failureCount: completed.numberRecordsFailed,
       startedAt: active.startedAt,
       completedAt,
+      errors: rowResults.errors.length > 0 ? rowResults.errors : undefined,
     });
   }
   await storage.setPushResult({
@@ -1909,6 +1941,7 @@ async function resumeBulkPush(active: ActivePush, org: SalesforceOrg, abortSigna
     objectName: active.objectName,
     operation: active.operation,
     ids: successfulIds,
+    idRecordIndexes: rowResults.idRecordIndexes,
     capturedAt: completedAt,
   });
   if (active.operation === 'insert' && successfulIds.length > 0) {
@@ -1937,6 +1970,9 @@ async function resumeBulkPush(active: ActivePush, org: SalesforceOrg, abortSigna
     processedRecords: completed.numberRecordsProcessed,
     failedRecords: completed.numberRecordsFailed,
     status: 'complete',
+    errors: rowResults.errors.length > 0 ? rowResults.errors : undefined,
+    ids: successfulIds,
+    idRecordIndexes: rowResults.idRecordIndexes,
   });
 }
 
@@ -2057,6 +2093,7 @@ messageBus.on('DATA_PUSH_RESULT_GET', async (message): Promise<MessageResponse> 
         objectName: result.objectName,
         operation: result.operation,
         ids: result.ids,
+        idRecordIndexes: result.idRecordIndexes,
         capturedAt: result.capturedAt,
         failedRecords: result.failedRecords,
       },
@@ -2261,7 +2298,8 @@ function computeNextRunAt(interval: ScheduleInterval, timeZone?: string, afterMs
     });
     const parts = localFmt.formatToParts(new Date(afterMs));
     const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? 0);
-    let y = get('year'), mo = get('month') - 1, d = get('day');
+    const y = get('year'), mo = get('month') - 1;
+    let d = get('day');
     const h = get('hour'), mi = get('minute'), sec = get('second');
 
     // Advance by N days in the target zone's calendar

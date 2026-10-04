@@ -17,6 +17,7 @@ import type { OffscreenCaptureRequest, OffscreenCaptureResponse } from '../core/
 import type { OffscreenBulkPushRequest, OffscreenBulkPushResponse } from '../core/types/offscreen';
 import type { OffscreenTokenRefreshResponse } from '../core/types/offscreen';
 import { BulkApiService } from '../services/salesforce/bulk-api';
+import { fetchBulkRowResults } from '../services/salesforce/bulk-results';
 import { StorageService } from '../services/storage';
 import { generateId } from '../core/utils';
 import { UNDO_TTL_MS } from '../core/constants';
@@ -82,12 +83,8 @@ export async function runBulkPush(request: OffscreenBulkPushRequest): Promise<vo
       });
     });
     if (completed.state !== 'JobComplete') throw new Error(`Salesforce Bulk job ended in ${completed.state}.`);
-    const ids: string[] = [];
-    try {
-      for (const row of await bulk.getSuccessfulResults(p.jobId)) if (row.sf__Id) ids.push(row.sf__Id);
-    } catch {
-      // Detailed results are optional; the summary remains recoverable.
-    }
+    // Per-row results mapped to input indices (#47); unreadable result files leave the summary intact.
+    const { ids, idRecordIndexes, errors } = await fetchBulkRowResults(bulk, p.jobId, p.rowIdentity);
     const completedAt = Date.now();
     const history = await storage.getPushHistory();
     if (!history.some(entry => entry.id === p.pushId)) {
@@ -97,11 +94,12 @@ export async function runBulkPush(request: OffscreenBulkPushRequest): Promise<vo
         totalRecords: p.totalRecords,
         successCount: completed.numberRecordsProcessed - completed.numberRecordsFailed,
         failureCount: completed.numberRecordsFailed, startedAt: p.startedAt, completedAt,
+        errors: errors.length > 0 ? errors : undefined,
       });
     }
     await storage.setPushResult({
       pushId: p.pushId, orgId: p.orgId, objectName: p.objectName,
-      operation: p.operation, ids, capturedAt: completedAt,
+      operation: p.operation, ids, idRecordIndexes, capturedAt: completedAt,
     });
     if (p.operation === 'insert' && ids.length > 0) {
       await storage.addPushTransaction({
@@ -119,6 +117,7 @@ export async function runBulkPush(request: OffscreenBulkPushRequest): Promise<vo
       pushId: p.pushId, totalRecords: p.totalRecords,
       processedRecords: completed.numberRecordsProcessed,
       failedRecords: completed.numberRecordsFailed, status: 'complete',
+      errors: errors.length > 0 ? errors : undefined, ids, idRecordIndexes,
     });
   }
 

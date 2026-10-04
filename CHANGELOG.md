@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-04
+
+The trust release: every defect from the 2026-08-31 audit (#40–#106) is fixed,
+the CI gates are green again, and the write paths are re-validated against a
+real development org.
+
+### Fixed — imports and other writes
+- **The file you review is the file that's pushed** — loading a new file on Import no longer pushes a previously cleansed dataset (#44), and changing the dataset resets mapping, validation, and stage progress so stale mapped rows can't be re-pushed (#51).
+- **Retry keeps your mappings** — Retry Failed Rows restores the manual mappings used for the original push instead of re-running automap (#51).
+- **Per-row results everywhere** — Bulk pushes report per-row errors and record IDs mapped back to the input rows; REST results carry their input index, so out-of-order batches and 204 upserts no longer shift IDs (#47). Rows dropped at mapping no longer shift error-file rows or make Retry re-send successful rows (#46), and now appear in the error file with their mapping error.
+- **Bulk import keeps every column** — the CSV header is the union of all records' fields, explicit blanks clear fields with `#N/A`, and values are sent verbatim (no spreadsheet-guard apostrophes on `-`, `+`, `@` values) (#45).
+- **Production typed confirmation on every route** — Advanced → Data Push now gets the same production gate and warnings as Import (#48).
+- **Relationship lookups validate** — external-ID and related-field lookups pass validation, and the match field is checked against the referenced object's describe (#50).
+- **Compare sync updates instead of duplicating** — Changed records are updated by target Id; only Added records are inserted (#52).
+- **Undo, Copy between orgs, and Clone** — undo targets the right org (#42); Copy between orgs writes to the target org, builds its ID map, and no longer stalls on all-failed pushes (#43); clone and migration pair IDs with source rows by result index, not position (#49, #90).
+- **No duplicate inserts from lost responses** — network errors on non-idempotent writes are no longer retried (#83).
+- Dates no longer shift a day in UTC+ time zones (#53); Bulk error CSVs are parsed properly (#97); aggregates no longer produce silent `NaN` (#102); pipeline joins keep colliding right-side fields (#92).
+
+### Fixed — schedules and long-running jobs
+- Schedules keep their alarms across service-worker restarts, honour the selected time zone, and no longer revert edits or resurrect deleted schedules (#54, #55, #62).
+- Snapshot writes report quota failures instead of recording success; the storage quota guard no longer blocks or recurses on writes; terminal checkpoints are pruned (#56, #63, #94, #99).
+- Bulk jobs: no false "interrupted" or 10-minute-timeout failures, cancel works after restarts, no duplicate history rows, and tokens refresh mid-job (#57–#61).
+
+### Fixed — security and export fidelity
+- Session tokens are no longer persisted to `chrome.storage.local`, are not broadcast to every UI surface, and the REST explorer only sends the token to the org's own origin (#64, #65, #67). Privileged message handlers check the sender (#68).
+- CSV and Excel exports neutralise spreadsheet formulas in text cells without turning real negative numbers into text (#66).
+- Exports keep every column (no 14-column truncation, no 50-row sampling), drop nested `attributes`, write a UTF-8 BOM for Excel, and surface export failures (#69, #70, #72, #73, #79).
+- Bulk exports type values from field metadata, matching REST — without corrupting leading-zero text, long IDs, or text that looks like `true` (#80).
+- Snapshots, Compare, Convert, Saved Jobs, Activity, and SOQL escaping fixes (#71, #74–#78, #81, #82, #91, #93).
+
+### Changed
+- **Store listing** — new name ("WaveLink — Salesforce SOQL Export & Data Import Tool") and summary; permission declarations match the manifest (`unlimitedStorage` added, `activeTab` removed).
+- The global Ctrl+Z shortcut no longer hijacks text-field undo, and the legacy tutorial no longer auto-opens (#84, #85). Accessibility attributes added across 34 components (#103).
+- Upgraded Jest to 30 and typescript-eslint to 8, clearing all dependency audit advisories.
+- `npm run validate:salesforce` now also checks Bulk per-row identity, ragged columns, blank-means-clear, verbatim values, and Bulk-vs-REST value types.
+
 ## [0.6.0] — 2026-08-31
 
 ### Added
@@ -83,6 +119,7 @@ in and out of Salesforce right from your browser, with nothing leaving your devi
 
 - Initial release.
 
+[0.7.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.6.0
 [0.2.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.1.0

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Reusable skeleton placeholder component for loading states.
  *
  * Replaces plain "Loading..." text with animated shimmer placeholders

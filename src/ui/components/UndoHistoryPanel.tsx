@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Fixed bottom-right overlay panel for viewing and undoing push transactions.
  *
  * What this file does:

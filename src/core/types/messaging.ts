@@ -173,7 +173,12 @@ export interface DataPushProgressPayload {
   processedRecords?: number;
   failedRecords?: number;
   status?: 'processing' | 'complete' | 'error' | 'cancelled';
+  /** Per-row failures; `recordIndex` is the position in the pushed `records` array (-1 = unidentified row). */
   errors?: Array<{ recordIndex: number; message: string }>;
+  /** Record IDs returned by Salesforce on completion. */
+  ids?: string[];
+  /** `idRecordIndexes[i]` is the pushed-record index that produced `ids[i]` (-1 = unidentified row). */
+  idRecordIndexes?: number[];
   /** Single error message for DATA_PUSH_ERROR broadcasts. */
   error?: string;
 }
@@ -195,6 +200,8 @@ export interface DataPushResultGetResponse {
   objectName: string;
   operation: 'insert' | 'update' | 'upsert' | 'delete';
   ids: string[];
+  /** `idRecordIndexes[i]` is the input record index that produced `ids[i]` (-1 = unidentified row). */
+  idRecordIndexes?: number[];
   capturedAt: number;
   /** Per-record failure metadata; indices correspond to input record positions. */
   failedRecords?: Array<{ index: number; record: Record<string, unknown>; error: string }>;
@@ -553,6 +560,7 @@ export interface PayloadMap {
   MIGRATION_REPORTS_GET: MigrationReportGetPayload;
   MIGRATION_REPORTS_SAVE: MigrationReportSavePayload;
   MIGRATION_REPORTS_DELETE: MigrationReportDeletePayload;
+  OFFSCREEN_TOKEN_REFRESH: { orgId?: string; instanceUrl?: string };
 }
 
 /** Base message shape — payload type is derived from the message type via PayloadMap. */

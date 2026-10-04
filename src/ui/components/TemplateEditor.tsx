@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Form component for creating or editing a DataTemplate.
  *
  * Provides text inputs for name, description, objectName, and category,

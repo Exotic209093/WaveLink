@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Data mapping and transformation engine.
  * Maps source data fields to Salesforce target fields with transformations.
  *
@@ -14,6 +14,12 @@ import type { SObjectField } from '../../core/types/salesforce';
 
 export interface MappingResult {
   mappedRecords: Record<string, unknown>[];
+  /**
+   * `sourceIndexes[i]` is the source-record index that produced `mappedRecords[i]`. Rows with
+   * mapping errors are dropped, so push results (indexed by mapped position) must be translated
+   * through this before they are applied to source rows (#46).
+   */
+  sourceIndexes: number[];
   errors: MappingError[];
 }
 
@@ -34,7 +40,7 @@ export type MappingMatchKind =
 
 /** A scored suggestion linking one source header to one Salesforce field. */
 export interface MappingSuggestion extends FieldMapping {
-  /** 0â€“1 confidence. 1 = exact API-name match, lower = looser/fuzzy. */
+  /** 0–1 confidence. 1 = exact API-name match, lower = looser/fuzzy. */
   confidence: number;
   /** What the match was based on (for surfacing "auto" vs "guess" in the UI). */
   matchedOn: MappingMatchKind;
@@ -103,6 +109,7 @@ export class DataMapper {
   ): MappingResult {
     // Time: O(N*M). Data: returns mappedRecords (good) + errors (per-record/per-field).
     const mappedRecords: Record<string, unknown>[] = [];
+    const sourceIndexes: number[] = [];
     const errors: MappingError[] = [];
 
     for (let i = 0; i < sourceRecords.length; i++) {
@@ -153,10 +160,11 @@ export class DataMapper {
 
       if (!hasError) {
         mappedRecords.push(mapped);
+        sourceIndexes.push(i);
       }
     }
 
-    return { mappedRecords, errors };
+    return { mappedRecords, sourceIndexes, errors };
   }
 
   /**
@@ -219,7 +227,7 @@ export class DataMapper {
   /**
    * Auto-generate field mappings by matching source field names to Salesforce
    * field names and labels. Conservative: only high-confidence matches (exact
-   * or normalized on name/label) are returned â€” fuzzy guesses are excluded.
+   * or normalized on name/label) are returned — fuzzy guesses are excluded.
    */
   autoMapFields(
     sourceFields: string[],

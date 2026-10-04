@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Keyboard shortcut editor component.
  *
  * Displays a table of all registered shortcuts with their default and current

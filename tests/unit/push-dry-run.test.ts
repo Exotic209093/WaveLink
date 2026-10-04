@@ -110,3 +110,27 @@ describe('simulatePush', () => {
     expect(lines[2]).toMatch(/^2,error,/);
   });
 });
+
+describe('simulatePush relationship lookups (#50)', () => {
+  const contactFields: SObjectField[] = [
+    field({ name: 'LastName', type: 'string', length: 80 }),
+    field({ name: 'AccountId', type: 'reference', referenceTo: ['Account'], relationshipName: 'Account' }),
+  ];
+  const relatedFields = {
+    Account: [
+      field({ name: 'Legacy_Code__c', type: 'string' }),
+      field({ name: 'Account_Key__c', type: 'string', externalId: true }),
+    ],
+  };
+
+  it('fails rows whose lookup matches on a non-External ID field of the referenced object', () => {
+    const report = simulatePush([{ LastName: 'Doe', Account: { Legacy_Code__c: 'A-1' } }], contactFields, 'insert', { relatedFields });
+    expect(report.failed).toBe(1);
+    expect(report.rows[0].reasons.join(' ')).toMatch(/not an External ID or idLookup field/);
+  });
+
+  it('passes rows whose lookup matches on an External ID field', () => {
+    const report = simulatePush([{ LastName: 'Doe', Account: { Account_Key__c: 'A-1' } }], contactFields, 'insert', { relatedFields });
+    expect(report.failed).toBe(0);
+  });
+});

@@ -1,4 +1,4 @@
-﻿import { h } from 'preact';
+import { h } from 'preact';
 import type { VNode } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';

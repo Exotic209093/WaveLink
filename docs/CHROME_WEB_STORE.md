@@ -1,6 +1,6 @@
 # Chrome Web Store release kit
 
-This file is the source of truth for the WaveLink 0.6.0 listing and privacy declarations. Copy text exactly unless the Chrome Web Store dashboard requires a shorter value.
+This file is the source of truth for the WaveLink 0.7.0 listing and privacy declarations. Copy text exactly unless the Chrome Web Store dashboard requires a shorter value.
 
 ## Dashboard and public links
 
@@ -18,49 +18,59 @@ npm run assets:store
 npm run package
 ```
 
-Upload `wavelink-0.6.0.zip`. The package contains the compiled Manifest V3 extension, icons, and bundled privacy page; it excludes source, tests, and build-only files.
+Upload `wavelink-0.7.0.zip`. The package contains the compiled Manifest V3 extension, icons, and bundled privacy page; it excludes source, tests, and build-only files.
 
 ## Store listing
 
 ### Product name
 
-> WaveLink — Salesforce Data Export & Import
+> WaveLink — Salesforce SOQL Export & Data Import Tool
 
-The product name comes from `public/manifest.json` and is 42 characters.
+The product name comes from `public/manifest.json` and is 52 characters (limit 75).
 
 ### Summary
 
-> Safely export, import, compare, schedule, and repeat Salesforce data jobs—directly from your browser.
+> Export Salesforce data with SOQL to CSV, Excel, JSON or XML right in Chrome. No Java, no install, no server. Free and open source.
 
-The summary comes from `public/manifest.json` and is 101 characters, below Chrome's 132-character limit.
+The summary comes from `public/manifest.json` and is 130 characters, below Chrome's 132-character limit.
 
 ### Detailed description
 
-> Move data in and out of your org with confidence.
+> Get Salesforce data out in seconds — straight from the browser tab you're already logged into.
 >
-> WaveLink is a local-first data workspace for administrators, developers, and consultants. Query and export records, validate imports before they run, compare snapshots, schedule recurring exports, and replay saved jobs—all without sending customer data to a WaveLink server.
+> WaveLink is a free, open-source data workspace for Salesforce admins, developers, and consultants. Write or build a SOQL query, preview the records, pick your columns, and download CSV, Excel, JSON, or XML. No Java runtime, no desktop Data Loader install, no third-party server holding your data.
 >
-> WHAT YOU CAN DO
+> EXPORT
 >
-> • Export with SOQL through REST or Bulk API 2.0
-> • Download CSV, JSON, Excel, or XML with only the columns you choose
-> • Import CSV, JSON, and XLSX through a guided mapping and validation flow
-> • Preview impact with dry runs, production warnings, and typed confirmation
-> • Retry failed rows, download results, and undo supported inserts
-> • Save reusable jobs and schedule local snapshots
-> • Compare files, snapshots, or connected orgs
-> • Copy a reviewed single-object dataset between connected orgs
-> • Inspect objects, records, API usage, and schemas in Advanced tools
+> • SOQL editor with autocomplete, plus a visual query builder for fields, filters, GROUP BY, and aggregates
+> • REST for quick queries, Bulk API 2.0 for large objects — with progress and cancel
+> • CSV, Excel (XLSX), JSON, or XML with only the columns you choose
+> • Save queries as reusable jobs and re-run them in one click
 >
-> BUILT FOR SAFER DATA WORK
+> SNAPSHOTS AND COMPARE
 >
-> The target org, environment, operation, and record count remain visible before a write. Bulk jobs keep resumable checkpoints, and unified activity history makes results and eligible recovery actions easy to find.
+> • Schedule recurring local snapshots of key objects
+> • Compare two files, two snapshots, or two connected orgs field-by-field
 >
-> LOCAL-FIRST PRIVACY
+> IMPORT
 >
-> WaveLink has no analytics, telemetry, advertising, or developer-operated backend. Data is stored in your browser and exchanged only with Salesforce domains selected by you. Uploaded records, query results, snapshots, job history, account details, and authentication information are handled only to provide the features you request. See the privacy policy for complete handling and deletion details.
+> • Guided CSV, JSON, and Excel import with field mapping, validation, and dry runs
+> • Production warnings and typed confirmation before writes
 >
-> Requires an active Salesforce browser session. WaveLink is independent and is not affiliated with or endorsed by Salesforce, Inc.
+> ADVANCED
+>
+> • Record Inspector, object and field browser, REST/Tooling API explorer, anonymous Apex, and API usage
+>
+> PRIVATE BY DESIGN
+>
+> WaveLink has no analytics, telemetry, advertising, or WaveLink backend. Your records stay in your browser and are exchanged only with the Salesforce orgs you select. Source code: https://github.com/Exotic209093/WaveLink
+>
+> Uses your existing Salesforce browser session. WaveLink is independent and is not affiliated with or endorsed by Salesforce, Inc.
+
+### Localised listing
+
+Add **Español** in the dashboard with the Spanish summary and description in
+[`launch-kit.md`](launch-kit.md#spanish-listing-store-listing--add-language--español).
 
 ### Category and language
 
@@ -69,15 +79,15 @@ The summary comes from `public/manifest.json` and is 101 characters, below Chrom
 
 ### Release notes
 
-> WaveLink 0.6.0 is a major workflow, safety, and reliability update:
+> WaveLink 0.7.0 is the "data you can trust" release — every known data-corruption, automation, and security defect from the August audit is fixed:
 >
-> • New task-first interface and seven-stage Guided Import
-> • Unified Saved Jobs, Schedules, Snapshots, and Activity
-> • Bulk API 2.0 query support and resumable job checkpoints
-> • CSV, JSON, Excel, and XML exports with selected-column support
-> • Production typed confirmation and clearer org context
-> • Improved accessibility, performance budgets, and package security
-> • A focused, single-object Copy flow replaces the former migration suite
+> • Imports push exactly the file and rows you reviewed; retry and error files target the right rows
+> • Bulk imports keep every column, clear fields correctly, and report per-row results
+> • Production typed confirmation on every write route; relationship lookups validate
+> • Undo, Copy between orgs, and Compare sync work correctly (no duplicates)
+> • Schedules survive browser restarts and fire on time in your time zone
+> • Session tokens no longer stored at rest; exports neutralise spreadsheet formulas
+> • Exports keep every column, non-ASCII text, and REST-consistent value types
 
 If no release-notes field is shown, keep this text for the submission notes rather than appending it to the permanent description.
 
@@ -88,15 +98,15 @@ Upload in this order:
 | Order | File | Dimensions | Purpose |
 |---:|---|---:|---|
 | Icon | `public/icons/icon-128.png` | 128×128 | Store and install icon |
-| 1 | `screenshots/screenshot-01-home.png` | 1280×800 | Connected Home workspace |
-| 2 | `screenshots/screenshot-02-export.png` | 1280×800 | SOQL export and results |
-| 3 | `screenshots/screenshot-03-import-review.png` | 1280×800 | Production-aware import review |
-| 4 | `screenshots/screenshot-04-compare.png` | 1280×800 | Compare workspace |
-| 5 | `screenshots/screenshot-05-activity.png` | 1280×800 | Jobs and activity history |
+| 1 | `screenshots/screenshot-02-export.png` | 1280×800 | SOQL export and results |
+| 2 | `screenshots/screenshot-01-home.png` | 1280×800 | Connected Home workspace |
+| 3 | `screenshots/screenshot-04-compare.png` | 1280×800 | Compare workspace |
+| 4 | `screenshots/screenshot-05-activity.png` | 1280×800 | Jobs and activity history |
+| 5 | `screenshots/screenshot-03-import-review.png` | 1280×800 | Production-aware import review |
 | Small promo | `screenshots/promo-small-440x280.png` | 440×280 | Required promotional tile |
 | Marquee promo | `screenshots/promo-marquee-1400x560.png` | 1400×560 | Optional large promotional tile |
 
-All screenshots are captures of v0.6.0 at the required dimensions. Organisation, user, and record identifiers are redacted. Regenerate promotional graphics with `npm run assets:store`.
+All screenshots are captures of v0.6.0 at the required dimensions; the 0.7.0 changes are fixes with no visible layout change on these screens. Organisation, user, and record identifiers are redacted. Regenerate promotional graphics with `npm run assets:store`.
 
 ## Privacy practices
 
@@ -108,15 +118,15 @@ All screenshots are captures of v0.6.0 at the required dimensions. Organisation,
 
 **storage**
 
-> Saves selected Salesforce org connections and authentication information, queries, mappings, reusable jobs, schedules, snapshots, results, activity history, checkpoints, undo information, and preferences in Chrome extension storage. This keeps the workspace available across extension sessions without a WaveLink backend.
+> Saves selected Salesforce org connections (without access tokens, which are kept only in memory-backed session storage), queries, mappings, reusable jobs, schedules, snapshots, results, activity history, checkpoints, undo information, and preferences in Chrome extension storage. This keeps the workspace available across extension sessions without a WaveLink backend.
 
 **cookies**
 
 > Reads the Salesforce `sid` session cookie from supported Salesforce domains so the user can connect an already authenticated org and make requested API calls. WaveLink does not read cookies from unrelated domains.
 
-**activeTab**
+**unlimitedStorage**
 
-> Identifies the Salesforce context in the tab where the user invokes WaveLink. It is not used to inspect unrelated page content.
+> Lets locally retained snapshots, job checkpoints, and result files exceed Chrome's default 10 MB extension-storage quota so scheduled snapshots and large jobs are not silently truncated. All of this data stays on the user's device and can be purged from Settings.
 
 **tabs**
 
@@ -174,14 +184,14 @@ The repository must be pushed before saving this URL so reviewers can reach the 
 
 ## Final submission checklist
 
-- [ ] Push the v0.6.0 code and public privacy policy to `main`.
+- [ ] Push the v0.7.0 code and public privacy policy to `main`.
 - [ ] Confirm the privacy-policy URL loads while signed out of GitHub.
-- [ ] Upload `wavelink-0.6.0.zip` and confirm version 0.6.0 is detected.
+- [ ] Upload `wavelink-0.7.0.zip` and confirm version 0.7.0 is detected.
 - [ ] Replace the description with the text in this file.
 - [ ] Upload all five screenshots in the documented order.
 - [ ] Upload the icon and promotional tiles.
 - [ ] Verify category, language, homepage, support URL, and privacy URL.
 - [ ] Reconfirm every permission and data-use declaration against the uploaded package.
-- [ ] Add the v0.6.0 release notes where the dashboard permits.
+- [ ] Add the v0.7.0 release notes where the dashboard permits.
 - [ ] Preview the public listing at desktop width and check every image crop.
 - [ ] Save the draft, review the dashboard's warnings, and submit only after a final joint check.

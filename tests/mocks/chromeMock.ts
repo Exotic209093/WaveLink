@@ -9,6 +9,14 @@ const storageMock: Record<string, Record<string, unknown>> = {
   session: {},
 };
 
+/**
+ * chrome.storage serialises values, so every get() returns a fresh copy. Returning the stored
+ * reference would let callers mutate "storage" without calling set(), hiding read-modify-write bugs.
+ */
+function cloneStored<T>(value: T): T {
+  return value === undefined ? value : JSON.parse(JSON.stringify(value)) as T;
+}
+
 const cookiesMock: Array<{ name: string; value: string; domain: string }> = [];
 
 const chrome = {
@@ -27,7 +35,17 @@ const chrome = {
     },
     lastError: null as chrome.runtime.LastError | null,
     getURL: jest.fn((path: string) => `chrome-extension://mock-id/${path}`),
+    getManifest: jest.fn(() => ({ manifest_version: 3, permissions: ['storage', 'unlimitedStorage'] })),
     id: 'mock-extension-id',
+  },
+  commands: {
+    onCommand: { addListener: jest.fn() },
+  },
+  alarms: {
+    get: jest.fn(() => Promise.resolve(undefined)),
+    create: jest.fn(() => Promise.resolve()),
+    clear: jest.fn(() => Promise.resolve(true)),
+    onAlarm: { addListener: jest.fn() },
   },
   identity: {
     launchWebAuthFlow: jest.fn(
@@ -44,7 +62,7 @@ const chrome = {
         const keyArray = Array.isArray(keys) ? keys : [keys];
         for (const key of keyArray) {
           if (key in storageMock.local) {
-            result[key] = storageMock.local[key];
+            result[key] = cloneStored(storageMock.local[key]);
           }
         }
         callback?.(result);
@@ -66,6 +84,7 @@ const chrome = {
         storageMock.local = {};
         return Promise.resolve();
       }),
+      getBytesInUse: jest.fn(() => Promise.resolve(JSON.stringify(storageMock.local).length)),
     },
     session: {
       get: jest.fn((keys: string | string[], callback?: (result: Record<string, unknown>) => void) => {
@@ -73,7 +92,7 @@ const chrome = {
         const keyArray = Array.isArray(keys) ? keys : [keys];
         for (const key of keyArray) {
           if (key in storageMock.session) {
-            result[key] = storageMock.session[key];
+            result[key] = cloneStored(storageMock.session[key]);
           }
         }
         callback?.(result);
