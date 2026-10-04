@@ -9,6 +9,14 @@ const storageMock: Record<string, Record<string, unknown>> = {
   session: {},
 };
 
+/**
+ * chrome.storage serialises values, so every get() returns a fresh copy. Returning the stored
+ * reference would let callers mutate "storage" without calling set(), hiding read-modify-write bugs.
+ */
+function cloneStored<T>(value: T): T {
+  return value === undefined ? value : JSON.parse(JSON.stringify(value)) as T;
+}
+
 const cookiesMock: Array<{ name: string; value: string; domain: string }> = [];
 
 const chrome = {
@@ -54,7 +62,7 @@ const chrome = {
         const keyArray = Array.isArray(keys) ? keys : [keys];
         for (const key of keyArray) {
           if (key in storageMock.local) {
-            result[key] = storageMock.local[key];
+            result[key] = cloneStored(storageMock.local[key]);
           }
         }
         callback?.(result);
@@ -84,7 +92,7 @@ const chrome = {
         const keyArray = Array.isArray(keys) ? keys : [keys];
         for (const key of keyArray) {
           if (key in storageMock.session) {
-            result[key] = storageMock.session[key];
+            result[key] = cloneStored(storageMock.session[key]);
           }
         }
         callback?.(result);

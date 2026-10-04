@@ -21,7 +21,6 @@
 import { MessageBus } from '../services/messaging';
 import { StorageService } from '../services/storage';
 import { SalesforceAuth } from '../services/salesforce/auth';
-import { SalesforceApiClient } from '../services/salesforce/api-client';
 import { ApiClientFactory } from '../services/salesforce/api-client-factory';
 import { BulkApiService } from '../services/salesforce/bulk-api';
 import { buildBulkRowIdentity, fetchBulkRowResults } from '../services/salesforce/bulk-results';
@@ -2285,7 +2284,8 @@ function computeNextRunAt(interval: ScheduleInterval, timeZone?: string, afterMs
     });
     const parts = localFmt.formatToParts(new Date(afterMs));
     const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? 0);
-    let y = get('year'), mo = get('month') - 1, d = get('day');
+    const y = get('year'), mo = get('month') - 1;
+    let d = get('day');
     const h = get('hour'), mi = get('minute'), sec = get('second');
 
     // Advance by N days in the target zone's calendar
