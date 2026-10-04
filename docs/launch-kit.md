@@ -116,7 +116,7 @@ unlisted YouTube upload and paste the URL into the listing's video field.
 >
 > WaveLink es independiente y no está afiliado ni respaldado por Salesforce, Inc.
 
-Have a native speaker skim this before publishing; it is written in neutral Latin American Spanish.
+The Spanish name and summary ship in `public/_locales/es/messages.json` (v0.7.1+); paste only the description in the dashboard. Have a native speaker skim it before publishing; it is written in neutral Latin American Spanish.
 
 ## Tracked links
 

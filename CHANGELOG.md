@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-10-04
+
+### Added
+- **Spanish store listing and extension name** — the extension name, summary, and shortcut description are now localised through `_locales` (English default, Spanish), so Chrome shows them in Spanish for Spanish-language browsers and the Chrome Web Store accepts a Spanish listing. The in-app interface remains in English.
+- The package smoke check verifies every `__MSG_*__` placeholder resolves in every locale and that each locale's name and summary fit the store's 75- and 132-character limits.
+
 ## [0.7.0] — 2026-10-04
 
 The trust release: every defect from the 2026-08-31 audit (#40–#106) is fixed,
@@ -119,6 +125,7 @@ in and out of Salesforce right from your browser, with nothing leaving your devi
 
 - Initial release.
 
+[0.7.1]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.1
 [0.7.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.6.0
 [0.2.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.2.0

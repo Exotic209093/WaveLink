@@ -1,6 +1,6 @@
 # Chrome Web Store release kit
 
-This file is the source of truth for the WaveLink 0.7.0 listing and privacy declarations. Copy text exactly unless the Chrome Web Store dashboard requires a shorter value.
+This file is the source of truth for the WaveLink 0.7.1 listing and privacy declarations. Copy text exactly unless the Chrome Web Store dashboard requires a shorter value.
 
 ## Dashboard and public links
 
@@ -18,7 +18,7 @@ npm run assets:store
 npm run package
 ```
 
-Upload `wavelink-0.7.0.zip`. The package contains the compiled Manifest V3 extension, icons, and bundled privacy page; it excludes source, tests, and build-only files.
+Upload `wavelink-0.7.1.zip`. The package contains the compiled Manifest V3 extension, icons, and bundled privacy page; it excludes source, tests, and build-only files.
 
 ## Store listing
 
@@ -26,13 +26,13 @@ Upload `wavelink-0.7.0.zip`. The package contains the compiled Manifest V3 exten
 
 > WaveLink — Salesforce SOQL Export & Data Import Tool
 
-The product name comes from `public/manifest.json` and is 52 characters (limit 75).
+The product name comes from `public/_locales/en/messages.json` (`extName`) and is 52 characters (limit 75).
 
 ### Summary
 
 > Export Salesforce data with SOQL to CSV, Excel, JSON or XML right in Chrome. No Java, no install, no server. Free and open source.
 
-The summary comes from `public/manifest.json` and is 130 characters, below Chrome's 132-character limit.
+The summary comes from `public/_locales/en/messages.json` (`extDescription`) and is 130 characters, below Chrome's 132-character limit.
 
 ### Detailed description
 
@@ -67,10 +67,18 @@ The summary comes from `public/manifest.json` and is 130 characters, below Chrom
 >
 > Uses your existing Salesforce browser session. WaveLink is independent and is not affiliated with or endorsed by Salesforce, Inc.
 
-### Localised listing
+### Localised listing (Español)
 
-Add **Español** in the dashboard with the Spanish summary and description in
+The package ships `_locales/en` (default) and `_locales/es`. The Spanish name
+and summary come from `public/_locales/es/messages.json` automatically:
+
+- Name: **WaveLink — Exporta e importa datos de Salesforce con SOQL** (57 characters)
+- Summary: **Exporta datos de Salesforce con SOQL a CSV, Excel, JSON o XML desde Chrome. Sin Java ni instalaciones. Gratis y de código abierto.** (130 characters)
+
+In the dashboard, switch the Store listing language to **Spanish** and paste the
+Spanish description from
 [`launch-kit.md`](launch-kit.md#spanish-listing-store-listing--add-language--español).
+Screenshots may reuse the English set.
 
 ### Category and language
 
@@ -184,9 +192,9 @@ The repository must be pushed before saving this URL so reviewers can reach the 
 
 ## Final submission checklist
 
-- [ ] Push the v0.7.0 code and public privacy policy to `main`.
+- [ ] Push the v0.7.1 code and public privacy policy to `main`.
 - [ ] Confirm the privacy-policy URL loads while signed out of GitHub.
-- [ ] Upload `wavelink-0.7.0.zip` and confirm version 0.7.0 is detected.
+- [ ] Upload `wavelink-0.7.1.zip` and confirm version 0.7.1 is detected.
 - [ ] Replace the description with the text in this file.
 - [ ] Upload all five screenshots in the documented order.
 - [ ] Upload the icon and promotional tiles.

@@ -42,6 +42,24 @@ for (const script of manifest.content_scripts || []) {
   for (const source of script.js || []) requireFile(source);
 }
 
+// Every __MSG_*__ placeholder must resolve in every shipped locale, within the store's length limits.
+const placeholders = [...JSON.stringify(manifest).matchAll(/__MSG_(\w+)__/g)].map(match => match[1]);
+if (placeholders.length > 0) {
+  if (!manifest.default_locale) fail('manifest uses __MSG_ placeholders without default_locale');
+  requireFile(`_locales/${manifest.default_locale}/messages.json`);
+  const localesDir = path.join(dist, '_locales');
+  for (const locale of fs.readdirSync(localesDir)) {
+    const messages = JSON.parse(fs.readFileSync(path.join(localesDir, locale, 'messages.json'), 'utf8'));
+    for (const key of placeholders) {
+      if (!messages[key]?.message) fail(`_locales/${locale} is missing "${key}"`);
+    }
+    const name = messages.extName?.message ?? '';
+    const description = messages.extDescription?.message ?? '';
+    if (name.length > 75) fail(`_locales/${locale} extName is ${name.length} characters (max 75)`);
+    if (description.length > 132) fail(`_locales/${locale} extDescription is ${description.length} characters (max 132)`);
+  }
+}
+
 for (const required of ['app/app.html', 'app/index.js', 'offscreen/offscreen.html', 'offscreen/index.js']) {
   requireFile(required);
 }

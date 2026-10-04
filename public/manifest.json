@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "WaveLink — Salesforce SOQL Export & Data Import Tool",
-  "version": "0.7.0",
-  "description": "Export Salesforce data with SOQL to CSV, Excel, JSON or XML right in Chrome. No Java, no install, no server. Free and open source.",
+  "name": "__MSG_extName__",
+  "default_locale": "en",
+  "version": "0.7.1",
+  "description": "__MSG_extDescription__",
   "homepage_url": "https://github.com/Exotic209093/WaveLink",
   "permissions": [
     "storage",
@@ -50,7 +51,7 @@
         "default": "Ctrl+Shift+L",
         "mac": "Command+Shift+L"
       },
-      "description": "Toggle WaveLink panel"
+      "description": "__MSG_commandTogglePanel__"
     }
   },
   "icons": {
