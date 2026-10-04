@@ -1,0 +1,11 @@
+{
+  "extName": {
+    "message": "WaveLink — Salesforce SOQL 내보내기 및 데이터 가져오기 도구"
+  },
+  "extDescription": {
+    "message": "SOQL로 Salesforce 데이터를 Chrome에서 바로 CSV, Excel, JSON, XML로 내보내세요. Java도 설치도 필요 없습니다. 무료 오픈 소스."
+  },
+  "commandTogglePanel": {
+    "message": "WaveLink 패널 표시/숨기기"
+  }
+}

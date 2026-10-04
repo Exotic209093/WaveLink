@@ -1,0 +1,11 @@
+{
+  "extName": {
+    "message": "WaveLink — Salesforce SOQL-export en data-importtool"
+  },
+  "extDescription": {
+    "message": "Exporteer Salesforce-gegevens met SOQL naar CSV, Excel, JSON of XML in Chrome. Geen Java, geen installatie. Gratis en open source."
+  },
+  "commandTogglePanel": {
+    "message": "WaveLink-paneel tonen of verbergen"
+  }
+}
