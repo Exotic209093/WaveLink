@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Card component for displaying a saved data template.
  *
  * Renders the template name, object badge, category, usage count,

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Configuration form panel for a single pipeline step.
  *
  * What this file does:

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Data mapping and transformation engine.
  * Maps source data fields to Salesforce target fields with transformations.
  *
@@ -40,7 +40,7 @@ export type MappingMatchKind =
 
 /** A scored suggestion linking one source header to one Salesforce field. */
 export interface MappingSuggestion extends FieldMapping {
-  /** 0â€“1 confidence. 1 = exact API-name match, lower = looser/fuzzy. */
+  /** 0–1 confidence. 1 = exact API-name match, lower = looser/fuzzy. */
   confidence: number;
   /** What the match was based on (for surfacing "auto" vs "guess" in the UI). */
   matchedOn: MappingMatchKind;
@@ -227,7 +227,7 @@ export class DataMapper {
   /**
    * Auto-generate field mappings by matching source field names to Salesforce
    * field names and labels. Conservative: only high-confidence matches (exact
-   * or normalized on name/label) are returned â€” fuzzy guesses are excluded.
+   * or normalized on name/label) are returned — fuzzy guesses are excluded.
    */
   autoMapFields(
     sourceFields: string[],

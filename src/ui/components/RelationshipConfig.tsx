@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Configuration component for lookup relationship fields.
  *
  * Provides a textarea for entering lookup record IDs (one per line)
