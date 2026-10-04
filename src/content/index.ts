@@ -136,8 +136,7 @@ async function reportOrgDetection(): Promise<void> {
 
   try {
     await messageBus.send('ORG_DETECT', orgInfo);
-  } catch (error) {
-    // Background may not be ready yet, fail silently
+  } catch {
     // Background may not be ready yet; ignore silently
   }
 }
