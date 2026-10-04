@@ -18,10 +18,11 @@ function neutralizeFormulaInjection(s: string): string {
 
 function escapeCsvValue(value: unknown): string {
   if (value === null || value === undefined) return '';
-// Serialize objects/arrays to JSON to avoid "[object Object]" in output,
-  // then neutralize formula-injection payloads on the resulting string.
-  const raw = typeof value === 'object' ? JSON.stringify(value) : String(value);
-  const s = neutralizeFormulaInjection(raw);
+  // Only string cells are guarded, as in the Excel exporter: a genuine number such as -5 must stay
+  // numeric rather than become the text '-5. Objects/arrays serialize to JSON (avoids "[object Object]").
+  const s = typeof value === 'string'
+    ? neutralizeFormulaInjection(value)
+    : typeof value === 'object' ? JSON.stringify(value) : String(value);
   if (/[",\n\r]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }

@@ -24,6 +24,7 @@ import { SalesforceAuth } from '../services/salesforce/auth';
 import { ApiClientFactory } from '../services/salesforce/api-client-factory';
 import { BulkApiService } from '../services/salesforce/bulk-api';
 import { buildBulkRowIdentity, fetchBulkRowResults } from '../services/salesforce/bulk-results';
+import { typeBulkQueryPage } from '../services/salesforce/bulk-query-typing';
 import { queryAllRecords, deriveColumns } from '../services/salesforce/queryAll';
 import { captureViaOffscreen, runBulkPushViaOffscreen } from './offscreen';
 import { buildUpsertSubrequests, parseUpsertCompositeResponse } from '../services/salesforce/composite-upsert';
@@ -31,7 +32,7 @@ import { DEFAULT_API_VERSION, DEFAULT_BATCH_SIZE, BULK_API_THRESHOLD, MAX_COMPOS
 import { generateId } from '../core/utils';
 import { isSalesforceUrl } from '../core/utils';
 import type { MessageResponse } from '../core/types/messaging';
-import type { SalesforceOrg } from '../core/types/salesforce';
+import type { SalesforceOrg, SObjectDescribe } from '../core/types/salesforce';
 import type { PushHistoryEntry, PushResult, PushTransaction, ScheduledExport, ExportSnapshot, ScheduleInterval, ActivePush, ScheduleRunHistoryEntry } from '../core/types/storage';
 import type { MigrationProject } from '../core/types/migration';
 
@@ -328,6 +329,20 @@ function bulkServiceFor(org: SalesforceOrg): BulkApiService {
   return apiClientFactory.getBulkService(org);
 }
 
+/** Describe an SObject through the schema cache, populating it on a miss. */
+async function describeSObjectCached(org: SalesforceOrg, objectName: string): Promise<SObjectDescribe> {
+  const cached = await storage.getCachedSchema(org.orgId, objectName);
+  if (cached) return cached as SObjectDescribe;
+  const result = await apiClientFactory.getClient(org).describeSObject(objectName);
+  const uiSettingsForTtl = await storage.getUiSettings();
+  const ttl = uiSettingsForTtl.schemaCacheTtlMinutes ? uiSettingsForTtl.schemaCacheTtlMinutes * 60 * 1000 : SCHEMA_CACHE_TTL;
+  await storage.setCachedSchema(org.orgId, objectName, result, ttl);
+  return result;
+}
+
+// Queried object per Bulk query job, so each result page costs no extra status call after the first.
+const bulkQueryObjects = new Map<string, string>();
+
 messageBus.on('SF_BULK_QUERY_START', async (message, sender): Promise<MessageResponse> => {
   try {
     const { soql } = message.payload as { soql: string };
@@ -352,7 +367,16 @@ messageBus.on('SF_BULK_QUERY_STATUS', async (message, sender): Promise<MessageRe
 messageBus.on('SF_BULK_QUERY_RESULTS', async (message, sender): Promise<MessageResponse> => {
   try {
     const { jobId, locator, maxRecords } = message.payload as { jobId: string; locator?: string; maxRecords?: number };
-    const page = await bulkServiceFor(await resolveSfOrg(message.payload, sender)).getQueryResults(jobId, locator, maxRecords);
+    const org = await resolveSfOrg(message.payload, sender);
+    const service = bulkServiceFor(org);
+    const page = await service.getQueryResults(jobId, locator, maxRecords);
+    // CSV values are all strings; type them from describe so Bulk exports match REST JSON types (#80).
+    let queriedObject = bulkQueryObjects.get(jobId);
+    if (!queriedObject) {
+      queriedObject = await service.getQueryJobStatus(jobId).then(job => job.object).catch(() => undefined);
+      if (queriedObject) bulkQueryObjects.set(jobId, queriedObject);
+    }
+    page.records = await typeBulkQueryPage(page.records, queriedObject, objectName => describeSObjectCached(org, objectName));
     return { success: true, data: page, requestId: message.requestId };
   } catch (error) {
     return { success: false, error: { code: 'SF_BULK_QUERY_RESULTS_ERROR', message: error instanceof Error ? error.message : 'Bulk query results failed' }, requestId: message.requestId };
@@ -420,17 +444,7 @@ messageBus.on('SF_DESCRIBE_SOBJECT', async (message, sender): Promise<MessageRes
   try {
     const { objectName } = message.payload as { objectName: string };
     const org = await resolveSfOrg(message.payload, sender);
-
-    const cached = await storage.getCachedSchema(org.orgId, objectName);
-    if (cached) {
-      return { success: true, data: cached, requestId: message.requestId };
-    }
-
-    const client = apiClientFactory.getClient(org);
-    const result = await client.describeSObject(objectName);
-    const uiSettingsForTtl = await storage.getUiSettings();
-    const ttl = uiSettingsForTtl.schemaCacheTtlMinutes ? uiSettingsForTtl.schemaCacheTtlMinutes * 60 * 1000 : SCHEMA_CACHE_TTL;
-    await storage.setCachedSchema(org.orgId, objectName, result, ttl);
+    const result = await describeSObjectCached(org, objectName);
     return { success: true, data: result, requestId: message.requestId };
   } catch (error) {
     return {

@@ -280,7 +280,7 @@ export class BulkApiService {
       delimiter: ',',
       skipEmptyLines: true,
       // No dynamicTyping: it coerces Text values ("00123" -> 123, long numbers lose precision,
-      // "true" -> boolean). Correct typing needs field metadata, not CSV guessing.
+      // "true" -> boolean). Values are typed from field describe metadata instead (bulk-query-typing.ts).
       transformHeader: header => header.trim(),
     });
     if (parsed.errors.length > 0) {

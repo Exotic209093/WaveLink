@@ -161,6 +161,8 @@ export type BulkJobState =
 export interface BulkQueryJob {
   id: string;
   operation: 'query' | 'queryAll';
+  /** API name of the queried (FROM) object. */
+  object?: string;
   state: 'UploadComplete' | 'InProgress' | 'Aborted' | 'JobComplete' | 'Failed';
   numberRecordsProcessed: number;
   retries?: number;
