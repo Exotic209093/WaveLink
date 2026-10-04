@@ -36,6 +36,19 @@ const QUOTA_EVICTION_THRESHOLD = 0.85;
 /** Target fraction of quota to free during emergency eviction. */
 const QUOTA_EVICTION_TARGET = 0.7;
 
+/** Remove terminal pushes older than ACTIVE_PUSH_PRUNE_AGE_MS from `all` in place; returns count. */
+function removeStaleTerminalPushes(all: Record<string, ActivePush>): number {
+  const cutoff = Date.now() - ACTIVE_PUSH_PRUNE_AGE_MS;
+  let pruned = 0;
+  for (const [id, push] of Object.entries(all)) {
+    if (TERMINAL_PUSH_STATUSES.has(push.status) && (push.updatedAt ?? push.startedAt) < cutoff) {
+      delete all[id];
+      pruned++;
+    }
+  }
+  return pruned;
+}
+
 /**
  * StorageService abstracts chrome.storage operations with type safety.
  */
@@ -669,14 +682,7 @@ export class StorageService {
    */
   async pruneTerminalPushes(): Promise<number> {
     const all = await this.getActivePushMap();
-    const cutoff = Date.now() - ACTIVE_PUSH_PRUNE_AGE_MS;
-    let pruned = 0;
-    for (const [id, push] of Object.entries(all)) {
-      if (TERMINAL_PUSH_STATUSES.has(push.status) && (push.updatedAt ?? push.startedAt) < cutoff) {
-        delete all[id];
-        pruned++;
-      }
-    }
+    const pruned = removeStaleTerminalPushes(all);
     if (pruned > 0) {
       await this.setLocal(STORAGE_KEYS.ACTIVE_PUSHES, all);
     }
@@ -827,10 +833,15 @@ export class StorageService {
 
   private async setLocal(key: string, value: unknown): Promise<void> {
     try {
-      // Pre-write quota check: if usage exceeds threshold, attempt eviction.
-      const usage = await this.getStorageUsage();
-      if (usage.bytesInUse > usage.quota * QUOTA_EVICTION_THRESHOLD) {
-        await this.evictForQuota(usage.quota);
+      // Pre-write quota check: if usage exceeds threshold, attempt eviction. Best-effort only:
+      // a failing usage API or eviction step must never block the caller's write.
+      try {
+        const usage = await this.getStorageUsage();
+        if (usage.bytesInUse > usage.quota * QUOTA_EVICTION_THRESHOLD) {
+          await this.evictForQuota(usage.quota);
+        }
+      } catch {
+        // Ignore; the write below (and its quota-error retry) still runs.
       }
       await chrome.storage.local.set({ [key]: value });
     } catch (error) {
@@ -855,6 +866,9 @@ export class StorageService {
   /**
    * Emergency eviction: clear schema cache entries and old push history until
    * usage drops below QUOTA_EVICTION_TARGET * quota.
+   *
+   * Writes here go straight to chrome.storage.local, never through setLocal: setLocal runs this
+   * eviction first, so re-entering it while usage is still high would recurse indefinitely.
    */
   private async evictForQuota(quota: number): Promise<void> {
     const target = quota * QUOTA_EVICTION_TARGET;
@@ -887,7 +901,10 @@ export class StorageService {
     if (usage <= target) return;
 
     // 3. Prune terminal active pushes.
-    await this.pruneTerminalPushes();
+    const pushes = await this.getLocal<Record<string, ActivePush>>(STORAGE_KEYS.ACTIVE_PUSHES) ?? {};
+    if (removeStaleTerminalPushes(pushes) > 0) {
+      await chrome.storage.local.set({ [STORAGE_KEYS.ACTIVE_PUSHES]: pushes });
+    }
 
     usage = await chrome.storage.local.getBytesInUse(null);
     if (usage <= target) return;
