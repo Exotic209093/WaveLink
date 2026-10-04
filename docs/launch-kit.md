@@ -82,41 +82,11 @@ Put export first; it is the safest and most searched-for job.
 Add the promo video (`promo/output/wavelink-promo-full-polished.mp4`) as an
 unlisted YouTube upload and paste the URL into the listing's video field.
 
-### Spanish listing (Store listing → add language → Español)
+### Other languages
 
-**Resumen**
-
-> Exporta datos de Salesforce con SOQL a CSV, Excel, JSON o XML desde Chrome. Sin Java ni instalaciones. Gratis y de código abierto.
-
-**Descripción**
-
-> Saca tus datos de Salesforce en segundos, desde la pestaña en la que ya iniciaste sesión.
->
-> WaveLink es un espacio de trabajo de datos gratuito y de código abierto para administradores, desarrolladores y consultores de Salesforce. Escribe o arma una consulta SOQL, revisa los registros, elige las columnas y descarga en CSV, Excel, JSON o XML. Sin Java, sin instalar Data Loader y sin servidores de terceros con tus datos.
->
-> EXPORTAR
->
-> • Editor SOQL con autocompletado y constructor visual de consultas
-> • REST para consultas rápidas y Bulk API 2.0 para objetos grandes
-> • CSV, Excel (XLSX), JSON o XML solo con las columnas que elijas
-> • Guarda consultas como trabajos reutilizables
->
-> SNAPSHOTS Y COMPARACIÓN
->
-> • Programa snapshots locales periódicos
-> • Compara archivos, snapshots u orgs conectadas campo por campo
->
-> IMPORTAR
->
-> • Importación guiada de CSV, JSON y Excel con mapeo de campos, validación y simulación
->
-> PRIVACIDAD
->
-> Sin analítica, telemetría, publicidad ni servidores de WaveLink. Tus registros se quedan en tu navegador. Código fuente: https://github.com/Exotic209093/WaveLink
->
-> WaveLink es independiente y no está afiliado ni respaldado por Salesforce, Inc.
-
-The Spanish name and summary ship in `public/_locales/es/messages.json` (v0.7.1+); paste only the description in the dashboard. Have a native speaker skim it before publishing; it is written in neutral Latin American Spanish.
+Spanish, Japanese, German, French, Portuguese (Brazil), Italian, Dutch, and
+Korean listings are in [`store-listings/`](store-listings/README.md). The names
+and summaries ship in the package (v0.7.2+); paste only each description.
 
 ## Tracked links
 

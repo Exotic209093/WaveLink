@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-10-04
+
+### Added
+- **Seven more store languages** — Japanese, German, French, Portuguese (Brazil), Italian, Dutch, and Korean `_locales` for the extension name, summary, and shortcut description, so the Chrome Web Store accepts a listing in each. Ready-to-paste store descriptions for all eight non-English languages live in `docs/store-listings/`. The in-app interface remains in English.
+
 ## [0.7.1] — 2026-10-04
 
 ### Added
@@ -125,6 +130,7 @@ in and out of Salesforce right from your browser, with nothing leaving your devi
 
 - Initial release.
 
+[0.7.2]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.2
 [0.7.1]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.1
 [0.7.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.6.0

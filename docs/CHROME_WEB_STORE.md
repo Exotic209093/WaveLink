@@ -1,6 +1,6 @@
 # Chrome Web Store release kit
 
-This file is the source of truth for the WaveLink 0.7.1 listing and privacy declarations. Copy text exactly unless the Chrome Web Store dashboard requires a shorter value.
+This file is the source of truth for the WaveLink 0.7.2 listing and privacy declarations. Copy text exactly unless the Chrome Web Store dashboard requires a shorter value.
 
 ## Dashboard and public links
 
@@ -18,7 +18,7 @@ npm run assets:store
 npm run package
 ```
 
-Upload `wavelink-0.7.1.zip`. The package contains the compiled Manifest V3 extension, icons, and bundled privacy page; it excludes source, tests, and build-only files.
+Upload `wavelink-0.7.2.zip`. The package contains the compiled Manifest V3 extension, icons, and bundled privacy page; it excludes source, tests, and build-only files.
 
 ## Store listing
 
@@ -67,18 +67,14 @@ The summary comes from `public/_locales/en/messages.json` (`extDescription`) and
 >
 > Uses your existing Salesforce browser session. WaveLink is independent and is not affiliated with or endorsed by Salesforce, Inc.
 
-### Localised listing (Español)
+### Localised listings
 
-The package ships `_locales/en` (default) and `_locales/es`. The Spanish name
-and summary come from `public/_locales/es/messages.json` automatically:
-
-- Name: **WaveLink — Exporta e importa datos de Salesforce con SOQL** (57 characters)
-- Summary: **Exporta datos de Salesforce con SOQL a CSV, Excel, JSON o XML desde Chrome. Sin Java ni instalaciones. Gratis y de código abierto.** (130 characters)
-
-In the dashboard, switch the Store listing language to **Spanish** and paste the
-Spanish description from
-[`launch-kit.md`](launch-kit.md#spanish-listing-store-listing--add-language--español).
-Screenshots may reuse the English set.
+The package ships `_locales` for English (default), Spanish, Japanese, German,
+French, Portuguese (Brazil), Italian, Dutch, and Korean. Each locale's name and
+summary come from `public/_locales/<locale>/messages.json` automatically. For
+each language, switch the Store listing language in the dashboard and paste the
+description from [`store-listings/`](store-listings/README.md). Screenshots can
+reuse the English set.
 
 ### Category and language
 
@@ -192,9 +188,9 @@ The repository must be pushed before saving this URL so reviewers can reach the 
 
 ## Final submission checklist
 
-- [ ] Push the v0.7.1 code and public privacy policy to `main`.
+- [ ] Push the v0.7.2 code and public privacy policy to `main`.
 - [ ] Confirm the privacy-policy URL loads while signed out of GitHub.
-- [ ] Upload `wavelink-0.7.1.zip` and confirm version 0.7.1 is detected.
+- [ ] Upload `wavelink-0.7.2.zip` and confirm version 0.7.2 is detected.
 - [ ] Replace the description with the text in this file.
 - [ ] Upload all five screenshots in the documented order.
 - [ ] Upload the icon and promotional tiles.
