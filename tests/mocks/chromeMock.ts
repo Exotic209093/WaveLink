@@ -27,7 +27,17 @@ const chrome = {
     },
     lastError: null as chrome.runtime.LastError | null,
     getURL: jest.fn((path: string) => `chrome-extension://mock-id/${path}`),
+    getManifest: jest.fn(() => ({ manifest_version: 3, permissions: ['storage', 'unlimitedStorage'] })),
     id: 'mock-extension-id',
+  },
+  commands: {
+    onCommand: { addListener: jest.fn() },
+  },
+  alarms: {
+    get: jest.fn(() => Promise.resolve(undefined)),
+    create: jest.fn(() => Promise.resolve()),
+    clear: jest.fn(() => Promise.resolve(true)),
+    onAlarm: { addListener: jest.fn() },
   },
   identity: {
     launchWebAuthFlow: jest.fn(
@@ -66,6 +76,7 @@ const chrome = {
         storageMock.local = {};
         return Promise.resolve();
       }),
+      getBytesInUse: jest.fn(() => Promise.resolve(JSON.stringify(storageMock.local).length)),
     },
     session: {
       get: jest.fn((keys: string | string[], callback?: (result: Record<string, unknown>) => void) => {
