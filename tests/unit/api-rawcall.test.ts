@@ -52,10 +52,19 @@ describe('SalesforceApiClient.rawCall', () => {
     expect(calls[0].url).toBe('https://example.my.salesforce.com/services/data');
   });
 
-  it('uses an absolute http(s) URL verbatim', async () => {
+  it('uses a same-origin absolute http(s) URL verbatim', async () => {
     const { calls } = mockFetch(jsonResp(200, true, {}));
-    await client().rawCall('GET', 'https://other.example.com/foo');
-    expect(calls[0].url).toBe('https://other.example.com/foo');
+    await client().rawCall('GET', 'https://example.my.salesforce.com/services/apexrest/foo');
+    expect(calls[0].url).toBe('https://example.my.salesforce.com/services/apexrest/foo');
+  });
+
+  it('refuses a cross-origin absolute URL without sending the bearer token (#65)', async () => {
+    const { calls } = mockFetch(jsonResp(200, true, {}));
+    await expect(client().rawCall('GET', 'https://other.example.com/foo')).rejects.toMatchObject({
+      statusCode: 403,
+      sfErrorCode: 'URL_ORIGIN_MISMATCH',
+    });
+    expect(calls).toHaveLength(0);
   });
 
   it('returns status + ok + parsed JSON body without throwing on 4xx', async () => {
