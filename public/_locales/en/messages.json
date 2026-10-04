@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "WaveLink — Salesforce SOQL Export & Data Import Tool",
+    "description": "Extension name shown in Chrome and on the Chrome Web Store (max 75 characters)."
+  },
+  "extDescription": {
+    "message": "Export Salesforce data with SOQL to CSV, Excel, JSON or XML right in Chrome. No Java, no install, no server. Free and open source.",
+    "description": "Store summary and extension description (max 132 characters)."
+  },
+  "commandTogglePanel": {
+    "message": "Toggle WaveLink panel",
+    "description": "Keyboard shortcut description on chrome://extensions/shortcuts."
+  }
+}
