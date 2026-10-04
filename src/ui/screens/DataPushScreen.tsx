@@ -157,6 +157,11 @@ export function DataPushScreen(props: {
 
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; label: string; createable: boolean; updateable: boolean; deletable: boolean }>>([]);
   const [describeFields, setDescribeFields] = useState<SObjectField[] | null>(null);
+  // Describe fields of objects referenced by relationship lookups, so validation
+  // can confirm each lookup's match field is an External ID / idLookup field.
+  // Cached per tab so switching orgs never validates against another org's schema.
+  const [relatedDescribe, setRelatedDescribe] = useState<{ tabId: number | undefined; fields: Record<string, SObjectField[]> }>({ tabId: undefined, fields: {} });
+  const relatedFields = relatedDescribe.tabId === tabId ? relatedDescribe.fields : {};
 
   const dataset = props.dataset;
   const datasetBytes = (dataset as unknown as { bytes?: number } | null)?.bytes ?? 0;
@@ -285,6 +290,35 @@ export function DataPushScreen(props: {
       .then(d => setDescribeFields(d.fields))
       .catch(e => setToast({ title: 'Describe Failed', body: e instanceof Error ? e.message : 'Unknown error' }));
   }, [sf, tabId, objectName]);
+
+  const lookupTargets = useMemo(() => {
+    if (!describeFields) return [];
+    const targets = new Set<string>();
+    for (const mapping of mappings) {
+      if (!mapping.lookup || mapping.lookup.mode === 'id') continue;
+      const referenceTo = describeFields.find(f => f.name === mapping.targetField)?.referenceTo ?? [];
+      if (referenceTo.length === 1) targets.add(referenceTo[0]);
+    }
+    return [...targets].sort();
+  }, [describeFields, mappings]);
+
+  useEffect(() => {
+    const missing = lookupTargets.filter(name => !relatedFields[name]);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    Promise.all(missing.map(name => sf.describeSObject(name, tabId).then(d => [name, d.fields] as const)))
+      .then(entries => {
+        if (cancelled) return;
+        setRelatedDescribe(prev => ({
+          tabId,
+          fields: { ...(prev.tabId === tabId ? prev.fields : {}), ...Object.fromEntries(entries) },
+        }));
+      })
+      .catch(() => {
+        // Validation still checks lookup shape; Salesforce rejects unusable match fields.
+      });
+    return () => { cancelled = true; };
+  }, [sf, tabId, lookupTargets.join('|'), relatedDescribe]);
 
   useEffect(() => {
     if (!dataset) {
@@ -439,6 +473,7 @@ export function DataPushScreen(props: {
     if (!mappedRecords || !describeFields) return;
     const report = simulatePush(mappedRecords, describeFields, operation, {
       externalIdField: operation === 'upsert' ? externalIdField : null,
+      relatedFields,
     });
     setDryRun(report);
     moveToStage('review');
@@ -451,7 +486,7 @@ export function DataPushScreen(props: {
   function validate(): void {
     if (!mappedRecords || !describeFields) return;
     const validator = new DataValidator();
-    const res = validator.validateRecords(mappedRecords, describeFields, operation);
+    const res = validator.validateRecords(mappedRecords, describeFields, operation, { relatedFields });
     if (res.valid) {
       setValidationErrors([]);
       setToast({ title: 'Validation Passed', body: 'No errors found.' });
