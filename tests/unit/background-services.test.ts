@@ -186,11 +186,8 @@ describe('SalesforceAuth', () => {
 
   describe('login', () => {
     it('throws AuthError when no Salesforce tab is open', async () => {
-      (chrome.tabs.query as jest.Mock).mockImplementation(
-        (_queryInfo: unknown, callback: (tabs: unknown[]) => void) => {
-          callback([]);
-        },
-      );
+      // SalesforceAuth uses the promise form of chrome.tabs.query (MV3).
+      (chrome.tabs.query as jest.Mock).mockResolvedValueOnce([]);
 
       await expect(auth.login()).rejects.toThrow(/Open an authenticated Salesforce tab/);
     });

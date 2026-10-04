@@ -9,6 +9,7 @@
 
 import { StorageService } from '../../src/services/storage';
 import type { ExtensionMessage, MessageResponse } from '../../src/core/types/messaging';
+import { dispatchRuntimeMessage } from '../mocks/runtimeMessages';
 import type { MigrationProject } from '../../src/core/types/migration';
 
 // Import background module to register handlers on the MessageBus.
@@ -24,19 +25,10 @@ function makeMessage<T>(type: string, payload: T): ExtensionMessage {
   };
 }
 
-function getRegisteredHandler(type: string) {
-  const listeners = (chrome.runtime.onMessage.addListener as jest.Mock).mock.calls;
-  const listener = listeners[listeners.length - 1]?.[0];
-  if (!listener) throw new Error(`No listener registered for ${type}`);
-
-  return async (message: ExtensionMessage): Promise<MessageResponse> => {
-    return new Promise((resolve) => {
-      const result = listener(message, {}, resolve);
-      if (result === false || result === undefined) {
-        resolve({ success: false, error: { code: 'NOT_HANDLED', message: 'No handler' }, requestId: message.requestId });
-      }
-    });
-  };
+function getRegisteredHandler(_type: string) {
+  // Route through every registered onMessage listener, as Chrome does; the
+  // background registers both the MessageBus and a scheduler-control listener.
+  return (message: ExtensionMessage): Promise<MessageResponse> => dispatchRuntimeMessage(message);
 }
 
 describe('Background Storage & Migration Handlers', () => {

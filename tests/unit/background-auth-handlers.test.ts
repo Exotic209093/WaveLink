@@ -12,6 +12,7 @@
 import { StorageService } from '../../src/services/storage';
 import { SalesforceAuth } from '../../src/services/salesforce/auth';
 import type { ExtensionMessage, MessageResponse } from '../../src/core/types/messaging';
+import { dispatchRuntimeMessage } from '../mocks/runtimeMessages';
 import type { SalesforceOrg } from '../../src/core/types/salesforce';
 
 // Import background module to register handlers on the MessageBus.
@@ -43,23 +44,10 @@ function makeMessage<T>(type: string, payload: T): ExtensionMessage {
   };
 }
 
-function getRegisteredHandler(type: string) {
-  // The MessageBus registers listeners via chrome.runtime.onMessage.addListener.
-  // We capture the listener from the mock and invoke it directly.
-  const listeners = (chrome.runtime.onMessage.addListener as jest.Mock).mock.calls;
-  // The last registered listener is the background handler (singleton MessageBus).
-  const listener = listeners[listeners.length - 1]?.[0];
-  if (!listener) throw new Error(`No listener registered for ${type}`);
-
-  return async (message: ExtensionMessage): Promise<MessageResponse> => {
-    return new Promise((resolve) => {
-      const result = listener(message, {}, resolve);
-      // If the handler returns false or undefined synchronously, it was not handled.
-      if (result === false || result === undefined) {
-        resolve({ success: false, error: { code: 'NOT_HANDLED', message: 'No handler' }, requestId: message.requestId });
-      }
-    });
-  };
+function getRegisteredHandler(_type: string) {
+  // Route through every registered onMessage listener, as Chrome does; the
+  // background registers both the MessageBus and a scheduler-control listener.
+  return (message: ExtensionMessage): Promise<MessageResponse> => dispatchRuntimeMessage(message);
 }
 
 describe('Background Auth Handlers', () => {
@@ -128,8 +116,10 @@ describe('Background Auth Handlers', () => {
       const response = await handler(message);
 
       expect(response.success).toBe(true);
+      // StorageService.getOrg returns null (not undefined) for a missing org.
       const storedOrg = await storage.getOrg(mockOrg.orgId);
-      expect(storedOrg).toBeUndefined();
+      expect(storedOrg).toBeNull();
+      expect(await storage.getActiveOrgId()).toBeNull();
     });
 
     it('succeeds even when org does not exist', async () => {
