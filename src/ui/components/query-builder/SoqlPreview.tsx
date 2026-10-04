@@ -24,7 +24,7 @@ export function SoqlPreview(props: {
           Apply to Editor
         </button>
       </div>
-      <pre class="wl-qb-preview" role="textbox" aria-readonly="true" aria-label="Generated SOQL query">{soql}</pre>
+      <pre class="wl-qb-preview" aria-label="Generated SOQL query">{soql}</pre>
     </div>
   );
 }

@@ -59,7 +59,7 @@ export function ExportModal(props: ExportModalProps): VNode | null {
 
     // Validate Excel sheet name: max 31 chars, no : \ / ? * [ ]
     if (format === 'excel') {
-      const invalidChars = /[:\\/?*\[\]]/;
+      const invalidChars = /[:\\/?*[\]]/;
       if (!sheetName.trim()) {
         setError('Sheet name cannot be empty.');
         return;
