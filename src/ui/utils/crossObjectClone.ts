@@ -148,3 +148,59 @@ export function remapIds(
     return remapped;
   });
 }
+
+/** Per-row outcome of a clone insert, as stored by the background push. */
+export interface ClonePushOutcome {
+  ids: string[];
+  /** `idRecordIndexes[k]` is the inserted-record index that produced `ids[k]` (-1 = unknown). */
+  idRecordIndexes?: number[];
+  failedRecords?: Array<{ index: number }>;
+}
+
+export interface CloneIdPairing {
+  /** Source-org ID -> target-org ID for rows whose result identifies them. */
+  pairs: Array<{ sourceId: string; targetId: string }>;
+  /** Inserted IDs that could not be tied to a source row (unknown or conflicting index). */
+  unmapped: number;
+  /** Source rows reported as failed. */
+  failed: number;
+}
+
+/**
+ * Pair inserted target IDs with the source rows that produced them (#49).
+ *
+ * Records are pushed 1:1 with `sourceRecords`, so `idRecordIndexes` indexes it directly. IDs are
+ * never zipped positionally: Bulk and multi-threaded REST results arrive out of input order and
+ * failed rows return no ID, so a zip re-parents children onto the wrong records. IDs whose index
+ * is unknown (-1, missing, out of range), shared with another ID, or reported as failed are left
+ * unmapped and counted rather than guessed. O(N).
+ */
+export function pairClonedIds(
+  sourceRecords: ReadonlyArray<Record<string, unknown>>,
+  outcome: ClonePushOutcome,
+): CloneIdPairing {
+  const failedIndexes = new Set((outcome.failedRecords ?? []).map(f => f.index));
+  const ids = Array.isArray(outcome.ids) ? outcome.ids : [];
+  const idsByIndex = new Map<number, string[]>();
+  let unmapped = 0;
+  ids.forEach((targetId, k) => {
+    const index = outcome.idRecordIndexes?.[k] ?? -1;
+    const known = Number.isInteger(index) && index >= 0 && index < sourceRecords.length;
+    if (!targetId || !known || failedIndexes.has(index)) {
+      unmapped++;
+      return;
+    }
+    idsByIndex.set(index, [...(idsByIndex.get(index) ?? []), targetId]);
+  });
+
+  const pairs: CloneIdPairing['pairs'] = [];
+  for (const [index, targetIds] of idsByIndex) {
+    const sourceId = sourceRecords[index]?.Id;
+    if (targetIds.length === 1 && typeof sourceId === 'string' && sourceId) {
+      pairs.push({ sourceId, targetId: targetIds[0] });
+    } else {
+      unmapped += targetIds.length;
+    }
+  }
+  return { pairs, unmapped, failed: failedIndexes.size };
+}
