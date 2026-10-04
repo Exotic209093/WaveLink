@@ -28,19 +28,38 @@ export function toSourceRecordIndex(pushedIndex: number, sourceIndexes?: number[
   return pushedIndex >= 0 && pushedIndex < sourceIndexes.length ? sourceIndexes[pushedIndex] : -1;
 }
 
+/** Error-file message for a source row that mapping excluded from the push. */
+function describeMappingDrop(messages: string[] | undefined): string {
+  const detail = messages && messages.length > 0 ? messages.join('; ') : 'row excluded during field mapping';
+  return `Not pushed (mapping error): ${detail}`;
+}
+
+/**
+ * Number of source rows excluded at mapping, i.e. never pushed (#46). 0 when rows were pushed 1:1.
+ */
+export function countMappingDroppedRows(sourceRecordCount: number, sourceIndexes?: number[]): number {
+  if (!sourceIndexes) return 0;
+  const pushed = new Set(sourceIndexes.filter(index => index >= 0 && index < sourceRecordCount));
+  return sourceRecordCount - pushed.size;
+}
+
 /**
  * Build complete success/error downloads while retaining every source column.
  *
  * `errors` and `rowIds.idRecordIndexes` are indexed by pushed position. IDs are attached only via
  * `idRecordIndexes`: results can arrive out of order and successes need not return an ID, so a
- * positional zip would label the wrong rows (#47). Rows dropped at mapping were never pushed and
- * appear in neither file.
+ * positional zip would label the wrong rows (#47).
+ *
+ * Rows dropped at mapping (source rows absent from `sourceIndexes`) were never pushed; they go to
+ * the error file with their `mappingErrors` (indexed by source position) so every source row lands
+ * in exactly one file.
  */
 export function buildPushOutcomeDatasets(
   originalRecords: Record<string, unknown>[],
   errors: Array<{ recordIndex: number; message: string }>,
   rowIds: { ids: string[]; idRecordIndexes?: number[] } = { ids: [] },
   sourceIndexes?: number[],
+  mappingErrors: ReadonlyArray<{ recordIndex: number; message: string }> = [],
 ): PushOutcomeDatasets {
   const inSource = (index: number): boolean => index >= 0 && index < originalRecords.length;
   const messages = new Map<number, string[]>();
@@ -55,12 +74,20 @@ export function buildPushOutcomeDatasets(
     const id = rowIds.ids[i];
     if (id && inSource(sourceIndex)) idsBySource.set(sourceIndex, id);
   });
-  const pushedSourceIndexes = sourceIndexes ?? originalRecords.map((_, i) => i);
+  const pushed = new Set(sourceIndexes ?? originalRecords.map((_, i) => i));
+  const droppedMessages = new Map<number, string[]>();
+  for (const error of mappingErrors) {
+    if (!inSource(error.recordIndex) || pushed.has(error.recordIndex)) continue;
+    droppedMessages.set(error.recordIndex, [...(droppedMessages.get(error.recordIndex) ?? []), error.message]);
+  }
   const successRecords: Record<string, unknown>[] = [];
   const errorRecords: Record<string, unknown>[] = [];
-  for (const recordIndex of pushedSourceIndexes) {
-    if (!inSource(recordIndex)) continue;
+  for (let recordIndex = 0; recordIndex < originalRecords.length; recordIndex++) {
     const record = originalRecords[recordIndex];
+    if (!pushed.has(recordIndex)) {
+      errorRecords.push({ ...record, WaveLinkError: describeMappingDrop(droppedMessages.get(recordIndex)), WaveLinkSourceRow: recordIndex + 2 });
+      continue;
+    }
     const rowErrors = messages.get(recordIndex);
     if (rowErrors) {
       errorRecords.push({ ...record, WaveLinkError: rowErrors.join('; '), WaveLinkSourceRow: recordIndex + 2 });
@@ -84,6 +111,9 @@ export function buildPushOutcomeDatasets(
 
 /**
  * Builds a retry dataset containing only the records that failed in the original push.
+ *
+ * Rows dropped at mapping are deliberately excluded: they were never sent, and re-pushing them
+ * with the same mappings cannot succeed. They are reported in the error file for the user to fix.
  *
  * @param originalRecords - Original dataset records
  * @param errors - Array of errors with pushed-record indices and messages

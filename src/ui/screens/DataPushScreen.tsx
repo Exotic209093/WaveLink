@@ -32,7 +32,7 @@ import { computePushProgress } from '../utils/pushMetrics';
 import { DryRunPanel } from '../components/DryRunPanel';
 import { simulatePush } from '../utils/pushDryRun';
 import type { DryRunReport } from '../utils/pushDryRun';
-import { buildPushOutcomeDatasets, buildRetryDataset } from '../utils/pushRetry';
+import { buildPushOutcomeDatasets, buildRetryDataset, countMappingDroppedRows } from '../utils/pushRetry';
 import { parseAnyFile } from '../utils/fileParse';
 import { DataMapper } from '../../data/mappers';
 import type { MappingMatchKind } from '../../data/mappers';
@@ -189,6 +189,8 @@ export function DataPushScreen(props: {
     sourceRecords: Record<string, unknown>[];
     /** Pushed position -> source position; push results must be translated through it (#46). */
     sourceIndexes?: number[];
+    /** Mapping errors (source-indexed) for rows excluded before the push; reported in the error file. */
+    mappingErrors?: Array<{ recordIndex: number; message: string }>;
     mappings: FieldMapping[];
   } | null>(null);
   const busRef = useRef<MessageBus | null>(null);
@@ -643,7 +645,10 @@ export function DataPushScreen(props: {
       setMappings(lastPushConfig.mappings);
 
       setRetryModalOpen(false);
-      setToast({ title: 'Retry Dataset Loaded', body: `${retryData.records.length} failed records loaded. Review mappings and push again.` });
+      const skipped = droppedAtMapping > 0
+        ? ` ${droppedAtMapping} ${droppedAtMapping === 1 ? 'row' : 'rows'} excluded at mapping ${droppedAtMapping === 1 ? 'is' : 'are'} not included; fix them from the error file.`
+        : '';
+      setToast({ title: 'Retry Dataset Loaded', body: `${retryData.records.length} failed records loaded. Review mappings and push again.${skipped}` });
     } catch (e) {
       setToast({ title: 'Retry Failed', body: e instanceof Error ? e.message : 'Unknown error' });
     }
@@ -659,6 +664,7 @@ export function DataPushScreen(props: {
         pushErrors ?? [],
         stored ?? undefined,
         lastPushConfig.sourceIndexes,
+        lastPushConfig.mappingErrors,
       );
       const selected = datasets[kind];
       await exportRecords(selected.records, selected.headers, {
@@ -673,6 +679,9 @@ export function DataPushScreen(props: {
     }
   }
 
+  const droppedAtMapping = lastPushConfig
+    ? countMappingDroppedRows(lastPushConfig.sourceRecords.length, lastPushConfig.sourceIndexes)
+    : 0;
   const hasDataset = !!dataset;
   const datasetTooLarge = hasDataset ? estimateTooLarge(datasetBytes, sourceRecords.length) : null;
   const datasetSizeWarning = hasDataset ? estimateSizeWarning(datasetBytes, sourceRecords.length) : null;
@@ -1221,7 +1230,7 @@ export function DataPushScreen(props: {
                 <>
                   <button class="wl-btn" disabled={busy} onClick={loadPushIds}>View IDs</button>
                   <button class="wl-buttonNeutral" disabled={busy} onClick={() => downloadOutcome('success')}>Download success file</button>
-                  {push.failed > 0 ? <button class="wl-buttonNeutral" disabled={busy} onClick={() => downloadOutcome('error')}>Download error file</button> : null}
+                  {push.failed > 0 || droppedAtMapping > 0 ? <button class="wl-buttonNeutral" disabled={busy} onClick={() => downloadOutcome('error')}>Download error file</button> : null}
                   <button class="wl-buttonBrand" disabled={busy} onClick={prepareDeletePushFromIds}>Prepare Delete Push</button>
                   {push.failed > 0 && pushErrors && pushErrors.length > 0 ? (
                     <button class="wl-buttonBrand" disabled={busy} onClick={() => setRetryModalOpen(true)}>Retry Failed Rows</button>
@@ -1294,6 +1303,7 @@ export function DataPushScreen(props: {
               setLastPushConfig({
                 sourceRecords,
                 sourceIndexes: mappedSourceIndexes ?? undefined,
+                mappingErrors: mappedSourceIndexes ? (mappingErrors ?? undefined) : undefined,
                 mappings: [...mappings],
               });
               setToast({ title: 'Push Started', body: `${res.strategy.toUpperCase()} - ${res.pushId}` });
@@ -1381,6 +1391,7 @@ export function DataPushScreen(props: {
               setLastPushConfig({
                 sourceRecords,
                 sourceIndexes: mappedSourceIndexes ?? undefined,
+                mappingErrors: mappedSourceIndexes ? (mappingErrors ?? undefined) : undefined,
                 mappings: [...mappings],
               });
               setToast({ title: 'Push Started', body: `${res.strategy.toUpperCase()} - ${res.pushId}` });
