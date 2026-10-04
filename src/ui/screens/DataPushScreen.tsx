@@ -18,7 +18,7 @@
 
 import type { VNode } from 'preact';
 import { h } from 'preact';
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import { Toast } from '../components/Toast';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -183,6 +183,11 @@ export function DataPushScreen(props: {
     mappings: FieldMapping[];
   } | null>(null);
   const busRef = useRef<MessageBus | null>(null);
+  // Set just before this screen loads a dataset it built itself (retry rows,
+  // rollback IDs) alongside state restored in the same update. The
+  // dataset-change effects honour it instead of auto-mapping and resetting,
+  // so restored manual mappings and prepared records survive.
+  const restoredStateRef = useRef<{ filename: string; mappedRecords: Record<string, unknown>[] | null } | null>(null);
 
   useEffect(() => {
     if (!savedJobPreset || savedJobPreset.definition.kind !== 'import') return;
@@ -285,6 +290,10 @@ export function DataPushScreen(props: {
       setValidationErrors(null);
       return;
     }
+    if (restoredStateRef.current) {
+      restoredStateRef.current = null;
+      return;
+    }
     if (savedJobPreset?.definition.mappings?.length) {
       const bySource = new Map(savedJobPreset.definition.mappings.map(mapping => [mapping.sourceField, mapping]));
       setMappings(sourceHeaders.map(header => bySource.get(header) ?? {
@@ -336,6 +345,30 @@ export function DataPushScreen(props: {
       return { ...m, targetField: 'Id', required: true };
     }));
   }, [dataset?.filename, operation, sourceHeaders.join('|')]);
+
+  // Anything derived from the previous rows is stale once the dataset (or its
+  // cleaned rows) changes. Without this, Review stays reachable and Confirm
+  // would push the previous dataset's mapped records. A layout effect so the
+  // stale state is never interactive, even for a frame.
+  useLayoutEffect(() => {
+    let restored = restoredStateRef.current;
+    if (restored && restored.filename !== dataset?.filename) {
+      restoredStateRef.current = null;
+      restored = null;
+    }
+    setMappingErrors(null);
+    setDryRun(null);
+    if (restored?.mappedRecords) {
+      setMappedRecords(restored.mappedRecords);
+      setValidationErrors([]);
+      return;
+    }
+    setMappedRecords(null);
+    setValidationErrors(null);
+    if (!dataset) return;
+    setFurthestStage(current => Math.min(current, 1));
+    setStage(current => (IMPORT_STAGES.findIndex(item => item.key === current) > 1 ? 'configure' : current));
+  }, [dataset, props.cleanedRecords]);
 
   const targetableFields = useMemo(() => {
     if (!describeFields) return [];
@@ -522,9 +555,11 @@ export function DataPushScreen(props: {
       }
 
       const records = res.ids.map(id => ({ Id: id }));
+      const filename = `rollback-${push.pushId}.json`;
+      restoredStateRef.current = { filename, mappedRecords: records };
       props.onDataset({
         sourceRecords: records,
-        filename: `rollback-${push.pushId}.json`,
+        filename,
         format: 'json',
         headers: ['Id'],
       });
@@ -552,10 +587,13 @@ export function DataPushScreen(props: {
     try {
       const retryData = buildRetryDataset(lastPushConfig.sourceRecords, pushErrors);
 
-      // Load retry dataset
+      // Load retry dataset; the flag keeps the automap effect from replacing
+      // the restored mappings below.
+      const filename = `retry-${push?.pushId || 'failed'}.json`;
+      restoredStateRef.current = { filename, mappedRecords: null };
       props.onDataset({
         sourceRecords: retryData.records,
-        filename: `retry-${push?.pushId || 'failed'}.json`,
+        filename,
         format: 'json',
         headers: retryData.headers,
       });

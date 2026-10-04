@@ -72,6 +72,14 @@ const BulkObjectOpsScreen = lazy(() => import(/* webpackChunkName: "adv-bulk-ops
 const RelationshipExplorerScreen = lazy(() => import(/* webpackChunkName: "adv-relationships" */ '../screens/RelationshipExplorerScreen').then(m => ({ default: m.RelationshipExplorerScreen })));
 const HelpScreen = lazy(() => import(/* webpackChunkName: "help" */ '../screens/HelpScreen').then(m => ({ default: m.HelpScreen })));
 
+type LoadedDataset = {
+  sourceRecords: Record<string, unknown>[];
+  filename: string;
+  format: 'csv' | 'json' | 'excel' | 'xml';
+  headers: string[];
+  bytes?: number;
+};
+
 export function AppRoot(): VNode {
   const sf = useMemo(() => new SfApi('app'), []);
   const [route, setRouteState] = useState<string>(() => window.location.hash.replace(/^#\/?/, '') || 'home');
@@ -108,14 +116,16 @@ export function AppRoot(): VNode {
   };
   const [soql, setSoql] = useState<string>('SELECT Id, Name FROM Account LIMIT 10');
 
-  const [dataset, setDataset] = useState<{
-    sourceRecords: Record<string, unknown>[];
-    filename: string;
-    format: 'csv' | 'json' | 'excel' | 'xml';
-    headers: string[];
-    bytes?: number;
-  } | null>(null);
+  const [dataset, setDataset] = useState<LoadedDataset | null>(null);
   const [cleaned, setCleaned] = useState<{ records: Record<string, unknown>[]; headers: string[] } | null>(null);
+  // Cleaned rows belong to the dataset they were cleaned from. Every path that
+  // swaps in a different dataset (upload, retry, rollback, snapshot) must drop
+  // them, or DataPushScreen would push the old cleaned rows under the new file.
+  // The Cleanser hand-off is unaffected: it sets `cleaned` after loading.
+  const replaceDataset = useCallback((next: LoadedDataset | null): void => {
+    setDataset(next);
+    setCleaned(null);
+  }, []);
 
   const [theme, setTheme] = useState<Theme>('light');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -396,7 +406,7 @@ export function AppRoot(): VNode {
         dataset={dataset}
         cleanedRecords={cleaned?.records ?? null}
         cleanedHeaders={cleaned?.headers ?? null}
-        onDataset={setDataset}
+        onDataset={replaceDataset}
         onRequestCleanser={() => setRoute('advanced/cleanse')}
         savedJobDraft={importJobDraft}
         onSavedJobDraftConsumed={() => setImportJobDraft(undefined)}
@@ -432,7 +442,7 @@ export function AppRoot(): VNode {
         tabId={selectedTabId ?? undefined}
         onOpenSchedules={() => setRoute('schedules')}
         onCreateImport={(records, headers, filename) => {
-          setDataset({ sourceRecords: records, headers, filename, format: 'json' });
+          replaceDataset({ sourceRecords: records, headers, filename, format: 'json' });
           setRoute('import');
         }}
       />
@@ -456,20 +466,21 @@ export function AppRoot(): VNode {
         sf={sf}
         tabId={selectedTabId!}
         dataset={dataset}
-        onDataset={(next) => { setDataset(next); setCleaned(null); }}
+        onDataset={replaceDataset}
         onCleaned={(result) => setCleaned(result)}
         onGoToPush={() => setRoute('import')}
-        onClearDataset={() => { setDataset(null); setCleaned(null); }}
+        onClearDataset={() => replaceDataset(null)}
       />
     );
     if (route === 'advanced/push') return (
       <DataPushScreen
         sf={sf}
         tabId={selectedTabId!}
+        context={context ?? undefined}
         dataset={dataset}
         cleanedRecords={cleaned?.records ?? null}
         cleanedHeaders={cleaned?.headers ?? null}
-        onDataset={setDataset}
+        onDataset={replaceDataset}
         onRequestCleanser={() => setRoute('advanced/cleanse')}
       />
     );
@@ -570,8 +581,7 @@ export function AppRoot(): VNode {
                 { Name: 'WaveLink Example Alpha', Type: 'Prospect' },
                 { Name: 'WaveLink Example Beta', Type: 'Customer - Direct' },
               ];
-              setDataset({ sourceRecords: records, headers: ['Name', 'Type'], filename: 'wavelink-safe-example.json', format: 'json' });
-              setCleaned(null);
+              replaceDataset({ sourceRecords: records, headers: ['Name', 'Type'], filename: 'wavelink-safe-example.json', format: 'json' });
             }
           }}
         />
