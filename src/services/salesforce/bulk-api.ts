@@ -70,12 +70,10 @@ export function bulkCsvCellValue(record: Record<string, unknown>, header: string
   const val = record[header];
   if (val === undefined) return '';
   if (val === null) return BULK_NULL_VALUE;
-  const str = String(val);
-  // Security (#66): neutralize formula-injection payloads in upload CSV.
-  if (/^[=+\-@\t\r]/.test(str)) {
-    return `'${str}`;
-  }
-  return str;
+  // Sent verbatim. Formula-injection neutralisation (#66) applies to files opened in a spreadsheet
+  // (exports), not API payloads: a `'` prefix here would be stored in Salesforce or make values
+  // such as -5, +44 20 7946 0000 or @handle invalid.
+  return String(val);
 }
 
 /**
@@ -281,7 +279,8 @@ export class BulkApiService {
       header: true,
       delimiter: ',',
       skipEmptyLines: true,
-      dynamicTyping: true,
+      // No dynamicTyping: it coerces Text values ("00123" -> 123, long numbers lose precision,
+      // "true" -> boolean). Correct typing needs field metadata, not CSV guessing.
       transformHeader: header => header.trim(),
     });
     if (parsed.errors.length > 0) {
