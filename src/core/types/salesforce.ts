@@ -65,6 +65,8 @@ export interface SObjectField {
   referenceTo?: string[];
   relationshipName?: string | null;
   externalId: boolean;
+  /** True when the field can identify a record in a relationship lookup (describe `idLookup`). */
+  idLookup?: boolean;
   unique: boolean;
 }
 
