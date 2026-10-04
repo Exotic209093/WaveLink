@@ -38,6 +38,8 @@ export interface OffscreenBulkPushPayload {
   totalRecords: number;
   startedAt: number;
   externalIdField?: string;
+  /** Input-row fingerprints used to map Bulk result rows back to input indices (#47). */
+  rowIdentity?: { headers: string[]; fingerprints: string[] };
 }
 
 export interface OffscreenBulkPushRequest {

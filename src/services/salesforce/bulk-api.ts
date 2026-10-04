@@ -47,6 +47,37 @@ export interface BulkQueryResultPage {
   numberOfRecords: number;
 }
 
+/** Bulk API 2.0 sets a field to null only for this literal; an empty cell leaves it unchanged. */
+export const BULK_NULL_VALUE = '#N/A';
+
+/**
+ * Ingest CSV header row: the union of keys across all records, in first-seen order (#45).
+ * The mapper omits blank-ignored keys per record, so row 0 alone can miss whole columns.
+ */
+export function bulkCsvHeaders(records: Record<string, unknown>[]): string[] {
+  const headers = new Set<string>();
+  for (const record of records) {
+    for (const key of Object.keys(record)) headers.add(key);
+  }
+  return Array.from(headers);
+}
+
+/**
+ * Unquoted ingest CSV cell for one field. Missing keys stay blank (Salesforce leaves the field
+ * untouched); an explicit `null` ("blank means clear") becomes `#N/A` so Bulk clears it like REST.
+ */
+export function bulkCsvCellValue(record: Record<string, unknown>, header: string): string {
+  const val = record[header];
+  if (val === undefined) return '';
+  if (val === null) return BULK_NULL_VALUE;
+  const str = String(val);
+  // Security (#66): neutralize formula-injection payloads in upload CSV.
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return `'${str}`;
+  }
+  return str;
+}
+
 /**
  * BulkApiService manages Bulk API 2.0 ingest jobs.
  */
@@ -182,6 +213,9 @@ export class BulkApiService {
     });
 
     const csvText = await response.text();
+    if (!response.ok) {
+      throw new SalesforceApiError(`Failed to retrieve bulk job results: ${csvText}`, response.status, undefined, { jobId });
+    }
     return this.parseCsv(csvText);
   }
 
@@ -198,6 +232,9 @@ export class BulkApiService {
     });
 
     const csvText = await response.text();
+    if (!response.ok) {
+      throw new SalesforceApiError(`Failed to retrieve bulk job results: ${csvText}`, response.status, undefined, { jobId });
+    }
     return this.parseCsv(csvText);
   }
 
@@ -275,19 +312,13 @@ export class BulkApiService {
   recordsToCsv(records: Record<string, unknown>[]): string {
     if (records.length === 0) return '';
 
-    const headers = Object.keys(records[0]);
+    const headers = bulkCsvHeaders(records);
     const lines = [headers.join(',')];
 
     for (const record of records) {
       const values = headers.map(h => {
-        const val = record[h];
-        if (val === null || val === undefined) return '';
-        let str = String(val);
-        // Security (#66): neutralize formula-injection payloads in upload CSV.
-        if (/^[=+\-@\t\r]/.test(str)) {
-          str = `'${str}`;
-        }
-        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        const str = bulkCsvCellValue(record, h);
+        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
           return `"${str.replace(/"/g, '""')}"`;
         }
         return str;

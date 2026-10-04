@@ -16,34 +16,64 @@ export interface PushOutcomeDatasets {
   error: { records: Record<string, unknown>[]; headers: string[] };
 }
 
-/** Build complete success/error downloads while retaining every source column. */
+/**
+ * Translate a pushed-record index into a source-record index (#46).
+ *
+ * Push results are indexed by position in the pushed (mapped) array, which omits rows dropped at
+ * mapping. `sourceIndexes` is DataMapper's mapped -> source map; omit it when rows were pushed 1:1.
+ * Returns -1 for indices that do not identify a pushed row.
+ */
+export function toSourceRecordIndex(pushedIndex: number, sourceIndexes?: number[]): number {
+  if (!sourceIndexes) return pushedIndex;
+  return pushedIndex >= 0 && pushedIndex < sourceIndexes.length ? sourceIndexes[pushedIndex] : -1;
+}
+
+/**
+ * Build complete success/error downloads while retaining every source column.
+ *
+ * `errors` and `rowIds.idRecordIndexes` are indexed by pushed position. IDs are attached only via
+ * `idRecordIndexes`: results can arrive out of order and successes need not return an ID, so a
+ * positional zip would label the wrong rows (#47). Rows dropped at mapping were never pushed and
+ * appear in neither file.
+ */
 export function buildPushOutcomeDatasets(
   originalRecords: Record<string, unknown>[],
   errors: Array<{ recordIndex: number; message: string }>,
-  successfulIds: string[] = [],
+  rowIds: { ids: string[]; idRecordIndexes?: number[] } = { ids: [] },
+  sourceIndexes?: number[],
 ): PushOutcomeDatasets {
+  const inSource = (index: number): boolean => index >= 0 && index < originalRecords.length;
   const messages = new Map<number, string[]>();
   for (const error of errors) {
-    if (error.recordIndex < 0 || error.recordIndex >= originalRecords.length) continue;
-    messages.set(error.recordIndex, [...(messages.get(error.recordIndex) ?? []), error.message]);
+    const sourceIndex = toSourceRecordIndex(error.recordIndex, sourceIndexes);
+    if (!inSource(sourceIndex)) continue;
+    messages.set(sourceIndex, [...(messages.get(sourceIndex) ?? []), error.message]);
   }
-  let successIndex = 0;
+  const idsBySource = new Map<number, string>();
+  rowIds.idRecordIndexes?.forEach((pushedIndex, i) => {
+    const sourceIndex = toSourceRecordIndex(pushedIndex, sourceIndexes);
+    const id = rowIds.ids[i];
+    if (id && inSource(sourceIndex)) idsBySource.set(sourceIndex, id);
+  });
+  const pushedSourceIndexes = sourceIndexes ?? originalRecords.map((_, i) => i);
   const successRecords: Record<string, unknown>[] = [];
   const errorRecords: Record<string, unknown>[] = [];
-  originalRecords.forEach((record, recordIndex) => {
+  for (const recordIndex of pushedSourceIndexes) {
+    if (!inSource(recordIndex)) continue;
+    const record = originalRecords[recordIndex];
     const rowErrors = messages.get(recordIndex);
     if (rowErrors) {
       errorRecords.push({ ...record, WaveLinkError: rowErrors.join('; '), WaveLinkSourceRow: recordIndex + 2 });
     } else {
-      const id = successfulIds[successIndex++];
+      const id = idsBySource.get(recordIndex);
       successRecords.push(id ? { ...record, WaveLinkRecordId: id } : { ...record });
     }
-  });
+  }
   const sourceHeaders = Array.from(new Set(originalRecords.flatMap(record => Object.keys(record))));
   return {
     success: {
       records: successRecords,
-      headers: [...sourceHeaders, ...(successfulIds.length ? ['WaveLinkRecordId'] : [])],
+      headers: [...sourceHeaders, ...(idsBySource.size ? ['WaveLinkRecordId'] : [])],
     },
     error: {
       records: errorRecords,
@@ -56,16 +86,20 @@ export function buildPushOutcomeDatasets(
  * Builds a retry dataset containing only the records that failed in the original push.
  *
  * @param originalRecords - Original dataset records
- * @param errors - Array of errors with record indices and messages
+ * @param errors - Array of errors with pushed-record indices and messages
+ * @param sourceIndexes - DataMapper's mapped -> source index map (#46); omit when rows were pushed 1:1
  * @returns Retry dataset with failed records and error mapping
  */
 export function buildRetryDataset(
   originalRecords: Record<string, unknown>[],
-  errors: Array<{ recordIndex: number; message: string }>
+  errors: Array<{ recordIndex: number; message: string }>,
+  sourceIndexes?: number[],
 ): RetryDataset {
+  const sourceErrors = errors.map(e => ({ ...e, recordIndex: toSourceRecordIndex(e.recordIndex, sourceIndexes) }));
+
   // Get unique failed indices (in case there are duplicate error entries)
   const failedIndices = Array.from(
-    new Set(errors.map(e => e.recordIndex).filter(idx => idx >= 0 && idx < originalRecords.length))
+    new Set(sourceErrors.map(e => e.recordIndex).filter(idx => idx >= 0 && idx < originalRecords.length))
   ).sort((a, b) => a - b);
 
   // Extract failed records
@@ -80,7 +114,7 @@ export function buildRetryDataset(
 
   // Create error map: new index -> error message
   const errorMap = new Map<number, string>();
-  errors.forEach(error => {
+  sourceErrors.forEach(error => {
     const newIndex = failedIndices.indexOf(error.recordIndex);
     if (newIndex >= 0) {
       // If multiple errors for same record, concatenate them

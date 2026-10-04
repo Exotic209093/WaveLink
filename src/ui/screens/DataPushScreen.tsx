@@ -171,6 +171,8 @@ export function DataPushScreen(props: {
   const [suggestions, setSuggestions] = useState<Record<string, { target: string; label: string }>>({});
   const [mappingErrors, setMappingErrors] = useState<Array<{ recordIndex: number; field: string; message: string; value?: unknown }> | null>(null);
   const [mappedRecords, setMappedRecords] = useState<Record<string, unknown>[] | null>(null);
+  // mapped position -> source position; null when mappedRecords are the source rows 1:1 (#46).
+  const [mappedSourceIndexes, setMappedSourceIndexes] = useState<number[] | null>(null);
   const [validationErrors, setValidationErrors] = useState<Array<{ field: string; message: string; value?: unknown }> | null>(null);
   const [dryRun, setDryRun] = useState<DryRunReport | null>(null);
 
@@ -180,6 +182,8 @@ export function DataPushScreen(props: {
   const [pushErrors, setPushErrors] = useState<Array<{ recordIndex: number; message: string }> | null>(null);
   const [lastPushConfig, setLastPushConfig] = useState<{
     sourceRecords: Record<string, unknown>[];
+    /** Pushed position -> source position; push results must be translated through it (#46). */
+    sourceIndexes?: number[];
     mappings: FieldMapping[];
   } | null>(null);
   const busRef = useRef<MessageBus | null>(null);
@@ -391,6 +395,7 @@ export function DataPushScreen(props: {
     const usable = mappings.filter(m => m.targetField && m.targetField.trim().length > 0);
     const res = mapper.mapRecords(sourceRecords, usable);
     setMappedRecords(res.mappedRecords);
+    setMappedSourceIndexes(res.sourceIndexes);
     setMappingErrors(res.errors);
     setValidationErrors(null);
     setDryRun(null);
@@ -533,6 +538,7 @@ export function DataPushScreen(props: {
       setExternalIdField('');
       setMappings(makeEmptyMappings(['Id']));
       setMappedRecords(records);
+      setMappedSourceIndexes(null);
       setMappingErrors(null);
       setValidationErrors([]);
       setToast({ title: 'Prepared Delete Push', body: `${records.length} IDs` });
@@ -550,7 +556,7 @@ export function DataPushScreen(props: {
     }
 
     try {
-      const retryData = buildRetryDataset(lastPushConfig.sourceRecords, pushErrors);
+      const retryData = buildRetryDataset(lastPushConfig.sourceRecords, pushErrors, lastPushConfig.sourceIndexes);
 
       // Load retry dataset
       props.onDataset({
@@ -575,7 +581,12 @@ export function DataPushScreen(props: {
     setBusy(true);
     try {
       const stored = kind === 'success' ? await sf.getDataPushResult(push.pushId) : null;
-      const datasets = buildPushOutcomeDatasets(lastPushConfig.sourceRecords, pushErrors ?? [], stored?.ids ?? []);
+      const datasets = buildPushOutcomeDatasets(
+        lastPushConfig.sourceRecords,
+        pushErrors ?? [],
+        stored ?? undefined,
+        lastPushConfig.sourceIndexes,
+      );
       const selected = datasets[kind];
       await exportRecords(selected.records, selected.headers, {
         format: 'csv',
@@ -1209,6 +1220,7 @@ export function DataPushScreen(props: {
               // Save push config for retry
               setLastPushConfig({
                 sourceRecords,
+                sourceIndexes: mappedSourceIndexes ?? undefined,
                 mappings: [...mappings],
               });
               setToast({ title: 'Push Started', body: `${res.strategy.toUpperCase()} - ${res.pushId}` });
@@ -1295,6 +1307,7 @@ export function DataPushScreen(props: {
               // Save push config for retry
               setLastPushConfig({
                 sourceRecords,
+                sourceIndexes: mappedSourceIndexes ?? undefined,
                 mappings: [...mappings],
               });
               setToast({ title: 'Push Started', body: `${res.strategy.toUpperCase()} - ${res.pushId}` });

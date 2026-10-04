@@ -59,6 +59,17 @@ describe('DataMapper', () => {
       expect(result.errors[0].field).toBe('required_field');
     });
 
+    it('maps each kept record back to its source row when rows are dropped (#46)', () => {
+      const mappings: FieldMapping[] = [
+        { sourceField: 'name', targetField: 'Name', required: true },
+      ];
+
+      const result = mapper.mapRecords([{ name: 'A' }, { name: '' }, { name: 'C' }, {}, { name: 'E' }], mappings);
+
+      expect(result.mappedRecords).toEqual([{ Name: 'A' }, { Name: 'C' }, { Name: 'E' }]);
+      expect(result.sourceIndexes).toEqual([0, 2, 4]);
+    });
+
     it('makes blank-cell ignore versus clear behavior explicit', () => {
       const ignored = mapper.mapRecords([{ email: '' }], [{
         sourceField: 'email', targetField: 'Email', required: false, blankBehavior: 'ignore',

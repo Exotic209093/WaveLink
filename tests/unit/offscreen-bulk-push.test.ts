@@ -1,5 +1,6 @@
 import { StorageService } from '../../src/services/storage';
 import { BulkApiService } from '../../src/services/salesforce/bulk-api';
+import { buildBulkRowIdentity } from '../../src/services/salesforce/bulk-results';
 import { runBulkPush } from '../../src/offscreen';
 
 describe('offscreen Bulk push finalization', () => {
@@ -44,5 +45,50 @@ describe('offscreen Bulk push finalization', () => {
     expect(await storage.getPushResult('push-offscreen')).toEqual(expect.objectContaining({ ids: ['001A', '001B'] }));
     expect((await storage.getPushHistory()).find(entry => entry.id === 'push-offscreen')).toEqual(expect.objectContaining({ successCount: 2 }));
     expect((await storage.getPushTransactions()).find(tx => tx.pushId === 'push-offscreen')?.rollbackIds).toEqual(['001A', '001B']);
+  });
+
+  it('broadcasts per-row errors and IDs mapped to input indices (#47)', async () => {
+    const storage = new StorageService();
+    const records = [{ Name: 'Acme' }, { Name: 'Globex' }, { Name: 'Initech' }];
+    await storage.setActivePush({
+      id: 'push-rows', orgId: '00D', objectName: 'Account', operation: 'insert',
+      totalRecords: 3, processedRecords: 0, failedRecords: 0, startedAt: 1,
+      status: 'processing', strategy: 'bulk', bulkJobId: '750yy', resumeSupported: true,
+    });
+    jest.spyOn(BulkApiService.prototype, 'pollJobCompletion').mockResolvedValue({
+      id: '750yy', operation: 'insert', object: 'Account', state: 'JobComplete',
+      numberRecordsProcessed: 3, numberRecordsFailed: 1, createdDate: 'now', jobType: 'V2Ingest',
+    });
+    // Result files echo the uploaded columns and are not in upload order.
+    jest.spyOn(BulkApiService.prototype, 'getSuccessfulResults').mockResolvedValue([
+      { sf__Id: '001C', sf__Created: 'true', sf__Error: '', Name: 'Initech' },
+      { sf__Id: '001A', sf__Created: 'true', sf__Error: '', Name: 'Acme' },
+    ]);
+    jest.spyOn(BulkApiService.prototype, 'getFailedResults').mockResolvedValue([
+      { sf__Id: '', sf__Created: '', sf__Error: 'DUPLICATE_VALUE:duplicate', Name: 'Globex' },
+    ]);
+    const sendMessage = chrome.runtime.sendMessage as jest.Mock;
+    sendMessage.mockClear();
+
+    await runBulkPush({
+      type: 'OFFSCREEN_BULK_PUSH',
+      payload: {
+        pushId: 'push-rows', jobId: '750yy', instanceUrl: 'https://example.my.salesforce.com',
+        accessToken: 'session-only', apiVersion: 'v65.0', orgId: '00D', objectName: 'Account',
+        operation: 'insert', totalRecords: 3, startedAt: 1, rowIdentity: buildBulkRowIdentity(records),
+      },
+    });
+
+    const complete = sendMessage.mock.calls.map(call => call[0]).find(m => m.type === 'DATA_PUSH_COMPLETE');
+    expect(complete.payload).toEqual(expect.objectContaining({
+      status: 'complete',
+      failedRecords: 1,
+      errors: [{ recordIndex: 1, message: 'DUPLICATE_VALUE:duplicate' }],
+      ids: ['001C', '001A'],
+      idRecordIndexes: [2, 0],
+    }));
+    expect(await storage.getPushResult('push-rows')).toEqual(expect.objectContaining({
+      ids: ['001C', '001A'], idRecordIndexes: [2, 0],
+    }));
   });
 });

@@ -198,6 +198,12 @@ export interface PushResult {
   objectName: string;
   operation: 'insert' | 'update' | 'upsert' | 'delete';
   ids: string[];
+  /**
+   * `idRecordIndexes[i]` is the input record index that produced `ids[i]` (-1 = unidentified row).
+   * Results can arrive out of input order and successes need not return an ID, so never zip `ids`
+   * positionally against the input.
+   */
+  idRecordIndexes?: number[];
   capturedAt: number;
   /** Failed records stored for retry */
   failedRecords?: Array<{ index: number; record: Record<string, unknown>; error: string }>;

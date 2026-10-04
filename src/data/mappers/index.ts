@@ -14,6 +14,12 @@ import type { SObjectField } from '../../core/types/salesforce';
 
 export interface MappingResult {
   mappedRecords: Record<string, unknown>[];
+  /**
+   * `sourceIndexes[i]` is the source-record index that produced `mappedRecords[i]`. Rows with
+   * mapping errors are dropped, so push results (indexed by mapped position) must be translated
+   * through this before they are applied to source rows (#46).
+   */
+  sourceIndexes: number[];
   errors: MappingError[];
 }
 
@@ -103,6 +109,7 @@ export class DataMapper {
   ): MappingResult {
     // Time: O(N*M). Data: returns mappedRecords (good) + errors (per-record/per-field).
     const mappedRecords: Record<string, unknown>[] = [];
+    const sourceIndexes: number[] = [];
     const errors: MappingError[] = [];
 
     for (let i = 0; i < sourceRecords.length; i++) {
@@ -153,10 +160,11 @@ export class DataMapper {
 
       if (!hasError) {
         mappedRecords.push(mapped);
+        sourceIndexes.push(i);
       }
     }
 
-    return { mappedRecords, errors };
+    return { mappedRecords, sourceIndexes, errors };
   }
 
   /**
