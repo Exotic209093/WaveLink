@@ -109,7 +109,8 @@ packaged-extension browser scenarios above.
   uploaded, `+44…` values stored verbatim, explicit null cleared Phone through
   Bulk update (`750dL000012hIb8QAE`), and Bulk-typed query values matched REST
   for populated number, currency, and boolean fields (`750dL000012h54TQAQ`).
-- Not yet run on 0.7.0: the packaged-extension browser matrix above.
+- Packaged-extension browser check of the 0.7.0 `dist` build: completed by the
+  maintainer on 2026-10-04 with no issues reported.
 
 ## Maintainer-authorized usability gate
 

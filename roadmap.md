@@ -12,8 +12,9 @@
 > for #43, #49, #56/#63/#94/#99, #66, and #80 were reworked after review found
 > them incomplete; CI, red on `main` from #107 to #125, is green again.
 > Write paths were re-validated with `npm run validate:salesforce` against the
-> `nebula-dev` org (see `docs/release-validation.md`). Remaining before 1.0: the
-> packaged-extension browser matrix on 0.7.0 and post-release field feedback.
+> `nebula-dev` org (see `docs/release-validation.md`). The maintainer completed the
+> packaged-extension browser check on 0.7.0. Remaining before 1.0: post-release
+> field feedback.
 
 A full-project test pass on 2026-08-31 at commit `74cf21b` found the automated
 gates all green — TypeScript, ESLint, `npm test` (499 tests / 49 suites), the
