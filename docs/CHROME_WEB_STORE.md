@@ -1,6 +1,6 @@
 # Chrome Web Store release kit
 
-This file is the source of truth for the WaveLink 0.7.2 listing and privacy declarations. Copy text exactly unless the Chrome Web Store dashboard requires a shorter value.
+This file is the source of truth for the WaveLink 0.7.3 listing and privacy declarations. Copy text exactly unless the Chrome Web Store dashboard requires a shorter value.
 
 ## Dashboard and public links
 
@@ -18,7 +18,7 @@ npm run assets:store
 npm run package
 ```
 
-Upload `wavelink-0.7.2.zip`. The package contains the compiled Manifest V3 extension, icons, and bundled privacy page; it excludes source, tests, and build-only files.
+Upload `wavelink-0.7.3.zip`. The package contains the compiled Manifest V3 extension, icons, and bundled privacy page; it excludes source, tests, and build-only files.
 
 ## Store listing
 
@@ -112,6 +112,15 @@ Upload in this order:
 
 All screenshots are captures of v0.6.0 at the required dimensions; the 0.7.0 changes are fixes with no visible layout change on these screens. Organisation, user, and record identifiers are redacted. Regenerate promotional graphics with `npm run assets:store`.
 
+### Promo video
+
+The store accepts a YouTube link, not a file. Upload the 25-second calm cut
+(`brag-output-2026-10-04-225829/brag.mp4`, kept outside the repository) to
+YouTube as **Unlisted**, titled "WaveLink — Salesforce data, right in your
+browser", then paste the YouTube URL into **Store listing → Promo video**. The
+same link works for every language listing. The voiceover was generated on an
+ElevenLabs free plan; confirm its licence terms allow promotional use first.
+
 ## Privacy practices
 
 ### Single purpose
@@ -188,9 +197,9 @@ The repository must be pushed before saving this URL so reviewers can reach the 
 
 ## Final submission checklist
 
-- [ ] Push the v0.7.2 code and public privacy policy to `main`.
+- [ ] Push the v0.7.3 code and public privacy policy to `main`.
 - [ ] Confirm the privacy-policy URL loads while signed out of GitHub.
-- [ ] Upload `wavelink-0.7.2.zip` and confirm version 0.7.2 is detected.
+- [ ] Upload `wavelink-0.7.3.zip` and confirm version 0.7.3 is detected.
 - [ ] Replace the description with the text in this file.
 - [ ] Upload all five screenshots in the documented order.
 - [ ] Upload the icon and promotional tiles.

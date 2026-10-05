@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { SfApi } from '../api/sf';
 import type { PushHistoryEntry, ScheduledExport, ExportSnapshot } from '../../core/types/storage';
 import { Icon } from '../components/Icon';
+import { Wavey } from '../components/Wavey';
 
 interface HomeScreenProps {
   sf: SfApi;
@@ -143,7 +144,7 @@ export function HomeScreen(props: HomeScreenProps): VNode {
           <div class="wl-cardSection">
             {activity.length === 0 ? (
               <div class="wl-emptyState">
-                <div class="wl-emptyState__icon"><Icon name="activity" size={28} /></div>
+                <div class="wl-emptyState__mascot"><Wavey mood="wave" size={84} /></div>
                 <p class="wl-emptyState__title">No activity yet</p>
                 <p class="wl-emptyState__desc">
                   Run your first export or import — recent runs and scheduled snapshots will appear here.

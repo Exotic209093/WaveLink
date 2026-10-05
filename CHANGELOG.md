@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-10-05
+
+### Added
+- **Meet Wavey** — WaveLink's mascot appears in the "No Salesforce tab detected" and "No activity yet" empty states, and celebrates when every row of an import succeeds. Wavey is decorative (hidden from screen readers) and stays still when the system asks for reduced motion. Brand files are in `assets/brand/`.
+
+### Fixed
+- Jobs & Activity showed "Â·" instead of "·" between activity details (mis-encoded text from an earlier change).
+
 ## [0.7.2] — 2026-10-04
 
 ### Added
@@ -130,6 +138,7 @@ in and out of Salesforce right from your browser, with nothing leaving your devi
 
 - Initial release.
 
+[0.7.3]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.3
 [0.7.2]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.2
 [0.7.1]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.1
 [0.7.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.0
