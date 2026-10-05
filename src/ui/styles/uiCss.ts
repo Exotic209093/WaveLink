@@ -884,6 +884,7 @@ export const uiCss = `
 
 @media (prefers-reduced-motion: reduce) {
   .wl-app, .wl-card, .wl-toast { animation: none !important; }
+  .wl-wavey__root, .wl-wavey__eyes, .wl-wavey__armR { animation: none !important; }
   .wl-btn, .wl-navBtn, .wl-topNavBtn, .wl-navGroupBtn, .wl-subNavBtn, .wl-panelRoot, .wl-panelEdgeBtn, .wl-panelTab { transition: none !important; animation: none !important; }
 }
 
@@ -2237,6 +2238,27 @@ export const uiCss = `
 .wl-emptyState__icon { font-size: 32px; opacity: 0.5; margin-bottom: var(--wl-space-2); }
 .wl-emptyState__title { font-size: 15px; font-weight: 700; color: var(--wl-ink); margin: 0 0 4px 0; }
 .wl-emptyState__desc { font-size: 13px; margin: 0 auto; max-width: 380px; line-height: 1.5; }
+
+/* ── Wavey (mascot) ── */
+.wl-emptyState__mascot { display: flex; justify-content: center; margin-bottom: var(--wl-space-2); }
+.wl-wavey { display: block; overflow: visible; }
+.wl-wavey__shadow { fill: var(--wl-ink); opacity: 0.12; }
+.wl-wavey__root { animation: wl-waveyBob 3.2s ease-in-out infinite alternate; }
+.wl-wavey__eyes { transform-box: fill-box; transform-origin: center; animation: wl-waveyBlink 4.6s infinite; }
+.wl-wavey--wave .wl-wavey__armR { transform-box: fill-box; transform-origin: 12% 12%; animation: wl-waveyWave 4.4s ease-in-out infinite; }
+@keyframes wl-waveyBob { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+@keyframes wl-waveyBlink { 0%, 93%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes wl-waveyWave {
+  0%, 55%, 100% { transform: rotate(0deg); }
+  62% { transform: rotate(-100deg); }
+  70% { transform: rotate(-75deg); }
+  78% { transform: rotate(-105deg); }
+  86% { transform: rotate(-80deg); }
+  93% { transform: rotate(-100deg); }
+}
+.wl-waveyCelebrate { display: flex; align-items: center; gap: var(--wl-space-3); padding: var(--wl-space-3) var(--wl-space-4); margin-bottom: var(--wl-space-3); border: 1px solid var(--wl-line); border-radius: 12px; background: var(--wl-surface-subtle); }
+.wl-waveyCelebrate__title { font-weight: 700; color: var(--wl-ink); margin: 0 0 2px 0; }
+.wl-waveyCelebrate__desc { font-size: 13px; color: var(--wl-ink-dim); margin: 0; }
 
 /* ── Tab bar within a screen ── */
 .wl-flowTabs {

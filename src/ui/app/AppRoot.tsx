@@ -28,7 +28,7 @@ import { OnboardingWizard } from '../components/OnboardingWizard';
 import { resolveAppRoute } from './routes';
 import type { ScheduleDraft } from '../utils/scheduleDraft';
 import type { SavedJob } from '../../core/types/storage';
-import { Icon } from '../components/Icon';
+import { Wavey } from '../components/Wavey';
 
 // ── Primary flows (new in v0.2) ───────────────────────────────────────
 import { HomeScreen } from '../screens/HomeScreen';
@@ -365,7 +365,7 @@ export function AppRoot(): VNode {
         <div class="wl-card">
           <div class="wl-cardSection">
             <div class="wl-emptyState">
-              <div class="wl-emptyState__icon"><Icon name="database" size={36} /></div>
+              <div class="wl-emptyState__mascot"><Wavey mood="curious" size={96} /></div>
               <p class="wl-emptyState__title">No Salesforce tab detected</p>
               <p class="wl-emptyState__desc">
                 Open a logged-in Salesforce Lightning tab, then click <strong>Refresh</strong> in the top-right.

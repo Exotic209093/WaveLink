@@ -32,3 +32,10 @@ Record `demo.gif` showing the core workflow:
 Recommended tools: [LICEcap](https://www.cockos.com/licecap/) (Windows/Mac), [Kap](https://getkap.co/) (Mac), [Peek](https://github.com/phw/peek) (Linux)
 
 Target: < 5 MB, 15–30 seconds, 600–800px wide, looping.
+
+## Brand
+
+| File | Description |
+|------|-------------|
+| `brand/wavey.svg` | Wavey, the WaveLink mascot (editable vector; source of `src/ui/components/Wavey.tsx`) |
+| `brand/wavey.png` | Wavey at 512 px with a transparent background, for README, store tiles, and social posts |

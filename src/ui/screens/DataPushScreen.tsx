@@ -44,6 +44,7 @@ import { TRANSFORM_OPTIONS } from '../utils/transforms';
 import { pushConfirmationPhrase, validateIdFirst } from '../utils/pushGuards';
 import { clampBatchSize, clampThreads } from '../utils/pushOptions';
 import { Icon } from '../components/Icon';
+import { Wavey } from '../components/Wavey';
 import { exportRecords } from '../utils/export';
 
 type Strategy = 'auto' | 'rest' | 'bulk';
@@ -1205,6 +1206,16 @@ export function DataPushScreen(props: {
           operation={operation}
           onClose={() => setDryRun(null)}
         />
+      ) : null}
+
+      {push?.status === 'complete' && push.failed === 0 && droppedAtMapping === 0 && push.total > 0 ? (
+        <div class="wl-waveyCelebrate" role="status">
+          <Wavey mood="happy" size={56} />
+          <div>
+            <p class="wl-waveyCelebrate__title">All {push.total.toLocaleString()} {push.total === 1 ? 'row' : 'rows'} succeeded</p>
+            <p class="wl-waveyCelebrate__desc">Download the success file for the new record IDs, or undo from Jobs &amp; Activity.</p>
+          </div>
+        </div>
       ) : null}
 
       {push ? (
