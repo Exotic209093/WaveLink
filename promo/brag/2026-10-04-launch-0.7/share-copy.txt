@@ -1,0 +1,1 @@
+Salesforce data, right in your browser. WaveLink lets you write SOQL, preview your records and export to CSV, Excel, JSON or XML from the tab you're already signed into. v0.7 adds dry runs and typed production confirmations. Free, open source, and on the Chrome Web Store in nine languages.

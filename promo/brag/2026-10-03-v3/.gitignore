@@ -1,0 +1,9 @@
+composition/node_modules/
+composition/tools/
+composition/.hyperframes/
+composition/.hyperframes-cache/
+composition/.render/
+composition/.tmp/
+composition/.DS_Store
+*.log
+brag.poster.mp4

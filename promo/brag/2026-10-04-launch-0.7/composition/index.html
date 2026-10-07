@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>WaveLink 0.7 — calm cut</title>
+<style>
+@font-face{font-family:'Wave Serif';src:url('assets/fonts/SitkaVF.ttf');font-weight:300 700;font-style:normal}
+@font-face{font-family:'Wave Serif';src:url('assets/fonts/SitkaVF-Italic.ttf');font-weight:300 700;font-style:italic}
+@font-face{font-family:'Wave Sans';src:url('assets/fonts/segoeuil.ttf');font-weight:300}
+@font-face{font-family:'Wave Sans';src:url('assets/fonts/segoeuisl.ttf');font-weight:350}
+@font-face{font-family:'Wave Sans';src:url('assets/fonts/segoeui.ttf');font-weight:400}
+@font-face{font-family:'Wave Sans';src:url('assets/fonts/seguisb.ttf');font-weight:600}
+@font-face{font-family:'Wave Mono';src:url('assets/fonts/consola.ttf')}
+@font-face{font-family:'Yu Gothic UI';src:local('Yu Gothic UI'),local('Yu Gothic UI Regular');font-weight:400}
+@font-face{font-family:'Malgun Gothic';src:local('Malgun Gothic');font-weight:400}
+:root{--bg:#f4f1ea;--ink:#1c1b19;--muted:#6b675f;--hair:#dad5ca;--teal:#0e7490;--cyan:#48cae4;--code:#14212b;--card:#fbfaf6}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:'Wave Sans','Yu Gothic UI','Malgun Gothic',sans-serif;color:var(--ink)}
+#film{position:relative;width:100%;height:100%;overflow:hidden;background:var(--bg)}
+.clip{position:absolute;inset:0;overflow:hidden}.scene{position:absolute;inset:0}
+.serif{font-family:'Wave Serif',Georgia,serif;font-variation-settings:'opsz' 36}
+.eyebrow{position:absolute;left:120px;top:96px;display:flex;align-items:center;gap:16px;font-size:26px;font-weight:350;color:var(--muted);letter-spacing:.5px}
+.eyebrow img{width:34px;height:34px}.eyebrow .num{font-family:'Wave Mono',monospace;font-size:22px;color:var(--teal)}
+.word{display:inline-block}
+/* Hook */
+.hook-text{position:absolute;left:120px;top:370px;width:1700px;font-size:132px;line-height:1.12;letter-spacing:-2.5px;font-weight:400}
+.hook-text .line2{color:var(--teal);font-style:italic}
+.hook-note{position:absolute;left:124px;top:730px;font-size:32px;font-weight:350;color:var(--muted)}
+/* Product window */
+.p-caption{position:absolute;left:120px;top:200px;width:520px;font-size:62px;line-height:1.16;letter-spacing:-1px}
+.p-caption em{color:var(--teal)}
+.p-note{position:absolute;left:124px;top:640px;width:440px;font-size:26px;font-weight:350;color:var(--muted);line-height:1.5}
+.window-cam{position:absolute;left:640px;top:170px;width:1160px;height:740px}
+.window{position:absolute;inset:0;background:var(--card);border:1px solid var(--hair);border-radius:22px;box-shadow:0 2px 4px #1c1b190a,0 30px 70px #1c1b1918;overflow:hidden}
+.w-bar{height:58px;display:flex;align-items:center;gap:10px;padding:0 22px;border-bottom:1px solid var(--hair);font-size:21px;color:var(--muted)}
+.dot{width:13px;height:13px;border-radius:50%;background:#e2ddd2}.w-title{margin-left:18px;display:flex;align-items:center;gap:10px}.w-title img{width:22px;height:22px}
+.code-panel{position:absolute;left:28px;right:28px;top:84px;height:250px;background:var(--code);border-radius:16px;padding:30px 34px;color:#e9eef2}
+.code-line{font:34px/1.55 'Wave Mono',monospace;white-space:pre;height:53px}.kw{color:var(--cyan)}
+.caret{display:inline-block;width:3px;height:36px;background:var(--cyan);vertical-align:-6px;margin-left:2px}
+.run{position:absolute;right:26px;bottom:26px;padding:14px 24px;border-radius:12px;background:#24394a;color:#c4d3de;font-size:24px;font-weight:600}
+.run-on{position:absolute;inset:0;border-radius:12px;background:var(--cyan);color:#072033;display:flex;align-items:center;justify-content:center;opacity:0}
+.results{position:absolute;left:28px;right:28px;top:360px}
+.res-head{display:flex;justify-content:space-between;font-size:22px;color:var(--muted);padding:0 18px 12px}
+.row{display:flex;justify-content:space-between;align-items:center;height:64px;padding:0 18px;border-top:1px solid var(--hair);font-size:27px}
+.row span{color:var(--muted);width:360px}
+.ptr{position:absolute;left:0;top:0;width:44px;height:54px;z-index:5;filter:drop-shadow(0 3px 4px #1c1b1933)}
+/* Formats */
+.f-title{position:absolute;left:120px;top:210px;width:1680px;font-size:96px;line-height:1.12;letter-spacing:-1.5px}
+.f-title em{color:var(--teal)}
+.cards{position:absolute;left:120px;top:520px;width:1680px;display:flex;gap:36px}
+.card{flex:1;height:300px;background:var(--card);border:1px solid var(--hair);border-radius:22px;padding:38px;box-shadow:0 18px 40px #1c1b1910;position:relative}
+.glyph{width:54px;height:66px;border:2px solid var(--ink);border-radius:8px}
+.card .name{margin-top:52px;font-size:56px;letter-spacing:-1px}.card .ext{font:22px 'Wave Mono',monospace;color:var(--muted);margin-top:8px}
+.card.sel{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal),0 18px 40px #0e749022}.card .tick{position:absolute;right:30px;top:30px;width:40px;height:40px;border-radius:50%;background:var(--teal);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center}
+.f-note{position:absolute;left:124px;top:878px;font-size:28px;font-weight:350;color:var(--muted)}
+/* Trust */
+.t-title{position:absolute;left:120px;top:300px;width:700px;font-size:120px;line-height:1.08;letter-spacing:-2px}
+.t-title em{color:var(--teal)}
+.t-note{position:absolute;left:124px;top:600px;width:640px;font-size:30px;font-weight:350;color:var(--muted);line-height:1.45}
+.t-note b{font-family:'Wave Mono',monospace;font-weight:400;font-size:24px;color:var(--teal);border:1px solid var(--teal);border-radius:8px;padding:2px 10px;margin-right:10px}
+.modal-cam{position:absolute;left:880px;top:190px;width:920px;height:560px}
+.modal{position:absolute;inset:0;background:#fff;border:1px solid var(--hair);border-radius:22px;box-shadow:0 30px 70px #1c1b1920;padding:40px 44px}
+.modal h3{margin:0 0 24px;font-size:36px;font-weight:600;letter-spacing:-.3px}
+.facts{display:flex;gap:56px;margin-bottom:24px}.fact{font-size:20px;color:var(--muted)}.fact b{display:block;font-size:30px;font-weight:600;color:var(--ink);margin-top:4px}
+.warn{background:#fbf3e2;border:1px solid #ecd6a6;color:#7a4b00;border-radius:12px;padding:14px 18px;font-size:22px;margin-bottom:26px}
+.ask{font-size:25px;margin-bottom:14px;color:#3d3a35}.ask b{font-family:'Wave Mono',monospace;font-weight:400;color:var(--ink)}
+.phrase-box{height:70px;border:1.5px solid var(--hair);border-radius:12px;padding:0 20px;display:flex;align-items:center;font:32px 'Wave Mono',monospace}
+.phrase .ch{display:none}
+.confirm{position:absolute;right:44px;bottom:36px;width:250px;height:64px;border-radius:12px;background:#ece8df;color:#4a4740;font-size:26px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.confirm-on,.confirm-done{position:absolute;inset:0;border-radius:12px;display:flex;align-items:center;justify-content:center;opacity:0;color:#fff}
+.confirm-on{background:var(--teal)}.confirm-done{background:#2f7d4f}
+.toast{position:absolute;left:1270px;top:790px;width:530px;background:#fff;border:1px solid var(--hair);border-radius:16px;box-shadow:0 18px 40px #1c1b1918;padding:20px 24px;display:flex;gap:18px;align-items:center}
+.toast i{width:46px;height:46px;border-radius:50%;background:#2f7d4f;color:#fff;font-style:normal;font-size:26px;display:flex;align-items:center;justify-content:center;flex:none}
+.toast b{display:block;font-size:26px;font-weight:600}.toast span{font-size:22px;color:var(--muted)}
+/* Languages */
+.l-title{position:absolute;left:120px;top:360px;width:700px;font-size:120px;line-height:1.08;letter-spacing:-2px}
+.l-title em{color:var(--teal)}
+.l-note{position:absolute;left:124px;top:640px;width:600px;font-size:30px;font-weight:350;color:var(--muted);line-height:1.45}
+.langs{position:absolute;left:880px;top:250px;width:920px;display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.lang{height:160px;background:var(--card);border:1px solid var(--hair);border-radius:20px;padding:28px 30px;display:flex;flex-direction:column;justify-content:space-between}
+.lang .native{font-size:40px;font-weight:400}.lang .code{font:20px 'Wave Mono',monospace;color:var(--teal)}
+/* Wavey */
+.m-slot{position:absolute}.m-slot svg{width:100%;height:100%;overflow:visible}
+.bubble{position:absolute;left:1300px;top:820px;min-width:250px;height:76px;padding:0 28px;background:#fff;border:1px solid var(--hair);border-radius:38px;box-shadow:0 12px 30px #1c1b1914;display:flex;align-items:center;justify-content:center;font-size:34px}
+.bubble:after{content:'';position:absolute;right:-12px;top:44px;width:22px;height:22px;background:#fff;border-right:1px solid var(--hair);border-bottom:1px solid var(--hair);transform:rotate(-45deg)}
+.bubble span{position:absolute;opacity:0;white-space:nowrap}
+/* Outro */
+.o-mark{position:absolute;left:0;right:0;top:330px;display:flex;justify-content:center;align-items:center;gap:34px}
+.o-mark img{width:130px;height:130px}.o-word{font-size:150px;font-weight:600;letter-spacing:-4px}
+.o-line{position:absolute;left:0;right:0;top:560px;text-align:center;font-size:64px;font-style:italic;color:var(--teal);letter-spacing:-.5px}
+.o-sub{position:absolute;left:0;right:0;top:680px;text-align:center;font-size:30px;font-weight:350;color:var(--muted);letter-spacing:.5px}
+</style></head><body>
+<div id="film" data-composition-id="wavelink-calm" data-width="1920" data-height="1080" data-duration="25" data-fps="30">
+
+<section class="clip" id="hook" data-start="0" data-duration="3.6" data-track-index="0"><div class="scene s-hook">
+<div class="eyebrow"><img src="assets/wavelink-icon.svg">WaveLink</div>
+<div class="hook-text serif"><div class="line1"></div><div class="line2"></div></div>
+<div class="hook-note">No Data Loader. Nothing to install.</div>
+<div class="m-slot" id="m-hook" style="left:1400px;top:360px;width:330px;height:360px"></div>
+</div></section>
+
+<section class="clip" id="product" data-start="3.3" data-duration="7" data-track-index="1"><div class="scene s-product">
+<div class="eyebrow"><span class="num">01</span>Export</div>
+<div class="p-caption serif">Write SOQL.<br><em>Preview your records.</em></div>
+<div class="p-note">Runs in the Salesforce tab you're already signed into.</div>
+<div class="window-cam"><div class="m-slot" id="m-prod" style="right:70px;top:-118px;width:150px;height:164px"></div><div class="window">
+<div class="w-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="w-title"><img src="assets/wavelink-icon.svg">WaveLink — Export</span><span style="margin-left:auto">Sample data</span></div>
+<div class="code-panel"><div class="code-line cl1"></div><div class="code-line cl2"></div><div class="code-line cl3"></div><div class="run"><span class="run-label">Run query</span><div class="run-on">Run query</div></div></div>
+<div class="results"><div class="res-head r-head"><span>Results</span><span>3 rows</span></div>
+<div class="row r1"><strong>Northstar Labs</strong><span>Technology</span></div><div class="row r2"><strong>Harbor Studio</strong><span>Media</span></div><div class="row r3"><strong>Summit Works</strong><span>Manufacturing</span></div></div>
+<svg class="ptr p-ptr" viewBox="0 0 58 70"><path fill="#fff" stroke="#1c1b19" stroke-width="3" d="M5 4L48 39L28 41L19 60Z"/></svg>
+</div></div>
+</div></section>
+
+<section class="clip" id="formats" data-start="9.9" data-duration="4.1" data-track-index="2"><div class="scene s-formats">
+<div class="eyebrow"><span class="num">02</span>Download</div>
+<div class="f-title serif">Export to CSV, Excel, JSON, <em>or XML.</em></div>
+<div class="cards"><div class="card c1 sel"><div class="tick">✓</div><div class="glyph"></div><div class="name serif">CSV</div><div class="ext">accounts.csv</div></div><div class="card c2"><div class="glyph"></div><div class="name serif">Excel</div><div class="ext">.xlsx</div></div><div class="card c3"><div class="glyph"></div><div class="name serif">JSON</div><div class="ext">.json</div></div><div class="card c4"><div class="glyph"></div><div class="name serif">XML</div><div class="ext">.xml</div></div></div>
+<div class="f-note">Only the columns you choose.</div>
+<div class="m-slot" id="m-fmt" style="left:1660px;top:842px;width:136px;height:149px"></div>
+</div></section>
+
+<section class="clip" id="trust" data-start="13.7" data-duration="5.3" data-track-index="3"><div class="scene s-trust">
+<div class="eyebrow"><span class="num">03</span>New in 0.7</div>
+<div class="t-title serif">Data you<br>can <em>trust.</em></div>
+<div class="t-note"><b>v0.7</b>Dry runs, typed production confirmation, and every audit fix — shipped.</div>
+<div class="modal-cam"><div class="modal">
+<h3>Confirm Production Data Push</h3>
+<div class="facts"><div class="fact">Target object<b>Account</b></div><div class="fact">Operation<b>INSERT</b></div><div class="fact">Records<b>2</b></div></div>
+<div class="warn">Production org: this operation can change live Salesforce data.</div>
+<div class="ask">Type <b>INSERT 2 Account</b> to confirm this action.</div>
+<div class="phrase-box"><span class="phrase"></span><span class="caret t-caret" style="background:var(--teal)"></span></div>
+<div class="confirm"><span class="confirm-label">Confirm push</span><div class="confirm-on">Confirm push</div><div class="confirm-done">✓ Confirmed</div></div>
+</div></div>
+<div class="m-slot" id="m-trust" style="left:1080px;top:770px;width:160px;height:175px"></div>
+<div class="toast"><i>✓</i><div><b>Dry Run Passed</b><span>2 of 2 rows would succeed.</span></div></div>
+<svg class="ptr t-ptr" viewBox="0 0 58 70"><path fill="#fff" stroke="#1c1b19" stroke-width="3" d="M5 4L48 39L28 41L19 60Z"/></svg>
+</div></section>
+
+<section class="clip" id="languages" data-start="18.7" data-duration="3.3" data-track-index="4"><div class="scene s-langs">
+<div class="eyebrow"><span class="num">04</span>Chrome Web Store</div>
+<div class="l-title serif">Nine <em>languages.</em></div>
+<div class="l-note">Find WaveLink in your own language on the Chrome Web Store.</div>
+<div class="langs"></div>
+<div class="bubble"><span>Hello</span><span>Hola</span><span>こんにちは</span><span>안녕하세요</span><span>Bonjour</span></div>
+<div class="m-slot" id="m-lang" style="left:1640px;top:800px;width:160px;height:175px"></div>
+</div></section>
+
+<section class="clip" id="outro" data-start="21.7" data-duration="3.3" data-track-index="5"><div class="scene s-outro">
+<div class="o-mark"><img src="assets/wavelink-icon.svg"><span class="o-word">WaveLink</span></div>
+<div class="o-line serif">Free on the Chrome Web Store.</div>
+<div class="o-sub">Open source · Local-first · Nothing to install</div>
+<div class="m-slot" id="m-out" style="left:880px;top:768px;width:160px;height:175px"></div>
+</div></section>
+
+<audio id="music-bed" src="assets/music/bed.wav" data-start="0" data-duration="25" data-track-index="30" data-volume="0.62" data-automation="{&quot;version&quot;:1,&quot;lanes&quot;:[{&quot;target&quot;:&quot;volume&quot;,&quot;points&quot;:[{&quot;t&quot;:0,&quot;v&quot;:0},{&quot;t&quot;:0.3,&quot;v&quot;:1},{&quot;t&quot;:0.31,&quot;v&quot;:1},{&quot;t&quot;:0.55,&quot;v&quot;:0.55},{&quot;t&quot;:2.28,&quot;v&quot;:0.55},{&quot;t&quot;:2.78,&quot;v&quot;:1},{&quot;t&quot;:3.7,&quot;v&quot;:1},{&quot;t&quot;:4.0,&quot;v&quot;:0.55},{&quot;t&quot;:8.1,&quot;v&quot;:0.55},{&quot;t&quot;:8.6,&quot;v&quot;:1},{&quot;t&quot;:10.15,&quot;v&quot;:1},{&quot;t&quot;:10.45,&quot;v&quot;:0.55},{&quot;t&quot;:13.59,&quot;v&quot;:0.55},{&quot;t&quot;:14.05,&quot;v&quot;:1},{&quot;t&quot;:14.09,&quot;v&quot;:1},{&quot;t&quot;:14.35,&quot;v&quot;:0.55},{&quot;t&quot;:16.95,&quot;v&quot;:0.55},{&quot;t&quot;:17.45,&quot;v&quot;:1},{&quot;t&quot;:18.95,&quot;v&quot;:1},{&quot;t&quot;:19.25,&quot;v&quot;:0.55},{&quot;t&quot;:20.56,&quot;v&quot;:0.55},{&quot;t&quot;:21.06,&quot;v&quot;:1},{&quot;t&quot;:22.1,&quot;v&quot;:1},{&quot;t&quot;:22.4,&quot;v&quot;:0.55},{&quot;t&quot;:23.2,&quot;v&quot;:1},{&quot;t&quot;:25,&quot;v&quot;:0}]}]}"></audio>
+<audio id="wavey-pop" src="assets/sfx/click2.ogg" data-start="1.05" data-duration="0.12" data-track-index="33" data-volume="0.1"></audio>
+<audio id="run-click" src="assets/sfx/click_001.ogg" data-start="6.75" data-duration="0.1" data-track-index="31" data-volume="0.16"></audio>
+<audio id="confirm-click" src="assets/sfx/click2.ogg" data-start="16.95" data-duration="0.12" data-track-index="32" data-volume="0.16"></audio>
+<audio id="vo-1" src="assets/vo/vo-1-trim.wav" data-start="0.45" data-duration="1.831" data-track-index="50" data-volume="1"></audio>
+<audio id="vo-2" src="assets/vo/vo-2-trim.wav" data-start="3.9" data-duration="4.204" data-track-index="51" data-volume="1"></audio>
+<audio id="vo-3" src="assets/vo/vo-3-trim.wav" data-start="10.35" data-duration="3.242" data-track-index="52" data-volume="1"></audio>
+<audio id="vo-4" src="assets/vo/vo-4-trim.wav" data-start="14.25" data-duration="2.696" data-track-index="53" data-volume="1"></audio>
+<audio id="vo-5" src="assets/vo/vo-5-trim.wav" data-start="19.15" data-duration="1.414" data-track-index="54" data-volume="1"></audio>
+<audio id="vo-6" src="assets/vo/vo-6-trim.wav" data-start="22.3" data-duration="1.794" data-track-index="55" data-volume="1"></audio>
+</div>
+<script src="assets/js/gsap.min.js"></script><script src="assets/js/mascot.js"></script><script>
+// Build per-word spans for the hook.
+function words(sel,text){const el=document.querySelector(sel);for(const w of text.split(' ')){const s=document.createElement('span');s.className='word';s.textContent=w;el.appendChild(s);el.appendChild(document.createTextNode(' '));}}
+words('.line1','Salesforce data,');words('.line2','right in your browser.');
+// SOQL lines, typed character by character.
+const SOQL=[['SELECT',' Name, Industry'],['FROM',' Account'],['LIMIT',' 3']];
+const codeChars=[];
+SOQL.forEach(([kw,rest],i)=>{const line=document.querySelector('.cl'+(i+1));const k=document.createElement('span');k.className='kw';line.appendChild(k);
+  for(const c of kw){const s=document.createElement('span');s.textContent=c;s.style.display='none';k.appendChild(s);codeChars.push(s);}
+  for(const c of rest){const s=document.createElement('span');s.textContent=c;s.style.display='none';line.appendChild(s);codeChars.push(s);}});
+const PHRASE='INSERT 2 Account';const ph=document.querySelector('.phrase');
+for(const c of PHRASE){const s=document.createElement('span');s.className='ch';s.textContent=c===' '?' ':c;ph.appendChild(s);}
+// Real language names; locales match public/_locales.
+const LANGS=[['English','en'],['Español','es'],['日本語','ja'],['Deutsch','de'],['Français','fr'],['Português','pt-BR'],['Italiano','it'],['Nederlands','nl'],['한국어','ko']];
+const lg=document.querySelector('.langs');for(const [n,c] of LANGS){const d=document.createElement('div');d.className='lang';d.innerHTML=`<span class="native">${n}</span><span class="code">${c}</span>`;lg.appendChild(d);}
+
+const tl=gsap.timeline({paused:true});
+const E='power2.out', S='sine.inOut';
+const soft=(sel,at,dur=.9,y=24)=>tl.fromTo(sel,{opacity:0,y,filter:'blur(10px)'},{opacity:1,y:0,filter:'blur(0px)',duration:dur,ease:E},at);
+const out=(sel,at,dur=.45)=>tl.to(sel,{opacity:0,y:-14,filter:'blur(8px)',duration:dur,ease:'power2.in'},at);
+
+// Wavey: build each instance, then small, deterministic gestures.
+['m-hook','m-prod','m-fmt','m-trust','m-lang','m-out'].forEach(id=>{document.getElementById(id).innerHTML=waveyMarkup(id+'-svg');});
+const M=id=>`#${id}-svg`;
+// Pop scales the HTML wrapper from its bottom centre (svgOrigin leaves a stale offset).
+const pop=(id,at)=>tl.fromTo('#'+id,{scale:.3,y:50,opacity:0},{scale:1,y:0,opacity:1,duration:.7,ease:'back.out(1.7)',transformOrigin:'50% 100%'},at);
+const peek=(id,at)=>tl.fromTo(`${M(id)} .m-root`,{y:90},{y:0,duration:.8,ease:'back.out(1.4)'},at);
+const blink=(id,at)=>tl.fromTo(`${M(id)} .m-eyes`,{scaleY:1},{scaleY:.1,duration:.07,ease:'power1.in',yoyo:true,repeat:1,transformOrigin:'50% 50%'},at);
+const look=(id,at,x,y,d=.35)=>tl.to(`${M(id)} .m-look`,{x,y,duration:d,ease:E},at);
+const wave=(id,at,n=2)=>{const a=`${M(id)} .m-arm-r`;tl.to(a,{rotation:-100,duration:.3,ease:E,transformOrigin:'12% 12%'},at);
+  for(let i=0;i<n;i++){tl.to(a,{rotation:-75,duration:.18,ease:'sine.inOut',transformOrigin:'12% 12%'},at+.3+i*.36);tl.to(a,{rotation:-105,duration:.18,ease:'sine.inOut',transformOrigin:'12% 12%'},at+.48+i*.36);}
+  tl.to(a,{rotation:0,duration:.35,ease:E,transformOrigin:'12% 12%'},at+.3+n*.36);};
+const happy=(id,at)=>{tl.to(`${M(id)} .m-smile`,{opacity:0,duration:.1},at);tl.to(`${M(id)} .m-grin`,{opacity:1,duration:.1},at);
+  tl.to(`${M(id)} .m-arm-l`,{rotation:75,duration:.3,ease:'back.out(2)',transformOrigin:'88% 12%'},at);tl.to(`${M(id)} .m-arm-r`,{rotation:-75,duration:.3,ease:'back.out(2)',transformOrigin:'12% 12%'},at);
+  tl.to(`${M(id)} .m-root`,{y:-18,duration:.22,ease:'power2.out',yoyo:true,repeat:1},at);};
+const nod=(id,at)=>tl.to(`${M(id)} .m-body`,{rotation:6,duration:.18,ease:'sine.inOut',yoyo:true,repeat:1,transformOrigin:'50% 100%'},at);
+const wink=(id,at)=>{tl.to(`${M(id)} .m-eye-r`,{scaleY:.1,duration:.08,transformOrigin:'50% 50%'},at);tl.to(`${M(id)} .m-look circle:nth-child(2)`,{opacity:0,duration:.05},at);
+  tl.to(`${M(id)} .m-eye-r`,{opacity:0,duration:.01},at+.08);tl.to(`${M(id)} .m-wink`,{opacity:1,duration:.05},at+.08);};
+const bob=(id,at,dur)=>tl.to(`${M(id)} .m-body`,{y:-5,duration:.9,ease:'sine.inOut',yoyo:true,repeat:Math.max(1,Math.floor(dur/.9)-1)},at);
+
+// 1. Hook — words drift in, hold, soften away.
+soft('.s-hook .eyebrow',.05,.8,10);
+document.querySelectorAll('.line1 .word').forEach((w,i)=>soft(w,.2+i*.12,1.0,30));
+document.querySelectorAll('.line2 .word').forEach((w,i)=>soft(w,.55+i*.1,1.0,30));
+soft('.hook-note',1.5,.9,14);
+out('.s-hook',3.05,.5);
+
+// 2. Product — window rises, slow push-in, SOQL types, Run, rows settle.
+soft('.s-product .eyebrow',3.55,.7,10);
+soft('.p-caption',3.65,1.0,24);
+soft('.p-note',4.3,.9,14);
+tl.fromTo('.window',{opacity:0,y:60,scale:.97,filter:'blur(6px)'},{opacity:1,y:0,scale:1,filter:'blur(0px)',duration:1.1,ease:'power3.out'},3.6);
+tl.fromTo('.window-cam',{scale:.985},{scale:1.03,duration:6.2,ease:S,transformOrigin:'60% 40%'},3.6);
+codeChars.forEach((c,i)=>tl.set(c,{display:'inline'},4.45+i*.045));
+tl.to('.run-on',{opacity:1,duration:.3,ease:E},6.15);
+tl.set('.run-label',{opacity:0},6.45);
+tl.fromTo('.p-ptr',{x:1180,y:560,opacity:0},{x:1010,y:290,opacity:1,duration:.8,ease:'power3.out'},5.9);
+tl.to('.run',{scale:.96,duration:.08},6.68);tl.to('.run',{scale:1,duration:.2,ease:E},6.76);
+tl.to('.p-ptr',{opacity:0,duration:.35},7.2);
+soft('.r-head',7.0,.6,12);
+['.r1','.r2','.r3'].forEach((r,i)=>soft(r,7.15+i*.22,.8,16));
+out('.s-product',9.55,.5);
+
+// 3. Formats — title, cards rise one by one.
+soft('.s-formats .eyebrow',10.1,.7,10);
+soft('.f-title',10.2,1.0,24);
+['.c1','.c2','.c3','.c4'].forEach((c,i)=>tl.fromTo(c,{opacity:0,y:50,filter:'blur(8px)'},{opacity:1,y:0,filter:'blur(0px)',duration:.9,ease:'power3.out'},10.75+i*.16));
+tl.fromTo('.c1 .tick',{scale:0},{scale:1,duration:.4,ease:'back.out(2)'},11.9);
+soft('.f-note',12.0,.8,12);
+out('.s-formats',13.35,.5);
+
+// 4. Trust — title, modal, dry run, typed phrase, confirm.
+soft('.s-trust .eyebrow',13.9,.7,10);
+soft('.t-title',14.0,1.0,26);
+tl.fromTo('.modal',{opacity:0,y:50,scale:.97,filter:'blur(6px)'},{opacity:1,y:0,scale:1,filter:'blur(0px)',duration:1.0,ease:'power3.out'},14.15);
+soft('.t-note',14.7,.9,14);
+tl.fromTo('.toast',{opacity:0,y:30},{opacity:1,y:0,duration:.7,ease:'power3.out'},14.9);
+document.querySelectorAll('.phrase .ch').forEach((c,i)=>tl.set(c,{display:'inline'},15.45+i*.06));
+tl.to('.confirm-on',{opacity:1,duration:.3,ease:E},16.5);
+tl.set('.confirm-label',{opacity:0},16.8);
+tl.fromTo('.t-ptr',{x:1840,y:960,opacity:0},{x:1640,y:705,opacity:1,duration:.8,ease:'power3.out'},16.1);
+tl.to('.confirm',{scale:.97,duration:.08},16.88);tl.to('.confirm',{scale:1,duration:.2,ease:E},16.96);
+tl.to('.confirm-done',{opacity:1,duration:.3,ease:E},16.96);
+tl.to('.confirm-on',{opacity:0,duration:.2},17.2);
+tl.to('.t-ptr',{opacity:0,duration:.35},17.4);
+tl.to('.t-caret',{opacity:0,duration:.2},16.5);
+out('.s-trust',18.35,.5);
+
+// 5. Languages — title, nine tiles appear one by one.
+soft('.s-langs .eyebrow',18.9,.7,10);
+soft('.l-title',19.0,1.0,26);
+soft('.l-note',19.5,.9,14);
+document.querySelectorAll('.lang').forEach((d,i)=>tl.fromTo(d,{opacity:0,y:26,filter:'blur(6px)'},{opacity:1,y:0,filter:'blur(0px)',duration:.7,ease:E},19.2+i*.11));
+out('.s-langs',21.35,.5);
+
+// 6. Outro — mark, line, held to the end.
+tl.fromTo('.o-mark img',{opacity:0,scale:.9,filter:'blur(8px)'},{opacity:1,scale:1,filter:'blur(0px)',duration:1.0,ease:'power3.out'},21.9);
+soft('.o-word',22.05,1.0,20);
+soft('.o-line',22.6,1.0,18);
+soft('.o-sub',23.2,.9,12);
+// Wavey choreography.
+pop('m-hook',1.0); wave('m-hook',1.55,2); blink('m-hook',2.75);
+peek('m-prod',4.7); blink('m-prod',5.4); look('m-prod',5.9,-4,5); look('m-prod',7.15,-5,7); happy('m-prod',7.6); blink('m-prod',8.7);
+pop('m-fmt',11.15); nod('m-fmt',11.95); blink('m-fmt',12.6);
+pop('m-trust',14.6); look('m-trust',15.4,-5,-5); look('m-trust',16.35,4,-5,.5); blink('m-trust',16.0); happy('m-trust',17.0);
+pop('m-lang',19.45); look('m-lang',19.6,-5,-1);
+['Hello','Hola','こんにちは','안녕하세요','Bonjour'].forEach((_,i)=>{const s=`.bubble span:nth-child(${i+1})`;tl.to(s,{opacity:1,duration:.12},19.75+i*.32);if(i<4)tl.to(s,{opacity:0,duration:.1},19.75+(i+1)*.32-.02);});
+tl.fromTo('.bubble',{opacity:0,scale:.8},{opacity:1,scale:1,duration:.35,ease:'back.out(1.8)',transformOrigin:'100% 70%'},19.65);
+pop('m-out',23.0); wave('m-out',23.45,2); wink('m-out',24.55);
+window.__timelines=window.__timelines||{};window.__timelines['wavelink-calm']=tl;
+</script></body></html>

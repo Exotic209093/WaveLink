@@ -1,0 +1,38 @@
+<svg viewBox="0 0 220 240" xmlns="http://www.w3.org/2000/svg" overflow="visible">
+  <defs>
+    <linearGradient id="wavey-body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#48cae4"/><stop offset="100%" stop-color="#0284a8"/>
+    </linearGradient>
+    <linearGradient id="wavey-crest" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9ee6f3"/><stop offset="100%" stop-color="#48cae4"/>
+    </linearGradient>
+    <clipPath id="wavey-clip"><path d="M110 42 C156 42 188 82 188 134 C188 186 154 216 110 216 C66 216 32 186 32 134 C32 82 64 42 110 42 Z"/></clipPath>
+  </defs>
+  <ellipse class="m-shadow" cx="110" cy="230" rx="62" ry="8" fill="#1c1b19" opacity=".12"/>
+  <g class="m-root">
+    <g class="m-arm-l"><rect x="14" y="132" width="24" height="52" rx="12" fill="#0e8fb2" transform="rotate(28 30 140)"/></g>
+    <g class="m-arm-r"><rect x="182" y="132" width="24" height="52" rx="12" fill="#0e8fb2" transform="rotate(-28 190 140)"/></g>
+    <g class="m-body">
+      <path class="m-crest" d="M88 64 C90 30 124 10 146 22 C158 29 158 45 147 50 C141 39 128 37 123 49 C119 57 106 62 88 64 Z" fill="url(#wavey-crest)"/>
+      <path d="M110 42 C156 42 188 82 188 134 C188 186 154 216 110 216 C66 216 32 186 32 134 C32 82 64 42 110 42 Z" fill="url(#wavey-body)"/>
+      
+      <g clip-path="url(#wavey-clip)">
+        <path d="M40 176 C56 160 72 160 84 176 S112 192 128 176 S156 160 176 170" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" opacity=".9"/>
+        <path d="M40 196 C56 182 72 182 84 196 S112 210 128 196 S156 182 176 190" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" opacity=".45"/>
+        <ellipse cx="78" cy="78" rx="26" ry="14" fill="#fff" opacity=".18" transform="rotate(-24 78 78)"/>
+      </g>
+      <g class="m-face">
+        <ellipse cx="72" cy="140" rx="11" ry="6" fill="#ffc2cc" opacity=".7"/>
+        <ellipse cx="148" cy="140" rx="11" ry="6" fill="#ffc2cc" opacity=".7"/>
+        <g class="m-eyes">
+          <g class="m-eye-l"><ellipse cx="88" cy="116" rx="10" ry="13" fill="#132029"/></g>
+          <g class="m-eye-r"><ellipse cx="132" cy="116" rx="10" ry="13" fill="#132029"/></g>
+          <g class="m-look"><circle cx="84" cy="111" r="3.6" fill="#fff"/><circle cx="128" cy="111" r="3.6" fill="#fff"/></g>
+        </g>
+        <path class="m-wink" d="M122 117 Q132 109 142 117" fill="none" stroke="#132029" stroke-width="4.5" stroke-linecap="round" opacity="0"/>
+        <path class="m-smile" d="M98 140 Q110 152 122 140" fill="none" stroke="#132029" stroke-width="4.5" stroke-linecap="round"/>
+        <path class="m-grin" d="M96 139 Q110 160 124 139 Z" fill="#132029" opacity="0"/>
+      </g>
+    </g>
+  </g>
+</svg>

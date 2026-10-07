@@ -1,0 +1,397 @@
+﻿{
+  "ok": true,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 9,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "duplicate_media_discovery_risk",
+        "severity": "warning",
+        "message": "Detected 4 matching img entries with the same source/start/duration.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\james\\projects\\WaveLink\\brag-output-2026-10-03-193129\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Avoid duplicated media nodes that can be discovered twice during compilation."
+      },
+      {
+        "code": "overlapping_gsap_tweens",
+        "severity": "warning",
+        "message": "GSAP tweens overlap on \"#export-cursor\" for scale between 14.79s and 14.79s.",
+        "selector": "#export-cursor",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\james\\projects\\WaveLink\\brag-output-2026-10-03-193129\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Shorten the earlier tween, move the later tween, or add `overwrite: \"auto\"`."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<section id=\"scene-intro\"> is a timeline element that contains nested <div id=\"intro-content\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene-intro",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\james\\projects\\WaveLink\\brag-output-2026-10-03-193129\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <section id=\"scene-intro\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<section id=\"scene-query\"> is a timeline element that contains nested <div id=\"query-content\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene-query",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\james\\projects\\WaveLink\\brag-output-2026-10-03-193129\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <section id=\"scene-query\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<section id=\"scene-export\"> is a timeline element that contains nested <div id=\"export-content\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene-export",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\james\\projects\\WaveLink\\brag-output-2026-10-03-193129\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <section id=\"scene-export\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<section id=\"scene-outro\"> is a timeline element that contains nested <div id=\"outro-content\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene-outro",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\james\\projects\\WaveLink\\brag-output-2026-10-03-193129\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <section id=\"scene-outro\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<div id=\"wash-a\"> is a timeline element that contains nested <div>. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#wash-a",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\james\\projects\\WaveLink\\brag-output-2026-10-03-193129\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <div id=\"wash-a\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<div id=\"wash-b\"> is a timeline element that contains nested <div>. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#wash-b",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\james\\projects\\WaveLink\\brag-output-2026-10-03-193129\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <div id=\"wash-b\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<div id=\"wash-c\"> is a timeline element that contains nested <div>. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#wash-c",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\james\\projects\\WaveLink\\brag-output-2026-10-03-193129\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <div id=\"wash-c\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      }
+    ],
+    "filesScanned": 1
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 5,
+    "findings": [
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 11,
+        "selector": "#export-content > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 150,
+          "top": 113.79,
+          "right": 336.11,
+          "bottom": 133.79,
+          "width": 186.11,
+          "height": 20
+        },
+        "containerSelector": "#wash-b > div:nth-of-type(1)",
+        "text": "A clear handoff",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-s9v4"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 150,
+          "y": 113.79,
+          "width": 186.11,
+          "height": 20
+        },
+        "firstSeen": 11,
+        "lastSeen": 11,
+        "occurrences": 1,
+        "heldMs": 0
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 11,
+        "selector": "#export-content > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 150,
+          "top": 125.79,
+          "right": 400.09,
+          "bottom": 197.79,
+          "width": 250.09,
+          "height": 72
+        },
+        "containerSelector": "#wash-b > div:nth-of-type(1)",
+        "text": "Your data.",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-7il6"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 150,
+          "y": 125.79,
+          "width": 250.09,
+          "height": 72
+        },
+        "firstSeen": 11,
+        "lastSeen": 11,
+        "occurrences": 1,
+        "heldMs": 0
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 11,
+        "selector": "#export-content > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > span:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 400.09,
+          "top": 125.79,
+          "right": 695.63,
+          "bottom": 197.79,
+          "width": 295.53,
+          "height": 72
+        },
+        "containerSelector": "#wash-b > div:nth-of-type(1)",
+        "text": "Your format.",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-r7pp"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 400.09,
+          "y": 125.79,
+          "width": 295.53,
+          "height": 72
+        },
+        "firstSeen": 11,
+        "lastSeen": 11,
+        "occurrences": 1,
+        "heldMs": 0
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 11,
+        "selector": "#export-content > div:nth-of-type(1) > div:nth-of-type(2)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 1416.58,
+          "top": 138.2,
+          "right": 1770,
+          "bottom": 189.84,
+          "width": 353.42,
+          "height": 51.64
+        },
+        "containerSelector": "#wash-b > div:nth-of-type(1)",
+        "text": "Choose the shape that fits the next step in your workflow.",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-ia3i"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 1416.58,
+          "y": 138.2,
+          "width": 353.42,
+          "height": 51.64
+        },
+        "firstSeen": 11,
+        "lastSeen": 11,
+        "occurrences": 1,
+        "heldMs": 0
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 11,
+        "selector": "#export-content > div:nth-of-type(8)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 1655.63,
+          "top": 1010,
+          "right": 1770,
+          "bottom": 1029,
+          "width": 114.38,
+          "height": 19
+        },
+        "containerSelector": "#wash-b > div:nth-of-type(1)",
+        "text": "03 / export",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-wab3"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 1655.63,
+          "y": 1010,
+          "width": 114.38,
+          "height": 19
+        },
+        "firstSeen": 11,
+        "lastSeen": 11,
+        "occurrences": 1,
+        "heldMs": 0
+      }
+    ],
+    "duration": 22,
+    "samples": [
+      1.222,
+      3.667,
+      6.111,
+      8.556,
+      11,
+      13.444,
+      15.889,
+      18.333,
+      20.778
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 5,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      1.222,
+      6.111,
+      11,
+      15.889,
+      20.778
+    ],
+    "checked": 74,
+    "passed": 74
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  },
+  "_meta": {
+    "version": "0.8.115",
+    "latestVersion": "0.8.115",
+    "updateAvailable": false
+  }
+}
+

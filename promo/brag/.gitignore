@@ -1,0 +1,17 @@
+# Re-creatable or too large for GitHub: dependencies, bundled ffmpeg (>100 MB),
+# raw renders and drafts, QA scratch, and Microsoft system fonts (not
+# redistributable; copy them from C:\Windows\Fonts to re-render).
+**/node_modules/
+**/tools/
+**/brag-render.mp4
+**/renders/
+**/assets/fonts/
+**/qa/
+**/qa-initial/
+**/qa-final/
+**/check-stderr.log
+**/work/*
+!**/work/music/
+**/work/music/*
+!**/work/music/make_bed.py
+__pycache__/

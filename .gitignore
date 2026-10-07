@@ -10,3 +10,7 @@ coverage/
 *.crx
 .idea/
 .claude/settings.local.json
+
+# Original /brag working folders (sources copied to promo/brag/)
+/brag-output-*/
+/promo-video.html

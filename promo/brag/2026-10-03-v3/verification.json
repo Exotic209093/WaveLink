@@ -1,0 +1,28 @@
+{
+  "duration": 22.0,
+  "width": 1920,
+  "height": 1080,
+  "fps": "30/1",
+  "frames": 660,
+  "bytes": 2750080,
+  "full_decode": "passed",
+  "poster_source_seconds": 1.8,
+  "poster_baked_into_frame_zero": true,
+  "poster_frame_zero_mean_pixel_error_0_to_255": 3.442,
+  "audio_copied_from_hyperframes_render": true,
+  "audio_analysis": "Summary:\n\n  Integrated loudness:\n    I:         -16.0 LUFS\n    Threshold: -26.0 LUFS\n\n  Loudness range:\n    LRA:         4.3 LU\n    Threshold: -35.9 LUFS\n    LRA low:   -18.5 LUFS\n    LRA high:  -14.1 LUFS\n\n  True peak:\n    Peak:       -1.8 dBFS\n[out#0/null @ 000002804581e600] video:0KiB audio:4128KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown\nsize=N/A time=00:00:22.01 bitrate=N/A speed= 281x    \n",
+  "streams": [
+    {
+      "codec_type": "video",
+      "codec_name": "h264",
+      "sample_rate": null,
+      "channels": null
+    },
+    {
+      "codec_type": "audio",
+      "codec_name": "aac",
+      "sample_rate": "48000",
+      "channels": 2
+    }
+  ]
+}

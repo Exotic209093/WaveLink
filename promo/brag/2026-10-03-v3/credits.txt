@@ -1,0 +1,19 @@
+WaveLink v3 promo
+
+Workflow: latent-spaces/brag, full Hyperframes workflow, installed from
+https://github.com/latent-spaces/brag/tree/main/skills/brag
+
+Animation/rendering: HyperFrames CLI 0.8.115, local HTML/GSAP composition.
+Brand and product UI: this WaveLink repository, source revision e6a396b.
+The UI is an illustrative reconstruction with fictional sample records.
+No Salesforce org or live records were accessed.
+
+Music: Happy Beats / Business Moves vol. 12, ende.app, bundled by brag.
+Source and cue information: brag/assets/music/README.md and cues/.
+Sound effects: Kenney, CC0, selected from brag's bundled SFX library.
+Font: local Windows Segoe UI and Consolas, matching product fallback families.
+
+This output was created locally. Nothing has been published.
+V1 remains in the separate promo/ directory.
+
+Motion source references: HyperFrames catalog zoom-through-transition and logo-brand-close, adapted into the local timeline.
