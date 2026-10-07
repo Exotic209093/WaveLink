@@ -1,0 +1,31 @@
+1
+00:00:00,000 --> 00:00:07,500
+Meet WaveLink. Your Salesforce data workspace.
+
+2
+00:00:07,500 --> 00:00:15,000
+Export, import and convert, right from your browser.
+
+3
+00:00:15,000 --> 00:00:25,000
+Write SOQL, preview results, and export to CSV, JSON, Excel or XML.
+
+4
+00:00:25,000 --> 00:00:35,000
+Map fields, validate your data, and review before you run.
+
+5
+00:00:35,000 --> 00:00:45,000
+Compare local files or snapshots to find added, removed and changed records.
+
+6
+00:00:45,000 --> 00:00:55,000
+Save export and import configurations, and keep activity in view.
+
+7
+00:00:55,000 --> 00:01:05,000
+Local-first by design. No WaveLink backend, analytics or telemetry.
+
+8
+00:01:05,000 --> 00:01:15,000
+WaveLink. Salesforce data. In your flow. Explore the project on GitHub.
