@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WaveLink — Promo film</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#061727;color:#f5fbff;font-family:"Segoe UI",sans-serif}
+    main{max-width:1440px;margin:0 auto;padding:32px}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+    h1{font-size:23px;margin:0}p{color:#adcad9;font-size:15px}video{display:block;width:100%;border-radius:14px;background:#061727;box-shadow:0 20px 80px #0005}
+    nav{display:flex;gap:24px;flex-wrap:wrap;margin-top:24px}a{color:#66dbef;text-underline-offset:4px}small{color:#adcad9}
+    @media(max-width:600px){main{padding:16px}header{display:block}}
+  </style>
+</head>
+<body><main>
+  <header><h1>WaveLink — Salesforce data. In your flow.</h1><p>Full promo · 75 seconds · 1080p</p></header>
+  <video controls preload="metadata" poster="output/wavelink-poster.jpg" aria-label="WaveLink promo film with instrumental music and on-screen product descriptions">
+    <source src="output/wavelink-promo-full-polished.mp4" type="video/mp4">
+    Your browser does not support video playback. Use the download link below.
+  </video>
+  <nav aria-label="Film downloads">
+    <a href="output/wavelink-promo-full-polished.mp4" download>Download MP4</a>
+    <a href="output/wavelink-promo.srt" download>Download captions</a>
+    <a href="output/storyboard.jpg">View storyboard</a>
+    <a href="storyboard.json">Editable copy and timing</a>
+  </nav>
+  <p><small>Product preview using redacted v0.6.0 repository screenshots. Original instrumental score; no voiceover.</small></p>
+</main></body></html>
