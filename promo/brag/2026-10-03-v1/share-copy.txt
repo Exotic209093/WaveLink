@@ -1,0 +1,3 @@
+Meet WaveLink: a local-first Salesforce data workspace in your browser. Write SOQL, preview records, and export to CSV, JSON, Excel or XML.
+
+Explore the project: https://github.com/Exotic209093/WaveLink

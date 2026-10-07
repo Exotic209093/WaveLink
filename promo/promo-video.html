@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WaveLink — Promo Video</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0e17;
+    --surface: #131926;
+    --accent: #0ea5e9;
+    --accent-glow: rgba(14, 165, 233, 0.3);
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --success: #22c55e;
+    --warn: #f59e0b;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  /* ── Slide container ── */
+  #stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: scale(0.96);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    pointer-events: none;
+    padding: 4rem 6rem;
+    text-align: center;
+  }
+
+  .slide.active {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+
+  /* ── Typography ── */
+  .tagline {
+    font-size: clamp(2.4rem, 5vw, 4.5rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 1.5rem;
+  }
+
+  .hook {
+    font-size: clamp(1.1rem, 2vw, 1.6rem);
+    font-weight: 300;
+    color: var(--text-muted);
+    max-width: 48rem;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+  }
+
+  .beat-number {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    margin-bottom: 1rem;
+  }
+
+  .beat-text {
+    font-size: clamp(1.4rem, 3vw, 2.4rem);
+    font-weight: 600;
+    line-height: 1.35;
+    max-width: 52rem;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 2rem;
+    width: 100%;
+    max-width: 64rem;
+    margin-top: 2rem;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 1rem;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  .stat-card.visible {
+    animation: statIn 0.6s ease forwards;
+  }
+
+  .stat-value {
+    font-size: 2.8rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-label {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .cta {
+    font-size: clamp(1.3rem, 2.5vw, 2rem);
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--accent);
+    padding: 1.2rem 3rem;
+    border-radius: 999px;
+    display: inline-block;
+    margin-top: 2rem;
+    box-shadow: 0 0 40px var(--accent-glow);
+  }
+
+  .social-caption {
+    font-size: 1rem;
+    color: var(--text-muted);
+    margin-top: 2rem;
+    max-width: 36rem;
+    line-height: 1.5;
+  }
+
+  /* ── Background effects ── */
+  .bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+    z-index: -2;
+  }
+
+  .bg-glow {
+    position: fixed;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: -1;
+    opacity: 0.4;
+    animation: glowPulse 6s ease-in-out infinite;
+  }
+
+  /* ── Progress bar ── */
+  #progress {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: var(--accent);
+    transition: width 0.3s linear;
+    z-index: 100;
+  }
+
+  /* ── Controls ── */
+  #controls {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 2rem;
+    display: flex;
+    gap: 0.75rem;
+    z-index: 100;
+  }
+
+  #controls button {
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text);
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+
+  #controls button:hover { background: rgba(255,255,255,0.08); }
+
+  #slide-counter {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 2rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    z-index: 100;
+  }
+
+  /* ── Animations ── */
+  @keyframes statIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes glowPulse {
+    0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
+    50% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.1); }
+  }
+
+  /* ── Logo mark ── */
+  .logo-mark {
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 2rem;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+
+<div id="stage">
+
+  <!-- SLIDE 0: Title -->
+  <div class="slide active" data-duration="6000">
+    <div class="logo-mark">WaveLink</div>
+    <div class="tagline">Your Data Never Leaves<br>Your Machine</div>
+    <div class="hook">Local-first Salesforce development, zero trust compromises.</div>
+  </div>
+
+  <!-- SLIDE 1: Hook -->
+  <div class="slide" data-duration="7000">
+    <div class="beat-number">The Problem</div>
+    <div class="beat-text">Stop trusting third-party servers with your Salesforce org data.</div>
+    <div class="hook" style="margin-top:1.5rem">Every credential, query, and configuration should stay entirely on your device.</div>
+  </div>
+
+  <!-- SLIDE 2: Zero Config -->
+  <div class="slide" data-duration="6000">
+    <div class="beat-number">Zero Configuration</div>
+    <div class="beat-text">Installs as a browser extension.<br>No OAuth app registration.<br>No external service setup.</div>
+  </div>
+
+  <!-- SLIDE 3: Local Storage -->
+  <div class="slide" data-duration="6000">
+    <div class="beat-number">Local-First Storage</div>
+    <div class="beat-text">Every credential, query, and preference persisted via chrome.storage.local.</div>
+    <div class="hook" style="margin-top:1rem">Nothing touches a third-party server. Ever.</div>
+  </div>
+
+  <!-- SLIDE 4: 21 Screens -->
+  <div class="slide" data-duration="6500">
+    <div class="beat-number">Full Toolkit</div>
+    <div class="beat-text">21 dedicated screens for complex admin workflows.</div>
+    <div class="hook" style="margin-top:1rem">Cross-org diffs · Pipeline builders · Scheduled snapshots · Schema explorer · Duplicate detection · Bulk operations</div>
+  </div>
+
+  <!-- SLIDE 5: Command Palette -->
+  <div class="slide" data-duration="5500">
+    <div class="beat-number">Power User Speed</div>
+    <div class="beat-text">Command palette + customizable keyboard shortcuts eliminate excessive clicking.</div>
+  </div>
+
+  <!-- SLIDE 6: Shadow DOM -->
+  <div class="slide" data-duration="5500">
+    <div class="beat-number">Secure by Design</div>
+    <div class="beat-text">Shadow DOM isolation prevents style and script leakage into your org's UI.</div>
+  </div>
+
+  <!-- SLIDE 7: Undo -->
+  <div class="slide" data-duration="5500">
+    <div class="beat-number">Safety Net</div>
+    <div class="beat-text">Built-in undo history lets you revert operations without risking production data.</div>
+  </div>
+
+  <!-- SLIDE 8: Zero Telemetry -->
+  <div class="slide" data-duration="5500">
+    <div class="beat-number">Privacy by Design</div>
+    <div class="beat-text">Zero analytics. Zero telemetry. Zero crash reporting.</div>
+    <div class="hook" style="margin-top:1rem">Your org data stays completely private.</div>
+  </div>
+
+  <!-- SLIDE 9: Stats -->
+  <div class="slide" data-duration="8000" data-stats="true">
+    <div class="beat-number">By the Numbers</div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-value">0</div><div class="stat-label">External servers</div></div>
+      <div class="stat-card"><div class="stat-value">21</div><div class="stat-label">Dedicated screens</div></div>
+      <div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Telemetry collected</div></div>
+      <div class="stat-card"><div class="stat-value">41.5K</div><div class="stat-label">Lines of TypeScript</div></div>
+      <div class="stat-card"><div class="stat-value">184</div><div class="stat-label">Source files</div></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 10: CTA -->
+  <div class="slide" data-duration="8000">
+    <div class="logo-mark">WaveLink</div>
+    <div class="tagline">Your Data Never Leaves<br>Your Machine</div>
+    <div class="cta">Install WaveLink Today</div>
+    <div class="social-caption">🔒 21 screens · Zero external servers · Zero telemetry<br>Local-first dev tools for security-conscious admins.<br>#Salesforce #LocalFirst #PrivacyByDesign</div>
+  </div>
+
+</div>
+
+<div id="progress" style="width:0%"></div>
+<div id="slide-counter">1 / 11</div>
+<div id="controls">
+  <button id="btn-prev">← Prev</button>
+  <button id="btn-pause">Pause</button>
+  <button id="btn-next">Next →</button>
+  <button id="btn-restart">Restart</button>
+</div>
+
+<script>
+(function() {
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const progress = document.getElementById('progress');
+  const counter = document.getElementById('slide-counter');
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+  const btnPause = document.getElementById('btn-pause');
+  const btnRestart = document.getElementById('btn-restart');
+
+  let current = 0;
+  let paused = false;
+  let timer = null;
+  let elapsed = 0;
+  let lastTick = performance.now();
+
+  function getDuration(index) {
+    return parseInt(slides[index].dataset.duration || '6000', 10);
+  }
+
+  function showSlide(index) {
+    slides.forEach((s, i) => s.classList.toggle('active', i === index));
+    counter.textContent = (index + 1) + ' / ' + slides.length;
+
+    // Animate stat cards if this is the stats slide
+    if (slides[index].dataset.stats === 'true') {
+      const cards = slides[index].querySelectorAll('.stat-card');
+      cards.forEach((card, i) => {
+        card.classList.remove('visible');
+        setTimeout(() => card.classList.add('visible'), 200 + i * 200);
+      });
+    }
+
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const totalDuration = slides.reduce((sum, s) => sum + getDuration(Array.from(slides).indexOf(s)), 0);
+    let completedDuration = 0;
+    for (let i = 0; i < current; i++) completedDuration += getDuration(i);
+    const pct = Math.min(100, ((completedDuration + elapsed) / totalDuration) * 100);
+    progress.style.width = pct + '%';
+  }
+
+  function advance() {
+    if (current < slides.length - 1) {
+      current++;
+      elapsed = 0;
+      lastTick = performance.now();
+      showSlide(current);
+      scheduleNext();
+    } else {
+      paused = true;
+      btnPause.textContent = 'Replay';
+      progress.style.width = '100%';
+    }
+  }
+
+  function scheduleNext() {
+    clearTimeout(timer);
+    if (paused) return;
+    const remaining = getDuration(current) - elapsed;
+    timer = setTimeout(advance, remaining);
+  }
+
+  function tick() {
+    if (!paused) {
+      const now = performance.now();
+      elapsed += now - lastTick;
+      lastTick = now;
+      updateProgress();
+    } else {
+      lastTick = performance.now();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // Controls
+  btnNext.addEventListener('click', () => {
+    if (current < slides.length - 1) {
+      current++;
+      elapsed = 0;
+      lastTick = performance.now();
+      showSlide(current);
+      if (!paused) scheduleNext();
+    }
+  });
+
+  btnPrev.addEventListener('click', () => {
+    if (current > 0) {
+      current--;
+      elapsed = 0;
+      lastTick = performance.now();
+      showSlide(current);
+      if (!paused) scheduleNext();
+    }
+  });
+
+  btnPause.addEventListener('click', () => {
+    paused = !paused;
+    btnPause.textContent = paused ? 'Play' : 'Pause';
+    if (paused) {
+      clearTimeout(timer);
+    } else {
+      lastTick = performance.now();
+      if (current === slides.length - 1) {
+        // Restart from beginning
+        current = 0;
+        elapsed = 0;
+        showSlide(0);
+      }
+      scheduleNext();
+    }
+  });
+
+  btnRestart.addEventListener('click', () => {
+    current = 0;
+    elapsed = 0;
+    paused = false;
+    btnPause.textContent = 'Pause';
+    lastTick = performance.now();
+    showSlide(0);
+    scheduleNext();
+  });
+
+  // Keyboard controls
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); btnNext.click(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); btnPrev.click(); }
+    if (e.key === 'p') { btnPause.click(); }
+    if (e.key === 'r') { btnRestart.click(); }
+  });
+
+  // Start
+  showSlide(0);
+  scheduleNext();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

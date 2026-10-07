@@ -115,7 +115,7 @@ All screenshots are captures of v0.6.0 at the required dimensions; the 0.7.0 cha
 ### Promo video
 
 The store accepts a YouTube link, not a file. Upload the 25-second calm cut
-(`brag-output-2026-10-04-225829/brag.mp4`, kept outside the repository) to
+(`promo/brag/2026-10-04-launch-0.7/brag.mp4`) to
 YouTube as **Unlisted**, titled "WaveLink — Salesforce data, right in your
 browser", then paste the YouTube URL into **Store listing → Promo video**. The
 same link works for every language listing. The voiceover was generated on an
