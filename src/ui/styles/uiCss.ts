@@ -463,6 +463,7 @@ export const uiCss = `
   color: var(--wl-ink);
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
 }
+a.wl-btn { display: inline-block; text-decoration: none; }
 .wl-btn:hover { border-color: rgba(2, 132, 168, 0.45); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(2, 90, 120, 0.08); }
 .wl-btn:active { transform: translateY(0px); box-shadow: none; }
 .wl-btnPrimary {

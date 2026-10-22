@@ -12,6 +12,7 @@ import type { SfApi } from '../api/sf';
 import type { PushHistoryEntry, ScheduledExport, ExportSnapshot } from '../../core/types/storage';
 import { Icon } from '../components/Icon';
 import { Wavey } from '../components/Wavey';
+import { formatRelative } from './SchedulesScreen';
 
 interface HomeScreenProps {
   sf: SfApi;
@@ -25,14 +26,6 @@ interface ActivityEntry {
   title: string;
   sub: string;
   time: number;
-}
-
-function formatRelative(ms: number): string {
-  const diff = Date.now() - ms;
-  if (diff < 60_000) return 'just now';
-  if (diff < 3_600_000) return `${Math.round(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.round(diff / 3_600_000)}h ago`;
-  return `${Math.round(diff / 86_400_000)}d ago`;
 }
 
 export function HomeScreen(props: HomeScreenProps): VNode {

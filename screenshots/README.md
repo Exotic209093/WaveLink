@@ -14,13 +14,17 @@ Take screenshots of these key flows in the extension:
 | File name | What to capture |
 |-----------|----------------|
 | `screenshot-01-home.png` | Connected Home workspace |
-| `screenshot-02-export.png` | SOQL Export with redacted live results |
+| `screenshot-02-export.png` | SOQL Export with results in the grid |
 | `screenshot-03-import-review.png` | Production-aware Import review |
 | `screenshot-04-compare.png` | Local files and snapshot Compare workspace |
 | `screenshot-05-activity.png` | Unified Jobs & Activity history |
 
-All five images were captured from the packaged v0.6.0 release-candidate build on 2026-08-30 at
-exactly 1280x800. Org, user, and record identifiers were redacted before capture.
+All five images were captured from the v1.0.0 build on 2026-10-22 at exactly 1280x800 PNG, using
+fictional demo data only (an "Acme demo" org with made-up Accounts such as "Blue Harbor Logistics").
+The production build (`npm run build`) was served locally with a scratch in-page fake `chrome.*` API and a
+stubbed Salesforce REST endpoint, then captured with headless Edge over CDP (light theme; page scale 0.7-0.85
+so results fit the frame). No real org, user, or record identifiers appear. The scratch harness lives in the
+untracked `preview/harness/` folder.
 
 ## Promotional assets
 
