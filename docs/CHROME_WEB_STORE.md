@@ -1,6 +1,6 @@
 # Chrome Web Store release kit
 
-This file is the source of truth for the WaveLink 0.7.3 listing and privacy declarations. Copy text exactly unless the Chrome Web Store dashboard requires a shorter value.
+This file is the source of truth for the WaveLink 1.0.0 listing and privacy declarations. Copy text exactly unless the Chrome Web Store dashboard requires a shorter value.
 
 ## Dashboard and public links
 
@@ -18,7 +18,7 @@ npm run assets:store
 npm run package
 ```
 
-Upload `wavelink-0.7.3.zip`. The package contains the compiled Manifest V3 extension, icons, and bundled privacy page; it excludes source, tests, and build-only files.
+Upload `wavelink-1.0.0.zip`. The package contains the compiled Manifest V3 extension, icons, and bundled privacy page; it excludes source, tests, and build-only files.
 
 ## Store listing
 
@@ -36,9 +36,15 @@ The summary comes from `public/_locales/en/messages.json` (`extDescription`) and
 
 ### Detailed description
 
-> Get Salesforce data out in seconds — straight from the browser tab you're already logged into.
+> Back up and export Salesforce data in seconds — straight from the browser tab you're already logged into.
 >
-> WaveLink is a free, open-source data workspace for Salesforce admins, developers, and consultants. Write or build a SOQL query, preview the records, pick your columns, and download CSV, Excel, JSON, or XML. No Java runtime, no desktop Data Loader install, no third-party server holding your data.
+> WaveLink is a free, open-source data workspace for Salesforce admins, developers, and consultants. Schedule local backups of the objects that matter and see exactly what changed, or write a SOQL query and download CSV, Excel, JSON, or XML. No Java runtime, no desktop Data Loader install, no third-party server holding your data.
+>
+> SCHEDULED BACKUPS
+>
+> • Schedule recurring local snapshots of key objects, in your time zone, that keep running across browser restarts
+> • Diff any two snapshots to see added, changed, and removed records field-by-field
+> • Snapshots stay on your device; storage limits fail loudly instead of silently truncating
 >
 > EXPORT
 >
@@ -47,15 +53,15 @@ The summary comes from `public/_locales/en/messages.json` (`extDescription`) and
 > • CSV, Excel (XLSX), JSON, or XML with only the columns you choose
 > • Save queries as reusable jobs and re-run them in one click
 >
-> SNAPSHOTS AND COMPARE
+> COMPARE
 >
-> • Schedule recurring local snapshots of key objects
-> • Compare two files, two snapshots, or two connected orgs field-by-field
+> • Compare two files, two snapshots, or two connected orgs field-by-field, then sync only what changed
 >
 > IMPORT
 >
 > • Guided CSV, JSON, and Excel import with field mapping, validation, and dry runs
-> • Production warnings and typed confirmation before writes
+> • Per-row results, an error file you can fix and retry, and undo
+> • Production warnings and typed confirmation before every write
 >
 > ADVANCED
 >
@@ -64,6 +70,8 @@ The summary comes from `public/_locales/en/messages.json` (`extDescription`) and
 > PRIVATE BY DESIGN
 >
 > WaveLink has no analytics, telemetry, advertising, or WaveLink backend. Your records stay in your browser and are exchanged only with the Salesforce orgs you select. Source code: https://github.com/Exotic209093/WaveLink
+>
+> Feedback and bug reports: Help → Feedback & Support inside the extension, or https://github.com/Exotic209093/WaveLink/issues
 >
 > Uses your existing Salesforce browser session. WaveLink is independent and is not affiliated with or endorsed by Salesforce, Inc.
 
@@ -83,7 +91,7 @@ reuse the English set.
 
 ### Release notes
 
-> WaveLink 0.7.0 is the "data you can trust" release — every known data-corruption, automation, and security defect from the August audit is fixed:
+> WaveLink 1.0 is the trust release. Every known data-corruption, automation, and security defect from a full audit is fixed, each with a regression test:
 >
 > • Imports push exactly the file and rows you reviewed; retry and error files target the right rows
 > • Bulk imports keep every column, clear fields correctly, and report per-row results
@@ -92,6 +100,9 @@ reuse the English set.
 > • Schedules survive browser restarts and fire on time in your time zone
 > • Session tokens no longer stored at rest; exports neutralise spreadsheet formulas
 > • Exports keep every column, non-ASCII text, and REST-consistent value types
+> • New: Help → Feedback & Support links for bug reports, feature requests, and reviews
+> • Meet Wavey, WaveLink's mascot, in empty and success states
+> • Extension name and summary in nine languages
 
 If no release-notes field is shown, keep this text for the submission notes rather than appending it to the permanent description.
 
@@ -110,16 +121,18 @@ Upload in this order:
 | Small promo | `screenshots/promo-small-440x280.png` | 440×280 | Required promotional tile |
 | Marquee promo | `screenshots/promo-marquee-1400x560.png` | 1400×560 | Optional large promotional tile |
 
-All screenshots are captures of v0.6.0 at the required dimensions; the 0.7.0 changes are fixes with no visible layout change on these screens. Organisation, user, and record identifiers are redacted. Regenerate promotional graphics with `npm run assets:store`.
+All screenshots are captures of the v1.0.0 build at the required dimensions, using fictional demo data. Regenerate promotional graphics with `npm run assets:store`.
 
 ### Promo video
 
-The store accepts a YouTube link, not a file. Upload the 25-second calm cut
-(`promo/brag/2026-10-04-launch-0.7/brag.mp4`) to
-YouTube as **Unlisted**, titled "WaveLink — Salesforce data, right in your
-browser", then paste the YouTube URL into **Store listing → Promo video**. The
-same link works for every language listing. The voiceover was generated on an
-ElevenLabs free plan; confirm its licence terms allow promotional use first.
+The store accepts a YouTube link, not a file. Upload the 30-second motion cut
+(`promo/motion/output/cut-30/wavelink-30s.mp4`) to YouTube as **Unlisted**,
+titled "WaveLink 1.0 — Salesforce backups and exports, right in your browser",
+then paste the YouTube URL into **Store listing → Promo video**. The same link
+works for every language listing. The soundtrack is original (synthesised in
+`promo/motion/audio.py`), so no licence check is needed. The older voiced cut
+(`promo/brag/2026-10-04-launch-0.7/brag.mp4`) uses an ElevenLabs free-plan
+voice; confirm its licence before using it instead.
 
 ## Privacy practices
 
@@ -197,14 +210,16 @@ The repository must be pushed before saving this URL so reviewers can reach the 
 
 ## Final submission checklist
 
-- [ ] Push the v0.7.3 code and public privacy policy to `main`.
+- [ ] Merge the v1.0.0 release PR so the code and public privacy policy are on `main`.
 - [ ] Confirm the privacy-policy URL loads while signed out of GitHub.
-- [ ] Upload `wavelink-0.7.3.zip` and confirm version 0.7.3 is detected.
+- [ ] Run the packaged-extension browser check on `wavelink-1.0.0.zip` (load unpacked, connect a dev org, export, import dry run, Help → Report a bug opens the form with the version filled in).
+- [ ] Upload `wavelink-1.0.0.zip` and confirm version 1.0.0 is detected.
 - [ ] Replace the description with the text in this file.
 - [ ] Upload all five screenshots in the documented order.
 - [ ] Upload the icon and promotional tiles.
 - [ ] Verify category, language, homepage, support URL, and privacy URL.
 - [ ] Reconfirm every permission and data-use declaration against the uploaded package.
-- [ ] Add the v0.7.0 release notes where the dashboard permits.
+- [ ] Upload the 30-second video to YouTube (unlisted) and paste the link.
+- [ ] Add the v1.0.0 release notes where the dashboard permits.
 - [ ] Preview the public listing at desktop width and check every image crop.
 - [ ] Save the draft, review the dashboard's warnings, and submit only after a final joint check.

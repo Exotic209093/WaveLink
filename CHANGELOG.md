@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-10-22
+
+The trust release. 1.0.0 ships the code from 0.7.0–0.7.3 to the Chrome Web
+Store; 0.7.x was tagged on GitHub but never uploaded, so this is the first store
+update since 0.6.0. Every item in the roadmap's 1.0 release gate is met: all
+audit issues (#40–#106) are closed with regression tests, schedules survive
+worker restarts, tokens are not stored at rest, every navigable screen has an
+interaction test, and the store-facing docs match the code.
+
+### Added
+- **Feedback & Support in Help** — opt-in links to report a bug (the GitHub form
+  is pre-filled with the installed version only), request a feature, or rate
+  WaveLink on the Chrome Web Store. Nothing is sent automatically.
+
+### Fixed
+- Home → Schedules & snapshots showed "just now" for every upcoming run; it now
+  shows the time until the next run (for example "in 7d").
+- Jobs & Activity no longer shows an internal design note under "Activity trail".
+
+### Changed
+- Store listing leads with scheduled local backups and snapshot diff, with
+  screenshots recaptured from the 1.0.0 build and the 30-second promo video.
+- `docs/metrics-log.md` starts the weekly store and repository metrics log.
+
 ## [0.7.3] — 2026-10-05
 
 ### Added
@@ -138,6 +162,7 @@ in and out of Salesforce right from your browser, with nothing leaving your devi
 
 - Initial release.
 
+[1.0.0]: https://github.com/Exotic209093/WaveLink/releases/tag/v1.0.0
 [0.7.3]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.3
 [0.7.2]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.2
 [0.7.1]: https://github.com/Exotic209093/WaveLink/releases/tag/v0.7.1

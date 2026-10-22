@@ -6,6 +6,8 @@
  * - Each category card lists topics that link to the relevant application screen.
  * - Provides a "Restart Tutorial" button that resets onboarding progress and
  *   opens the OnboardingWizard overlay.
+ * - Offers opt-in feedback links (GitHub issue forms and the store review page).
+ *   Nothing is sent automatically; the links only open in a new tab.
  *
  * Complexity:
  * - O(S) where S is the number of onboarding steps for filtering and rendering.
@@ -51,6 +53,31 @@ const HELP_CATEGORIES: Array<{
     filter: (s) => s.category === 'advanced',
   },
 ];
+
+const REPO_URL = 'https://github.com/Exotic209093/WaveLink';
+const STORE_URL = 'https://chromewebstore.google.com/detail/wavelink/ccknhhibbedolfnbgnenomdohlmojblo';
+
+/** Installed extension version, or '' outside a packaged extension. */
+function extensionVersion(): string {
+  try {
+    return chrome.runtime.getManifest().version ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Opt-in feedback destinations. The bug form is pre-filled with the installed
+ * version only — never org, user, or record data.
+ */
+export function feedbackLinks(version: string): Array<{ label: string; href: string; description: string }> {
+  const bugUrl = `${REPO_URL}/issues/new?template=bug_report.yml${version ? `&version=${encodeURIComponent(version)}` : ''}`;
+  return [
+    { label: 'Report a bug', href: bugUrl, description: 'Opens a GitHub issue form.' },
+    { label: 'Request a feature', href: `${REPO_URL}/issues/new?template=feature_request.yml`, description: 'Tell us about a workflow WaveLink should handle.' },
+    { label: 'Rate WaveLink', href: `${STORE_URL}/reviews`, description: 'An honest Chrome Web Store review helps other admins find it.' },
+  ];
+}
 
 /** Static help topics for the Data Cleanser category (not in ONBOARDING_STEPS). */
 const CLEANSER_TOPICS = [
@@ -211,6 +238,31 @@ export function HelpScreen(props: {
             <button class="wl-btn" onClick={() => onNavigate(APP_ROUTES.advancedSchemaCompare)}>Schema Compare</button>
             <button class="wl-btn" onClick={() => onNavigate(APP_ROUTES.advancedRelationships)}>Relationships</button>
           </div>
+        </div>
+      </div>
+
+      {/* Feedback */}
+      <div class="wl-card">
+        <div class="wl-cardHeader">
+          <h2>Feedback &amp; Support</h2>
+        </div>
+        <div class="wl-muted" style="margin-bottom:8px">
+          Links open in a new tab. WaveLink sends nothing on its own — please never paste record data,
+          session tokens, or org IDs into a report.
+        </div>
+        <div class="wl-actions" style="flex-wrap:wrap">
+          {feedbackLinks(extensionVersion()).map((link) => (
+            <a
+              key={link.label}
+              class="wl-btn"
+              href={link.href}
+              target="_blank"
+              rel="noreferrer"
+              title={link.description}
+            >
+              {link.label}
+            </a>
+          ))}
         </div>
       </div>
 
