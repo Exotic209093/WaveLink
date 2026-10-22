@@ -10,6 +10,9 @@
 //   node promo/motion/render.mjs --cues-only  export the cue map + music section plan only
 //   node promo/motion/render.mjs --music track.mp3 [--music-start 31.5]   produced bed (Suno/ElevenLabs)
 //   options: --fps 30  --crf 14  --out path.mp4  --safe 64 (px)  --no-audit  --force
+//   other compositions: --src wavelink-v1.html --format landscape|vertical [--duration 30] [--out-dir dir]
+//     (format sets the viewport: 1920x1080 or 1080x1920; --duration asserts the composition length;
+//      outputs default to output/<src>-<format>/; stills come from __wl.stills when it exists)
 //
 // Needs Node 22+ (built-in WebSocket), Chrome/Edge/Chromium, and ffmpeg.
 // Overrides: CHROME_PATH, FFMPEG_PATH, PYTHON. Audio needs Python with numpy + imageio-ffmpeg
@@ -25,10 +28,17 @@ const argv = process.argv.slice(2);
 const flag = (n) => argv.includes(`--${n}`);
 const opt = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] : d; };
 const CUT = +opt('cut', 15) === 30 ? 30 : 15;
-const OUT_DIR = path.join(HERE, 'output', ...(CUT === 30 ? ['cut-30'] : []));
+const SRC = opt('src', 'wavelink-15s.html');
+const CUSTOM = path.basename(SRC) !== 'wavelink-15s.html';
+const FORMAT = opt('format', 'landscape') === 'vertical' ? 'vertical' : 'landscape';
+const [VW, VH] = FORMAT === 'vertical' ? [1080, 1920] : [1920, 1080];
+const STEM = path.basename(SRC, '.html');
+const OUT_DIR = opt('out-dir') ? path.resolve(opt('out-dir'))
+  : CUSTOM ? path.join(HERE, 'output', `${STEM}-${FORMAT}`)
+  : path.join(HERE, 'output', ...(CUT === 30 ? ['cut-30'] : []));
 const FPS = +opt('fps', 60);
 const CRF = opt('crf', '14');
-const OUT = path.resolve(opt('out', path.join(OUT_DIR, `wavelink-${CUT}s.mp4`)));
+const OUT = path.resolve(opt('out', path.join(OUT_DIR, CUSTOM ? `${STEM}-${FORMAT}.mp4` : `wavelink-${CUT}s.mp4`)));
 const BUILD = path.join(OUT_DIR, 'build');
 const AUDIO_DIR = path.join(OUT_DIR, 'audio');
 const SILENT = path.join(BUILD, 'picture.mp4');
@@ -103,7 +113,7 @@ async function launch() {
   const proc = spawn(findChrome(), [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--mute-audio',
-    '--force-device-scale-factor=1', '--window-size=1920,1080', '--force-color-profile=srgb',
+    '--force-device-scale-factor=1', `--window-size=${VW},${VH}`, '--force-color-profile=srgb',
     '--allow-file-access-from-files', '--disable-background-timer-throttling',
     '--disable-renderer-backgrounding', 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -133,12 +143,17 @@ async function launch() {
 
 async function openComposition(cdp) {
   await cdp.send('Page.enable');
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: VW, height: VH, deviceScaleFactor: 1, mobile: false });
   const loaded = cdp.once('Page.loadEventFired');
-  await cdp.send('Page.navigate', { url: `${pathToFileURL(path.join(HERE, 'wavelink-15s.html')).href}?render${CUT === 30 ? '&cut=30' : ''}` });
+  const query = CUSTOM
+    ? `?render&format=${FORMAT}&out=${encodeURIComponent(path.relative(HERE, OUT_DIR).split(path.sep).join('/') + '/')}`
+    : `?render${CUT === 30 ? '&cut=30' : ''}`;
+  await cdp.send('Page.navigate', { url: `${pathToFileURL(path.resolve(HERE, SRC)).href}${query}` });
   await loaded;
   await cdp.eval('window.__wl.ready');
-  return cdp.eval('({ d: __wl.duration, fonts: __wl.fonts(), face: getComputedStyle(document.getElementById("s1-title")).fontFamily })');
+  const info = await cdp.eval('({ d: __wl.duration, fonts: __wl.fonts(), face: getComputedStyle(document.getElementById("s1-title") || document.body).fontFamily })');
+  if (opt('duration') && Math.abs(+opt('duration') - info.d) > 1e-6) throw new Error(`--duration ${opt('duration')} but ${SRC} (${FORMAT}) runs ${info.d}s`);
+  return info;
 }
 
 async function shot(cdp, t) {
@@ -171,7 +186,7 @@ async function main() {
   const { cdp, stop } = await launch();
   try {
     let info = await openComposition(cdp);
-    console.log(`composition: ${info.d}s @ 1920x1080, ${FPS} fps`);
+    console.log(`composition: ${CUSTOM ? `${SRC} (${FORMAT}) ` : ''}${info.d}s @ ${VW}x${VH}, ${FPS} fps`);
 
     const audio = !flag('no-audio') && !flag('audit') && !flag('stills');
     if (audio) {
@@ -202,13 +217,15 @@ async function main() {
     if (flag('stills')) {
       const dir = path.join(OUT_DIR, 'stills');
       rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
-      for (const [i, t] of STILL_TIMES.entries()) {
+      const stills = (await cdp.eval('window.__wl.stills || null')) || STILL_TIMES;
+      const tile = (await cdp.eval('window.__wl.sheet || null')) || '4x4';
+      for (const [i, t] of stills.entries()) {
         writeFileSync(path.join(dir, `${String(i).padStart(2, '0')}.png`), await shot(cdp, t));
       }
       execFileSync(findFfmpeg(), ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', '1', '-i', '%02d.png',
-        '-vf', 'scale=480:-1,tile=4x4:padding=6:color=0x222222', '-frames:v', '1', path.join(OUT_DIR, 'contact-sheet.jpg')],
+        '-vf', `scale=${VW > VH ? 480 : 270}:-1,tile=${tile}:padding=6:color=0x222222`, '-frames:v', '1', path.join(OUT_DIR, 'contact-sheet.jpg')],
         { cwd: dir, stdio: 'inherit' });
-      console.log(STILL_TIMES.map((t, i) => `  ${String(i).padStart(2, '0')}.png  t=${t}s`).join('\n'));
+      console.log(stills.map((t, i) => `  ${String(i).padStart(2, '0')}.png  t=${t}s`).join('\n'));
       console.log(`stills → ${dir}\ncontact sheet → ${path.join(OUT_DIR, 'contact-sheet.jpg')}`);
       return;
     }

@@ -103,12 +103,13 @@ def fade(n, start, length, out=True):
     g = np.ones(n)
     i0, i1 = int(start * SR), int((start + length) * SR)
     ramp = 0.5 + 0.5 * np.cos(np.linspace(0, np.pi, max(i1 - i0, 1)))
+    a, b = max(i0, 0), max(min(i1, n), 0)  # clip to the buffer (a fade may start before it)
     if out:
-        g[i0:i1] = ramp[: max(0, min(i1, n) - i0)]
-        g[i1:] = 0
+        g[a:b] = ramp[a - i0: b - i0]
+        g[max(i1, 0):] = 0
     else:
-        g[:i0] = 0
-        g[i0:i1] = ramp[::-1][: max(0, min(i1, n) - i0)]
+        g[:a] = 0
+        g[a:b] = ramp[::-1][a - i0: b - i0]
     return g
 
 

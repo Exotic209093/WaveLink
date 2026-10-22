@@ -1,6 +1,7 @@
 """Generate a music bed for the 15s promo with the ElevenLabs Music API.
 
     python promo/motion/elevenlabs_music.py [--takes 2] [--style viral|keynote|hard] [--cut 15|30]
+    python promo/motion/elevenlabs_music.py --audio-dir promo/motion/output/v1/landscape/audio   (other compositions)
 
 Reads ELEVENLABS_API_KEY from the environment (never from the repo). Uses a
 composition plan whose section durations match the scene cuts in cues.json, so
@@ -33,7 +34,12 @@ STYLES = {
 NEGATIVE = ["vocals", "singing", "spoken word", "lo-fi", "muddy mix", "acoustic guitar", "long fade-in"]
 
 
+AUDIO_DIR = None  # --audio-dir override: any composition's audio folder (holding cues.json)
+
+
 def audio_dir(cut):
+    if AUDIO_DIR:
+        return AUDIO_DIR
     return HERE / "output" / ("cut-30" if cut == 30 else "") / "audio"
 
 
@@ -96,7 +102,10 @@ def main():
     ap.add_argument("--style", choices=STYLES, default="viral")
     ap.add_argument("--model", default="music_v1")
     ap.add_argument("--cut", type=int, choices=(15, 30), default=15)
+    ap.add_argument("--audio-dir", help="audio folder with cues.json (default: the 15s/30s cut's)")
     args = ap.parse_args()
+    global AUDIO_DIR
+    AUDIO_DIR = Path(args.audio_dir).resolve() if args.audio_dir else None
     key = os.environ.get("ELEVENLABS_API_KEY")
     if not key:
         sys.exit("Set ELEVENLABS_API_KEY in the environment.")
