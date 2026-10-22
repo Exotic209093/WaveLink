@@ -14,3 +14,5 @@ motion/output/**/audio/candidates/*
 !motion/output/cut-30/audio/candidates/eleven-viral-1.mp3
 
 __pycache__/
+!motion/output/v1/landscape/audio/candidates/eleven-viral-2.mp3
+!motion/output/v1/vertical/audio/candidates/eleven-viral-2.mp3
