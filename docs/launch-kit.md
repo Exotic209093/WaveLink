@@ -20,7 +20,9 @@ log the numbers in [`metrics-log.md`](metrics-log.md).
 
 ## Before posting anywhere
 
-1. **Ship 1.0.0 first.** The store still serves 0.6.0. 1.0.0 contains every
+Steps 1 and 2 are done: the store has served 1.0.0 since 2026-10-23.
+
+1. **Ship 1.0.0 first.** The store served 0.6.0 until 2026-10-23. 1.0.0 contains every
    audit fix (import, schedules, security, export fidelity) plus the Help →
    Feedback & Support links, so launch traffic has somewhere to report bugs.
    Follow the submission checklist in [`CHROME_WEB_STORE.md`](CHROME_WEB_STORE.md).
@@ -65,14 +67,12 @@ captures of the 1.0.0 build.
 
 | Use | File | Length |
 |---|---|---:|
-| Store listing (unlisted YouTube link) | `promo/motion/output/cut-30/wavelink-30s.mp4` | 30 s |
-| LinkedIn native upload | `promo/motion/output/cut-30/wavelink-30s.mp4` | 30 s |
-| Short loops (Reddit, Discord, replies) | `promo/motion/output/wavelink-15s.mp4` | 15 s |
-| Voiced walkthrough (optional) | `promo/brag/2026-10-04-launch-0.7/brag.mp4` | 25 s |
+| LinkedIn native upload | `promo/motion/output/v1/share/wavelink-1.0-30s-share.mp4` | 30 s |
+| Short loops (Reddit, Discord, replies) | `promo/motion/output/v1/share/wavelink-1.0-15s-vertical-share.mp4` | 15 s |
+| Full-quality masters (60 fps) | `promo/motion/output/v1/wavelink-1.0-30s.mp4`, `wavelink-1.0-15s-vertical.mp4` | |
 
-The 30-second cut is the roadmap's "30-second demo video". The voiced cut uses
-an ElevenLabs free-tier voice; confirm its licence allows promotional use before
-publishing it.
+The `share/` copies are 30 fps H.264 Main and play smoothly in every player and
+upload form; use them for posts. The 1.0 listing has no YouTube video.
 
 ### Other languages
 
@@ -104,6 +104,18 @@ Space the posts over a week rather than one day, and reply to every comment
 within a few hours; early engagement drives most of the reach. Suggested order:
 Reddit (day 1), LinkedIn personal (day 2), SFXD and Trailblazer (days 3–4),
 company page (day 5), Stack Exchange answers on an ongoing basis.
+
+Schedule for 1.0 (posted by scheduled agent runs; SFXD and Stack Exchange stay
+manual because Discord forbids automated user accounts and Stack Exchange bans
+AI-generated answers):
+
+| Date | Channel |
+|---|---|
+| Tue 2026-10-27 | Reddit r/salesforce |
+| Wed 2026-10-28 | LinkedIn personal |
+| Thu 2026-10-29 | Trailblazer Community (SFXD by hand) |
+| Fri 2026-10-30 | LinkedIn company page |
+| Tue 2026-11-03 | Review-request drafts |
 
 ### Reddit — r/salesforce
 
