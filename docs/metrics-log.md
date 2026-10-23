@@ -28,3 +28,4 @@ US ChromeOS trickle that never turns into users (see
 | Week of | Store version | Weekly users | Impressions | Listing views | Installs | Uninstalls | Reviews (avg) | Stars | Repo views / uniques | Issues opened | Notes |
 |---|---|---:|---:|---:|---:|---:|---|---:|---|---:|---|
 | 2026-09-28 | 0.6.0 | 15 | ~20 | ~4 | — | — | 0 | 1 | — | 0 | Baseline from the 30-day figures to 2026-10-02 (87 impressions, 16 views ÷ ~4.3). |
+| 2026-10-23 | 1.0.0 | 15 | ~15 | ~3 | ~12 | 0 | 1 (5.0) | 1 | 1 / 1 | 0 | Launch day: 1.0.0 live on the store. Dashboard data runs to 2026-10-21, so figures are the 30-day totals ÷ ~4.3 (66 impressions, 13 views, 50 installs, mostly US ChromeOS). Listing shows 17 users. No campaign traffic yet. |
