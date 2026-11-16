@@ -25,6 +25,12 @@ const config = (_env: unknown, argv: { mode?: string }): Configuration => ({
   module: {
     rules: [
       {
+        // The UI stylesheet is a template-literal string Terser cannot minify.
+        test: /src[\\/]ui[\\/]styles[\\/]uiCss\.ts$/,
+        enforce: 'pre',
+        use: path.resolve(__dirname, 'scripts/css-string-minify-loader.js'),
+      },
+      {
         test: /\.tsx?$/,
         use: {
           loader: 'ts-loader',

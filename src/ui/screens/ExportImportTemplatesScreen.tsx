@@ -111,7 +111,6 @@ export function ExportImportTemplatesScreen(props: {
     <div>
       <div class="wl-pageHeader">
         <div class="wl-pageHeader__main">
-          <span class="wl-pageHeader__eyebrow">Templates</span>
           <h1 class="wl-pageHeader__title">Saved export & import templates</h1>
           <p class="wl-pageHeader__sub">
             Save your most-used queries and mappings so you can run them again with one click.

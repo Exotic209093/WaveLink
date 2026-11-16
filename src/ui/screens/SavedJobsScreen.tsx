@@ -84,7 +84,6 @@ export function SavedJobsScreen(props: {
     <div>
       <header class="wl-pageHeader">
         <div class="wl-pageHeader__main">
-          <span class="wl-pageHeader__eyebrow">Saved Jobs</span>
           <h1 class="wl-pageHeader__title">Repeat trusted workflows</h1>
           <p class="wl-pageHeader__sub">Versioned export, import, and schedule configurations. Portable files contain no credentials or customer records.</p>
         </div>

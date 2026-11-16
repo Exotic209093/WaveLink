@@ -40,6 +40,26 @@ export interface AppShellContext {
   environment?: 'production' | 'sandbox';
 }
 
+export type EnvBandKey = 'production' | 'sandbox' | 'unknown' | 'none';
+
+/**
+ * Text for the environment band at the top of the shell. The band is the one
+ * place the UI always says which kind of org a write will reach; it carries a
+ * text label so it never relies on color alone.
+ */
+export function envBandState(context?: AppShellContext): { key: EnvBandKey; label: string; note: string } {
+  if (!context?.instanceUrl && !context?.orgId) {
+    return { key: 'none', label: 'No org connected', note: 'Open a Salesforce tab to connect.' };
+  }
+  if (context.environment === 'production') {
+    return { key: 'production', label: 'Production', note: 'Imports, updates and deletes change live data.' };
+  }
+  if (context.environment === 'sandbox') {
+    return { key: 'sandbox', label: 'Sandbox', note: 'Changes stay in this sandbox.' };
+  }
+  return { key: 'unknown', label: 'Org type not detected', note: 'Treat writes as live until you confirm the org.' };
+}
+
 export function AppShell(props: {
   mode: 'app' | 'panel' | 'popup';
   context?: AppShellContext;
@@ -66,8 +86,16 @@ export function AppShell(props: {
   const itemIsActive = (item: NavItem): boolean =>
     route === item.key || Boolean(item.activeRoutes?.some(activeRoute => route === activeRoute || route.startsWith(`${activeRoute}/`)));
 
+  const env = envBandState(context);
+
   return (
-    <div class="wl-app" data-mode={mode}>
+    <div class="wl-app" data-mode={mode} data-env={env.key}>
+      {mode !== 'popup' ? (
+        <div class="wl-envBand" data-env={env.key} role="status">
+          <strong class="wl-envBand__label">{env.label}</strong>
+          <span class="wl-envBand__note">{env.note}</span>
+        </div>
+      ) : null}
       <div class="wl-topbar">
         <div class="wl-brand">
           <span class="wl-brandMark" aria-hidden="true"><Icon name="activity" size={14} /></span>

@@ -255,7 +255,7 @@ export function ResultsGrid(props: {
         style="max-height:480px;overflow:auto"
         onScroll={handleScroll}
       >
-        <table class="wl-table" style="table-layout:fixed">
+        <table class="wl-table wl-resultsTable" style="table-layout:fixed">
           <thead>
             <tr>
               {visibleCols.map((c, ci) => (

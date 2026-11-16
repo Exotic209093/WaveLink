@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Environment band** — a strip across the top of the app and the in-page panel
+  says which kind of org you are working in: crimson for Production ("Imports,
+  updates and deletes change live data"), slate for Sandbox, and a warning tone
+  when the org type is not detected. It always carries a text label.
+
+### Changed
+- **New look.** Flat panels on a cool background replace the stacked cards,
+  shadows and blur; navigation uses text tabs; page titles drop the repeated
+  all-caps label above them. Light and dark themes share one set of colour tokens,
+  and every text colour now meets WCAG AA (the old brand teal on white was 4.3:1).
+- **Atkinson Hyperlegible** (bundled, no network fetch) replaces the system font.
+  It keeps 0/O and 1/l/I distinct in record IDs; field API names in result grids
+  now show as written (`BillingCity`, not `BILLINGCITY`).
+- **Home** is now a work surface: start an export, import or conversion; see
+  recent runs with written/failed counts and a result bar; see scheduled backups.
+- The UI stylesheet is minified at build time and 74 unused rules were removed,
+  so the app, popup and content bundles are about 10 KiB smaller.
+
+### Fixed
+- Several colour tokens (for example success and warning colours) were only
+  defined for dark mode, and the panel header used an undefined surface colour.
+- The top bar overflowed sideways on narrow windows.
+
 ## [1.0.0] — 2026-10-22
 
 The trust release. 1.0.0 ships the code from 0.7.0–0.7.3 to the Chrome Web

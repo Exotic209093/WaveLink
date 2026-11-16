@@ -68,7 +68,6 @@ export function AdvancedLabScreen(props: { onNavigate: (route: string) => void }
     <div>
       <div class="wl-pageHeader">
         <div class="wl-pageHeader__main">
-          <span class="wl-pageHeader__eyebrow">Advanced</span>
           <h1 class="wl-pageHeader__title">Advanced tools</h1>
           <p class="wl-pageHeader__sub">
             Schema analysis, data quality, and bulk operations that complement the export/import flow.

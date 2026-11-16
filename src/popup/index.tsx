@@ -14,9 +14,11 @@
 
 import { h, render } from 'preact';
 import { uiCss } from '../ui/styles/uiCss';
+import { fontsCss } from '../ui/styles/fontsCss';
 import { injectCss } from '../ui/utils/injectCss';
 import { PopupRoot } from '../ui/popup/PopupRoot';
 
+injectCss(document, fontsCss, 'wavelink-fonts');
 injectCss(document, uiCss, 'wavelink-ui');
 
 const root = document.getElementById('root');

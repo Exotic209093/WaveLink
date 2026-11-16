@@ -41,7 +41,6 @@ export function ImportScreen(props: {
     <div>
       <div class="wl-pageHeader">
         <div class="wl-pageHeader__main">
-          <span class="wl-pageHeader__eyebrow">Import</span>
           <h1 class="wl-pageHeader__title">Import records into Salesforce</h1>
           <p class="wl-pageHeader__sub">
             Drop a CSV, Excel, or JSON file in. Auto-map headers to fields, transform and validate, then insert / update / upsert.

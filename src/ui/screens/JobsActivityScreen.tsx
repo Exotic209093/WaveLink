@@ -162,7 +162,7 @@ export function JobsActivityScreen(props: { sf: SfApi; onNavigate: (route: strin
   }
 
   return <div>
-    <header class="wl-pageHeader"><div class="wl-pageHeader__main"><span class="wl-pageHeader__eyebrow">Jobs & Activity</span><h1 class="wl-pageHeader__title">Repeat, monitor, and recover work</h1><p class="wl-pageHeader__sub">One auditable center for writes, scheduled runs, results, undo windows, and durable recovery checkpoints.</p></div><div class="wl-pageHeader__actions"><button class="wl-buttonNeutral" onClick={refresh}>Refresh</button></div></header>
+    <header class="wl-pageHeader"><div class="wl-pageHeader__main"><h1 class="wl-pageHeader__title">Repeat, monitor, and recover work</h1><p class="wl-pageHeader__sub">One auditable center for writes, scheduled runs, results, undo windows, and durable recovery checkpoints.</p></div><div class="wl-pageHeader__actions"><button class="wl-buttonNeutral" onClick={refresh}>Refresh</button></div></header>
 
     <div class="wl-hubGrid" style="margin-bottom:20px">
       <button class="wl-hubCard" onClick={() => props.onNavigate('templates')}><div class="wl-hubCard__icon"><Icon name="folder" /></div><h2 class="wl-hubCard__title">Saved jobs</h2><p class="wl-hubCard__desc">Reuse versioned export and import configurations.</p><span class="wl-hubCard__cta">Open saved jobs</span></button>

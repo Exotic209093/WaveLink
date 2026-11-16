@@ -27,7 +27,6 @@ export function CompareScreen(props: { sf: SfApi; initialMode?: CompareMode }): 
     <div>
       <div class="wl-pageHeader">
         <div class="wl-pageHeader__main">
-          <span class="wl-pageHeader__eyebrow">Compare</span>
           <h1 class="wl-pageHeader__title">Compare data</h1>
           <p class="wl-pageHeader__sub">
             See what's been added, removed, or changed — between two local files / snapshots, or
