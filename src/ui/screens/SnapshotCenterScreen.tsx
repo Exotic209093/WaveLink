@@ -109,7 +109,7 @@ export function SnapshotCenterScreen(props: {
   return (
     <div>
       <header class="wl-pageHeader">
-        <div class="wl-pageHeader__main"><span class="wl-pageHeader__eyebrow">Snapshot Center</span><h1 class="wl-pageHeader__title">Browse, download, and compare snapshots</h1><p class="wl-pageHeader__sub">A local timeline by job, org, object, and status. Pin important baselines and turn reviewed differences into an Import job.</p></div>
+        <div class="wl-pageHeader__main"><h1 class="wl-pageHeader__title">Browse, download, and compare snapshots</h1><p class="wl-pageHeader__sub">A local timeline by job, org, object, and status. Pin important baselines and turn reviewed differences into an Import job.</p></div>
         <div class="wl-pageHeader__actions"><button class="wl-buttonBrand" onClick={props.onOpenSchedules}>Manage schedules</button></div>
       </header>
 

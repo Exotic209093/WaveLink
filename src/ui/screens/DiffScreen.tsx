@@ -154,7 +154,6 @@ export function DiffScreen(props: { hideHeader?: boolean } = {}): VNode {
       {props.hideHeader ? null : (
         <div class="wl-pageHeader">
           <div class="wl-pageHeader__main">
-            <span class="wl-pageHeader__eyebrow">Diff</span>
             <h1 class="wl-pageHeader__title">Compare two exports</h1>
             <p class="wl-pageHeader__sub">
               Pick two snapshots or files, choose a key field, and see what's been added, removed, or changed.

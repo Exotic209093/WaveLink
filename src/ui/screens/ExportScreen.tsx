@@ -176,7 +176,6 @@ export function ExportScreen(props: {
     <div>
       <div class="wl-pageHeader">
         <div class="wl-pageHeader__main">
-          <span class="wl-pageHeader__eyebrow">Export</span>
           <h1 class="wl-pageHeader__title">Export records out of Salesforce</h1>
           <p class="wl-pageHeader__sub">
             Run a SOQL query, preview results, then download as CSV, JSON, Excel, or XML.

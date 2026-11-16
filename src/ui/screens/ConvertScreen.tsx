@@ -90,7 +90,6 @@ export function ConvertScreen(): VNode {
     <div>
       <div class="wl-pageHeader">
         <div class="wl-pageHeader__main">
-          <span class="wl-pageHeader__eyebrow">Convert</span>
           <h1 class="wl-pageHeader__title">Format converter</h1>
           <p class="wl-pageHeader__sub">
             Drop a file in, pick an output format, get a download. Works fully offline — no Salesforce connection needed.

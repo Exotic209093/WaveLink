@@ -208,7 +208,6 @@ export function SchedulesScreen(props: { sf: SfApi; draft?: ScheduleDraft; onDra
     <div>
       <div class="wl-pageHeader">
         <div class="wl-pageHeader__main">
-          <span class="wl-pageHeader__eyebrow">Schedules</span>
           <h1 class="wl-pageHeader__title">Scheduled exports</h1>
           <p class="wl-pageHeader__sub">
             Run SOQL exports on a cadence. Snapshots are stored locally and can be downloaded or diffed.
